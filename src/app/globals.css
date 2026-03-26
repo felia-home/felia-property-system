@@ -1,0 +1,32 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f2f1ed;
+  --surface: #ffffff;
+  --surface2: #f7f6f2;
+  --border: #e0deda;
+  --text: #1c1b18;
+  --muted: #706e68;
+  --hint: #a09e98;
+  --accent: #234f35;
+  --accent2: #1a3d28;
+  --accent-bg: #e6f0e9;
+  --amber: #8a5200;
+  --amber-bg: #fff3d6;
+  --red: #8c1f1f;
+  --red-bg: #fdeaea;
+  --blue: #1a3f6e;
+  --blue-bg: #e6effa;
+}
+
+body {
+  font-family: 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+a { color: inherit; text-decoration: none; }
