@@ -1,3 +1,11 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 // フェリアホーム 物件DB スキーマ（Phase 1 + 2対応版）
 // 前回のschema.prismaに以下のモデルを追加
 
