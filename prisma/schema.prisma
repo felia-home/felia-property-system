@@ -6,43 +6,104 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-// フェリアホーム 物件DB スキーマ（Phase 1 + 2対応版）
-// 前回のschema.prismaに以下のモデルを追加
+
+model Property {
+  id                  String    @id @default(cuid())
+  legacy_id           String?   @unique
+  property_type       String
+  status              String    @default("DRAFT")
+  title               String?
+  catch_copy          String?
+  prefecture          String    @default("東京都")
+  city                String
+  address             String    @default("")
+  price               Int
+  area_land_m2        Float?
+  area_build_m2       Float?
+  area_exclusive_m2   Float?
+  station_line        String?
+  station_name        String
+  station_walk        Int
+  building_year       Int?
+  building_month      Int?
+  structure           String?
+  rooms               String?
+  floors_total        Int?
+  floor_unit          Int?
+  delivery_timing     String?
+  reins_number        String?
+  city_plan           String?
+  use_zone            String?
+  bcr                 Float?
+  far                 Float?
+  private_road        Boolean   @default(false)
+  management_fee      Int?
+  repair_reserve      Int?
+  total_units         Int?
+  description_hp      String?
+  description_portal  String?
+  published_hp        Boolean   @default(false)
+  published_suumo     Boolean   @default(false)
+  published_athome    Boolean   @default(false)
+  published_at        DateTime?
+  compliance_checked  Boolean   @default(false)
+  compliance_checked_at DateTime?
+  compliance_result   Json?
+  agent_id            String?
+  is_deleted          Boolean   @default(false)
+  deleted_at          DateTime?
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  history             PropertyHistory[]
+  @@map("properties")
+}
+
+model PropertyHistory {
+  id             String   @id @default(cuid())
+  property_id    String
+  property       Property @relation(fields: [property_id], references: [id])
+  changed_by     String
+  change_type    String
+  changed_fields Json
+  note           String?
+  created_at     DateTime @default(now())
+  @@map("property_history")
+}
 
 model AdApproval {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   property_id      String
-  status           String   // DRAFT|REVIEW|PENDING|APPROVED|PUBLISHED_HP|PUBLISHED_ALL|SUSPENDED|SOLD
+  status           String
   approved_by      String?
   approved_at      DateTime?
-  publish_settings Json?    // { hp_public, hp_members_only, portal_suumo, portal_athome, portal_yahoo, portal_homes }
+  publish_settings Json?
   notes            String?
-  created_at       DateTime @default(now())
+  created_at       DateTime  @default(now())
   @@map("ad_approvals")
 }
 
 model SaleRecord {
-  id                 String   @id @default(cuid())
-  property_id        String   @unique
-  sold_price         Int
-  listed_price       Int
-  price_diff_pct     Float    // (sold_price - listed_price) / listed_price * 100
-  days_on_market     Int
-  inquiry_count      Int      @default(0)
-  viewing_count      Int      @default(0)
-  buyer_type         String?  // "individual" | "corporation" | "investor"
-  price_per_m2       Float?
-  sold_at            DateTime
-  agent_id           String?
-  season             String?  // "Q1" | "Q2" | "Q3" | "Q4"
-  property_snapshot  Json     // 成約時点の物件情報スナップショット
-  created_at         DateTime @default(now())
+  id                String   @id @default(cuid())
+  property_id       String   @unique
+  sold_price        Int
+  listed_price      Int
+  price_diff_pct    Float
+  days_on_market    Int
+  inquiry_count     Int      @default(0)
+  viewing_count     Int      @default(0)
+  buyer_type        String?
+  price_per_m2      Float?
+  sold_at           DateTime
+  agent_id          String?
+  season            String?
+  property_snapshot Json
+  created_at        DateTime @default(now())
   @@map("sale_records")
 }
 
 model CompetitorListing {
   id               String    @id @default(cuid())
-  source           String    // "suumo" | "athome" | "yahoo" | "homes"
+  source           String
   source_id        String
   property_type    String?
   address_city     String?
@@ -54,7 +115,7 @@ model CompetitorListing {
   first_seen_at    DateTime  @default(now())
   last_seen_at     DateTime  @default(now())
   sold_detected_at DateTime?
-  price_history    Json?     // [{ price: number, recorded_at: string }]
+  price_history    Json?
   @@unique([source, source_id])
   @@map("competitor_listings")
 }
@@ -65,7 +126,7 @@ model Viewing {
   customer_crm_id String
   agent_id        String?
   scheduled_at    DateTime
-  status          String   @default("scheduled") // "scheduled" | "completed" | "cancelled"
+  status          String   @default("scheduled")
   notes           String?
   feedback        String?
   google_event_id String?
@@ -76,7 +137,7 @@ model Viewing {
 model DocumentParseLog {
   id           String    @id @default(cuid())
   property_id  String?
-  source_type  String    // "pdf" | "image"
+  source_type  String
   source_url   String
   parse_result Json
   confidence   Json
@@ -88,10 +149,10 @@ model DocumentParseLog {
 
 model AuditLog {
   id          String   @id @default(cuid())
-  entity_type String   // "property" | "ad_approval" | "sale"
+  entity_type String
   entity_id   String
-  action      String   // "approve" | "publish" | "unpublish" | "sold" etc.
-  actor_id    String   // staff ID or "agent:{name}"
+  action      String
+  actor_id    String
   before      Json?
   after       Json?
   note        String?
