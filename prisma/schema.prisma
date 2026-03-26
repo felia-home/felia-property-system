@@ -1,0 +1,92 @@
+// フェリアホーム 物件DB スキーマ（Phase 1 + 2対応版）
+// 前回のschema.prismaに以下のモデルを追加
+
+model AdApproval {
+  id               String   @id @default(cuid())
+  property_id      String
+  status           String   // DRAFT|REVIEW|PENDING|APPROVED|PUBLISHED_HP|PUBLISHED_ALL|SUSPENDED|SOLD
+  approved_by      String?
+  approved_at      DateTime?
+  publish_settings Json?    // { hp_public, hp_members_only, portal_suumo, portal_athome, portal_yahoo, portal_homes }
+  notes            String?
+  created_at       DateTime @default(now())
+  @@map("ad_approvals")
+}
+
+model SaleRecord {
+  id                 String   @id @default(cuid())
+  property_id        String   @unique
+  sold_price         Int
+  listed_price       Int
+  price_diff_pct     Float    // (sold_price - listed_price) / listed_price * 100
+  days_on_market     Int
+  inquiry_count      Int      @default(0)
+  viewing_count      Int      @default(0)
+  buyer_type         String?  // "individual" | "corporation" | "investor"
+  price_per_m2       Float?
+  sold_at            DateTime
+  agent_id           String?
+  season             String?  // "Q1" | "Q2" | "Q3" | "Q4"
+  property_snapshot  Json     // 成約時点の物件情報スナップショット
+  created_at         DateTime @default(now())
+  @@map("sale_records")
+}
+
+model CompetitorListing {
+  id               String    @id @default(cuid())
+  source           String    // "suumo" | "athome" | "yahoo" | "homes"
+  source_id        String
+  property_type    String?
+  address_city     String?
+  station_name     String?
+  station_walk     Int?
+  price            Int?
+  area_m2          Float?
+  rooms            String?
+  first_seen_at    DateTime  @default(now())
+  last_seen_at     DateTime  @default(now())
+  sold_detected_at DateTime?
+  price_history    Json?     // [{ price: number, recorded_at: string }]
+  @@unique([source, source_id])
+  @@map("competitor_listings")
+}
+
+model Viewing {
+  id              String   @id @default(cuid())
+  property_id     String
+  customer_crm_id String
+  agent_id        String?
+  scheduled_at    DateTime
+  status          String   @default("scheduled") // "scheduled" | "completed" | "cancelled"
+  notes           String?
+  feedback        String?
+  google_event_id String?
+  created_at      DateTime @default(now())
+  @@map("viewings")
+}
+
+model DocumentParseLog {
+  id           String    @id @default(cuid())
+  property_id  String?
+  source_type  String    // "pdf" | "image"
+  source_url   String
+  parse_result Json
+  confidence   Json
+  confirmed_by String?
+  confirmed_at DateTime?
+  created_at   DateTime  @default(now())
+  @@map("document_parse_logs")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  entity_type String   // "property" | "ad_approval" | "sale"
+  entity_id   String
+  action      String   // "approve" | "publish" | "unpublish" | "sold" etc.
+  actor_id    String   // staff ID or "agent:{name}"
+  before      Json?
+  after       Json?
+  note        String?
+  created_at  DateTime @default(now())
+  @@map("audit_logs")
+}

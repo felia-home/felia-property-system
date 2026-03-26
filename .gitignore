@@ -1,0 +1,58 @@
+# =============================================================
+# フェリアホーム 物件情報管理システム — .gitignore
+# =============================================================
+
+# ===== 環境変数（絶対に commit しない） =====
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+
+# ===== Node.js =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== Next.js =====
+.next/
+out/
+build/
+
+# ===== TypeScript =====
+*.tsbuildinfo
+next-env.d.ts
+
+# ===== Prisma =====
+# generated client は git 管理外（npm run db:generate で再生成）
+# ただし schema.prisma と migrations/ は管理する
+
+# ===== テスト =====
+coverage/
+.vitest/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== エディタ =====
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# ===== ログ =====
+logs/
+*.log
+
+# ===== アップロードファイル（S3で管理） =====
+uploads/
+tmp/
+
+# ===== Prisma Studio =====
+.prisma/
+
+# ===== デプロイ設定（本番の秘密情報） =====
+.vercel
+.netlify

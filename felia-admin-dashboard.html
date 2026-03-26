@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>フェリアホーム 物件管理ダッシュボード</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f4f3ef;
+    --surface: #ffffff;
+    --surface2: #f9f8f5;
+    --border: #e4e2db;
+    --text: #1a1917;
+    --muted: #6b6963;
+    --accent: #2d5a3d;
+    --accent-light: #e8f0eb;
+    --amber: #92580a;
+    --amber-bg: #fef3dd;
+    --red: #9b2626;
+    --red-bg: #fdeaea;
+    --blue: #1a4a7a;
+    --blue-bg: #e8f0fa;
+    --gray: #5a5855;
+    --gray-bg: #f0efec;
+  }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* レイアウト */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* サイドバー */
+  .sidebar {
+    width: 220px;
+    background: var(--text);
+    color: #fff;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-logo {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .sidebar-logo .brand { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
+  .sidebar-logo .sub { font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 2px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .sidebar-nav { padding: 12px 0; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 20px; cursor: pointer;
+    color: rgba(255,255,255,0.6); font-size: 13px;
+    transition: all 0.15s;
+  }
+  .nav-item:hover { color: #fff; background: rgba(255,255,255,0.06); }
+  .nav-item.active { color: #fff; background: rgba(255,255,255,0.1); }
+  .nav-icon { width: 16px; height: 16px; opacity: 0.7; flex-shrink: 0; }
+  .nav-badge {
+    margin-left: auto;
+    background: #c0392b;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+  }
+
+  /* メインコンテンツ */
+  .main { flex: 1; overflow-x: hidden; }
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .topbar-title { font-size: 15px; font-weight: 500; }
+  .topbar-right { display: flex; align-items: center; gap: 16px; }
+  .topbar-date { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+
+  .content { padding: 28px; }
+
+  /* KPIカード */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+  }
+  .kpi-label { font-size: 11px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+  .kpi-value { font-size: 28px; font-weight: 700; line-height: 1; font-family: 'DM Mono', monospace; }
+  .kpi-unit { font-size: 13px; font-weight: 400; margin-left: 4px; color: var(--muted); }
+  .kpi-delta { font-size: 11px; margin-top: 6px; }
+  .kpi-delta.up { color: var(--accent); }
+  .kpi-delta.down { color: var(--red); }
+  .kpi-accent { position: absolute; top: 0; left: 0; width: 4px; height: 100%; border-radius: 12px 0 0 12px; }
+
+  /* セクションタイトル */
+  .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .section-title { font-size: 14px; font-weight: 500; }
+  .section-hint { font-size: 12px; color: var(--muted); }
+
+  /* 物件テーブル */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel-title { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left;
+    font-size: 11px; font-weight: 500;
+    color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 10px 16px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  td { padding: 13px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+
+  .property-name { font-weight: 500; font-size: 13px; }
+  .property-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* ステータスバッジ */
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .badge-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+  .badge-pending { background: var(--amber-bg); color: var(--amber); }
+  .badge-pending .badge-dot { background: var(--amber); }
+  .badge-approved { background: var(--accent-light); color: var(--accent); }
+  .badge-approved .badge-dot { background: var(--accent); }
+  .badge-published { background: var(--blue-bg); color: var(--blue); }
+  .badge-published .badge-dot { background: var(--blue); }
+  .badge-alert { background: var(--red-bg); color: var(--red); }
+  .badge-alert .badge-dot { background: var(--red); }
+  .badge-gray { background: var(--gray-bg); color: var(--gray); }
+  .badge-gray .badge-dot { background: var(--gray); }
+
+  /* ポータルタグ */
+  .portal-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .portal-tag {
+    font-size: 10px; padding: 2px 7px;
+    border-radius: 4px; font-family: 'DM Mono', monospace;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .portal-tag.on { background: var(--blue-bg); color: var(--blue); border-color: #b5cce8; }
+
+  /* ボタン */
+  .btn {
+    padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 500;
+    cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 5px;
+    transition: all 0.15s; white-space: nowrap; font-family: inherit;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #234a31; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { background: var(--surface2); }
+  .btn-danger { background: var(--red-bg); color: var(--red); }
+  .btn-danger:hover { background: #f9d4d4; }
+  .btn-sm { padding: 4px 10px; font-size: 11px; }
+
+  /* スコアバー */
+  .score-bar { display: flex; align-items: center; gap: 8px; }
+  .score-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 2px; }
+  .score-num { font-size: 11px; font-family: 'DM Mono', monospace; font-weight: 500; width: 32px; text-align: right; }
+
+  /* 成約アラートパネル */
+  .alert-row {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .alert-row:last-child { border-bottom: none; }
+  .alert-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: grid; place-items: center; flex-shrink: 0;
+    font-size: 14px;
+  }
+  .alert-icon.urgent { background: var(--red-bg); }
+  .alert-icon.alert { background: var(--amber-bg); }
+  .alert-body { flex: 1; }
+  .alert-title { font-size: 13px; font-weight: 500; }
+  .alert-signals { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .alert-score {
+    font-family: 'DM Mono', monospace;
+    font-size: 20px; font-weight: 700;
+    flex-shrink: 0; text-align: right;
+  }
+  .alert-score.urgent { color: var(--red); }
+  .alert-score.warn { color: var(--amber); }
+  .alert-actions { display: flex; gap: 6px; margin-top: 10px; }
+
+  /* タブ */
+  .tabs { display: flex; gap: 2px; padding: 4px; background: var(--surface2); border-radius: 9px; width: fit-content; margin-bottom: 20px; }
+  .tab { padding: 6px 16px; border-radius: 7px; font-size: 12px; font-weight: 500; cursor: pointer; color: var(--muted); transition: all 0.15s; }
+  .tab.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+  /* PDF取込エリア */
+  .upload-zone {
+    border: 2px dashed var(--border); border-radius: 12px;
+    padding: 40px; text-align: center;
+    cursor: pointer; transition: all 0.2s;
+    margin-bottom: 20px;
+  }
+  .upload-zone:hover { border-color: var(--accent); background: var(--accent-light); }
+  .upload-icon { font-size: 32px; margin-bottom: 12px; }
+  .upload-text { font-size: 14px; font-weight: 500; color: var(--text); }
+  .upload-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* 抽出プレビュー */
+  .extract-preview {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .extract-field { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .extract-field:last-child { border-bottom: none; }
+  .extract-key { width: 140px; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  .extract-val { flex: 1; font-size: 13px; font-weight: 500; }
+  .extract-conf { margin-left: 12px; }
+  .conf-high { color: var(--accent); font-size: 10px; }
+  .conf-medium { color: var(--amber); font-size: 10px; }
+  .conf-low { color: var(--red); font-size: 10px; }
+  .conf-low-val { background: var(--red-bg); color: var(--red); border-radius: 4px; padding: 1px 6px; }
+
+  /* グリッド */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- サイドバー -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="brand">Felia Home</div>
+      <div class="sub">Property Management</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity=".5"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".5"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".5"/></svg>
+        ダッシュボード
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M2 3h12M2 8h12M2 13h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        物件一覧
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        広告確認待ち
+        <span class="nav-badge">3</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M8 2L2 6v8h4v-4h4v4h4V6L8 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        PDF取込
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M13 7L8 2 3 7v7h3.5v-4h3v4H13V7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        成約アラート
+        <span class="nav-badge">2</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M2 6h12" stroke="currentColor" stroke-width="1.5"/></svg>
+        ポータル連動
+      </div>
+      <div class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        査定ツール
+      </div>
+    </nav>
+  </aside>
+
+  <!-- メイン -->
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-title">物件管理ダッシュボード</div>
+      <div class="topbar-right">
+        <div class="topbar-date" id="currentDate"></div>
+        <div class="avatar">山田</div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- KPIカード -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-accent" style="background:#2d5a3d"></div>
+          <div class="kpi-label">掲載中物件</div>
+          <div class="kpi-value">47<span class="kpi-unit">件</span></div>
+          <div class="kpi-delta up">↑ 3件 先週比</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-accent" style="background:#92580a"></div>
+          <div class="kpi-label">広告確認待ち</div>
+          <div class="kpi-value">3<span class="kpi-unit">件</span></div>
+          <div class="kpi-delta" style="color:var(--amber)">要対応</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-accent" style="background:#9b2626"></div>
+          <div class="kpi-label">成約アラート</div>
+          <div class="kpi-value">2<span class="kpi-unit">件</span></div>
+          <div class="kpi-delta" style="color:var(--red)">確認が必要</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-accent" style="background:#1a4a7a"></div>
+          <div class="kpi-label">今月の成約</div>
+          <div class="kpi-value">5<span class="kpi-unit">件</span></div>
+          <div class="kpi-delta up">↑ 2件 先月比</div>
+        </div>
+      </div>
+
+      <!-- タブ切り替え -->
+      <div class="tabs">
+        <div class="tab active" onclick="showTab('approval')">広告確認ワークフロー</div>
+        <div class="tab" onclick="showTab('sold')">成約アラート</div>
+        <div class="tab" onclick="showTab('upload')">PDF取込</div>
+        <div class="tab" onclick="showTab('list')">物件一覧</div>
+      </div>
+
+      <!-- 広告確認ワークフロー -->
+      <div id="tab-approval">
+        <div class="section-head">
+          <div class="section-title">広告確認待ち（HP掲載前の必須ステップ）</div>
+          <div class="section-hint">AIのコンプライアンスチェック済み。担当者が内容を確認して承認してください。</div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span style="width:8px;height:8px;border-radius:50%;background:var(--amber);display:inline-block"></span>
+              PENDING — 承認待ち 3件
+            </div>
+            <button class="btn btn-outline btn-sm">一括表示</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>物件</th>
+                <th>価格</th>
+                <th>掲載先設定</th>
+                <th>AI確認</th>
+                <th>登録日</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="property-name">中野区若宮1丁目 新築戸建</div>
+                  <div class="property-sub">西武新宿線「野方」徒歩5分・4LDK</div>
+                </td>
+                <td><strong>8,280</strong>万円</td>
+                <td>
+                  <div class="portal-tags">
+                    <span class="portal-tag on">HP公開</span>
+                    <span class="portal-tag on">SUUMO</span>
+                    <span class="portal-tag">athome</span>
+                    <span class="portal-tag on">Yahoo</span>
+                  </div>
+                </td>
+                <td><span class="badge badge-approved"><span class="badge-dot"></span>OK</span></td>
+                <td style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace">2025-03-24</td>
+                <td>
+                  <div style="display:flex;gap:6px">
+                    <button class="btn btn-outline btn-sm" onclick="previewProperty('nakano-001')">確認</button>
+                    <button class="btn btn-primary btn-sm" onclick="approveProperty('nakano-001')">承認</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="property-name">目黒区南2丁目 土地（B区画）</div>
+                  <div class="property-sub">東急東横線「都立大学」徒歩8分・120㎡</div>
+                </td>
+                <td><strong>12,000</strong>万円</td>
+                <td>
+                  <div class="portal-tags">
+                    <span class="portal-tag on">HP公開</span>
+                    <span class="portal-tag on">SUUMO</span>
+                    <span class="portal-tag on">athome</span>
+                    <span class="portal-tag">Yahoo</span>
+                  </div>
+                </td>
+                <td><span class="badge badge-pending"><span class="badge-dot"></span>要確認</span></td>
+                <td style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace">2025-03-25</td>
+                <td>
+                  <div style="display:flex;gap:6px">
+                    <button class="btn btn-outline btn-sm">確認</button>
+                    <button class="btn btn-primary btn-sm" disabled style="opacity:.4">承認</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="property-name">渋谷区代々木2丁目 土地</div>
+                  <div class="property-sub">大江戸線「新宿」徒歩6分・整形地</div>
+                </td>
+                <td><strong>39,000</strong>万円</td>
+                <td>
+                  <div class="portal-tags">
+                    <span class="portal-tag">HP公開</span>
+                    <span class="portal-tag on">HP会員限定</span>
+                    <span class="portal-tag on">SUUMO</span>
+                    <span class="portal-tag">athome</span>
+                  </div>
+                </td>
+                <td><span class="badge badge-approved"><span class="badge-dot"></span>OK</span></td>
+                <td style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace">2025-03-25</td>
+                <td>
+                  <div style="display:flex;gap:6px">
+                    <button class="btn btn-outline btn-sm">確認</button>
+                    <button class="btn btn-primary btn-sm" onclick="approveProperty('shibuya-001')">承認</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span style="width:8px;height:8px;border-radius:50%;background:#2d5a3d;display:inline-block"></span>
+              掲載中一覧（承認済み）
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr><th>物件</th><th>ステータス</th><th>掲載日数</th><th>問合数</th><th>掲載先</th><th>操作</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="property-name">目黒区平町2丁目 中古戸建</div>
+                  <div class="property-sub">東急東横線「都立大学」徒歩8分・4LDK+DEN</div>
+                </td>
+                <td><span class="badge badge-published"><span class="badge-dot"></span>HP+ポータル</span></td>
+                <td style="font-family:'DM Mono',monospace;font-size:12px">32日</td>
+                <td style="font-family:'DM Mono',monospace;font-size:12px">7件</td>
+                <td>
+                  <div class="portal-tags">
+                    <span class="portal-tag on">HP</span>
+                    <span class="portal-tag on">SUUMO</span>
+                    <span class="portal-tag on">Yahoo</span>
+                  </div>
+                </td>
+                <td><button class="btn btn-outline btn-sm">管理</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 成約アラート -->
+      <div id="tab-sold" style="display:none">
+        <div class="section-head">
+          <div class="section-title">成約検知アラート</div>
+          <div class="section-hint">AIが「成約した可能性がある」と判断した物件です。確認の上、成約確定 or 継続掲載を選択してください。</div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">AIが検知した要確認物件</div>
+          </div>
+
+          <div class="alert-row">
+            <div class="alert-icon urgent">🔴</div>
+            <div class="alert-body">
+              <div class="alert-title">目黒区南2丁目 土地（A区画）</div>
+              <div class="alert-signals">
+                · REINSで成約情報を確認 (+80点)　
+                · SUUMOから掲載消滅 (+40点)
+              </div>
+              <div class="alert-actions">
+                <button class="btn btn-danger btn-sm" onclick="confirmSold('meguro-a')">成約確定・全掲載停止</button>
+                <button class="btn btn-outline btn-sm">継続掲載</button>
+                <button class="btn btn-outline btn-sm">詳細確認</button>
+              </div>
+            </div>
+            <div>
+              <div class="alert-score urgent">120<span style="font-size:12px;font-weight:400">/100</span></div>
+              <div style="font-size:10px;color:var(--red);text-align:right;margin-top:2px">URGENT</div>
+            </div>
+          </div>
+
+          <div class="alert-row">
+            <div class="alert-icon alert">🟡</div>
+            <div class="alert-body">
+              <div class="alert-title">渋谷区本町4丁目 中古マンション</div>
+              <div class="alert-signals">
+                · 掲載94日経過・直近30日の問合0件 (+40点)　
+                · 商談中ステータスが62日継続 (+40点)　
+                · 価格改定3回 (+10点)
+              </div>
+              <div class="alert-actions">
+                <button class="btn btn-danger btn-sm" onclick="confirmSold('shibuya-mansion')">成約確定・全掲載停止</button>
+                <button class="btn btn-outline btn-sm">継続掲載</button>
+                <button class="btn btn-outline btn-sm">詳細確認</button>
+              </div>
+            </div>
+            <div>
+              <div class="alert-score warn">90<span style="font-size:12px;font-weight:400">/100</span></div>
+              <div style="font-size:10px;color:var(--amber);text-align:right;margin-top:2px">ALERT</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PDF取込 -->
+      <div id="tab-upload" style="display:none">
+        <div class="section-head">
+          <div class="section-title">販売図面・資料から物件情報を自動取込</div>
+          <div class="section-hint">PDF・JPEGをアップロードするとAIが情報を抽出します。抽出後に担当者が確認・修正して登録します。</div>
+        </div>
+        <div class="upload-zone" onclick="simulateUpload()">
+          <div class="upload-icon">📄</div>
+          <div class="upload-text">販売図面PDFまたは画像をドロップ</div>
+          <div class="upload-sub">対応形式: PDF・JPEG・PNG　最大20MB</div>
+        </div>
+
+        <div id="parse-result" style="display:none">
+          <div class="section-head" style="margin-top:4px">
+            <div class="section-title">抽出結果プレビュー — 確認後に「登録」してください</div>
+            <span class="badge badge-pending" style="font-size:12px">要確認 2項目</span>
+          </div>
+          <div class="two-col">
+            <div>
+              <div class="extract-preview">
+                <div class="extract-field">
+                  <span class="extract-key">物件種別</span>
+                  <span class="extract-val">新築戸建</span>
+                  <span class="extract-conf conf-high">▲ high</span>
+                </div>
+                <div class="extract-field">
+                  <span class="extract-key">価格</span>
+                  <span class="extract-val">8,280万円</span>
+                  <span class="extract-conf conf-high">▲ high</span>
+                </div>
+                <div class="extract-field">
+                  <span class="extract-key">所在地</span>
+                  <span class="extract-val">東京都中野区若宮1丁目</span>
+                  <span class="extract-conf conf-high">▲ high</span>
+                </div>
+                <div class="extract-field">
+                  <span class="extract-key">最寄駅</span>
+                  <span class="extract-val">野方駅 徒歩5分</span>
+                  <span class="extract-conf conf-high">▲ high</span>
+                </div>
+                <div class="extract-field">
+                  <span class="extract-key">面積（建物）</span>
+                  <span class="extract-val">102.5㎡</span>
+                  <span class="extract-conf conf-medium">△ medium</span>
+                </div>
+                <div class="extract-field">
+                  <span class="extract-key">間取り</span>
+                  <span class="extract-val">4LDK</span>
+                  <span class="extract-conf conf-high">▲ high</span>
+                </div>
+                <div class="extract-field">
+                  <span class="extract-key">建ぺい率</span>
+                  <span class="extract-val conf-low-val">50%？（要確認）</span>
+                  <span class="extract-conf conf-low">▼ low</span>
+                </div>
+                <div class="extract-field">
+                  <span class="extract-key">レインズ番号</span>
+                  <span class="extract-val conf-low-val">未取得（要入力）</span>
+                  <span class="extract-conf conf-low">▼ low</span>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-primary" onclick="registerProperty()">確認済み・登録する</button>
+                <button class="btn btn-outline">修正して再取込</button>
+                <button class="btn btn-outline" style="color:var(--red)">破棄</button>
+              </div>
+            </div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+              <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.06em">ソースプレビュー</div>
+              <div style="padding:16px;font-size:12px;color:var(--muted);line-height:1.8;font-family:'DM Mono',monospace">
+                物件種別: 新築戸建<br>
+                所在地: 東京都中野区若宮1丁目×番×号<br>
+                価格: 8,280万円（税込）<br>
+                土地面積: 85.20㎡（25.77坪）<br>
+                建物面積: 102.49㎡（30.99坪）<br>
+                間取り: 4LDK<br>
+                交通: 西武新宿線「野方」駅 徒歩5分<br>
+                構造: 木造2階建<br>
+                引渡し: 即時<br>
+                <span style="color:var(--amber)">建ぺい率: 5x%（一部不鮮明）</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 物件一覧 -->
+      <div id="tab-list" style="display:none">
+        <div class="section-head">
+          <div class="section-title">物件一覧</div>
+          <button class="btn btn-primary btn-sm">+ 新規登録</button>
+        </div>
+        <div class="panel">
+          <table>
+            <thead>
+              <tr><th>物件名</th><th>ステータス</th><th>価格</th><th>掲載日数</th><th>成約スコア</th><th>操作</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><div class="property-name">中野区若宮1丁目 新築戸建</div><div class="property-sub">野方駅5分・4LDK・8,280万円</div></td>
+                <td><span class="badge badge-pending"><span class="badge-dot"></span>承認待ち</span></td>
+                <td style="font-family:'DM Mono',monospace">8,280万</td>
+                <td style="font-family:'DM Mono',monospace;font-size:12px">2日</td>
+                <td>
+                  <div class="score-bar">
+                    <div class="score-track"><div class="score-fill" style="width:5%;background:var(--accent)"></div></div>
+                    <div class="score-num" style="color:var(--accent)">5</div>
+                  </div>
+                </td>
+                <td><button class="btn btn-outline btn-sm">詳細</button></td>
+              </tr>
+              <tr>
+                <td><div class="property-name">目黒区平町2丁目 中古戸建</div><div class="property-sub">都立大学駅8分・4LDK+DEN・22,200万円</div></td>
+                <td><span class="badge badge-published"><span class="badge-dot"></span>掲載中</span></td>
+                <td style="font-family:'DM Mono',monospace">22,200万</td>
+                <td style="font-family:'DM Mono',monospace;font-size:12px">32日</td>
+                <td>
+                  <div class="score-bar">
+                    <div class="score-track"><div class="score-fill" style="width:20%;background:var(--accent)"></div></div>
+                    <div class="score-num" style="color:var(--accent)">20</div>
+                  </div>
+                </td>
+                <td><button class="btn btn-outline btn-sm">詳細</button></td>
+              </tr>
+              <tr>
+                <td><div class="property-name">渋谷区本町4丁目 中古マンション</div><div class="property-sub">幡ヶ谷駅3分・3LDK・商談中</div></td>
+                <td><span class="badge badge-alert"><span class="badge-dot"></span>成約アラート</span></td>
+                <td style="font-family:'DM Mono',monospace">6,800万</td>
+                <td style="font-family:'DM Mono',monospace;font-size:12px">94日</td>
+                <td>
+                  <div class="score-bar">
+                    <div class="score-track"><div class="score-fill" style="width:90%;background:var(--amber)"></div></div>
+                    <div class="score-num" style="color:var(--amber)">90</div>
+                  </div>
+                </td>
+                <td><button class="btn btn-outline btn-sm">詳細</button></td>
+              </tr>
+              <tr>
+                <td><div class="property-name">目黒区南2丁目 土地（A区画）</div><div class="property-sub">都立大学駅8分・120㎡</div></td>
+                <td><span class="badge badge-alert"><span class="badge-dot"></span>成約アラート</span></td>
+                <td style="font-family:'DM Mono',monospace">12,000万</td>
+                <td style="font-family:'DM Mono',monospace;font-size:12px">58日</td>
+                <td>
+                  <div class="score-bar">
+                    <div class="score-track"><div class="score-fill" style="width:100%;background:var(--red)"></div></div>
+                    <div class="score-num" style="color:var(--red)">120</div>
+                  </div>
+                </td>
+                <td><button class="btn btn-outline btn-sm">詳細</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // 現在日付
+  document.getElementById('currentDate').textContent =
+    new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'short' });
+
+  // タブ切り替え
+  function showTab(name) {
+    ['approval','sold','upload','list'].forEach(t => {
+      document.getElementById('tab-'+t).style.display = t === name ? 'block' : 'none';
+    });
+    document.querySelectorAll('.tab').forEach((el, i) => {
+      el.classList.toggle('active', ['approval','sold','upload','list'][i] === name);
+    });
+  }
+
+  // 承認
+  function approveProperty(id) {
+    if (!confirm('この物件の広告確認を承認し、掲載設定通りに公開します。よろしいですか？')) return;
+    alert('✅ 承認しました。設定されたポータルサイトへの掲載が開始されます。');
+  }
+
+  // プレビュー
+  function previewProperty(id) {
+    alert('物件詳細プレビュー画面を開きます（実装時にモーダルで表示）');
+  }
+
+  // 成約確定
+  function confirmSold(id) {
+    if (!confirm('⚠️ 成約を確定します。\n\nHP・SUUMOなど連動中の全ポータルから即時非掲載されます。\n\nこの操作は取り消せません。実行しますか？')) return;
+    alert('成約処理を完了しました。\n\n・HP非掲載: 完了\n・SUUMO非掲載: 完了\n・athome非掲載: 完了\n\n成約データをマーケティングDBに格納しました。');
+  }
+
+  // PDF取込シミュレーション
+  function simulateUpload() {
+    const zone = document.querySelector('.upload-zone');
+    zone.style.borderColor = 'var(--accent)';
+    zone.innerHTML = '<div class="upload-icon">⏳</div><div class="upload-text">AIが情報を抽出中...</div><div class="upload-sub">しばらくお待ちください</div>';
+    setTimeout(() => {
+      zone.style.display = 'none';
+      document.getElementById('parse-result').style.display = 'block';
+    }, 1800);
+  }
+
+  // 登録
+  function registerProperty() {
+    if (!confirm('要確認項目を修正済みですか？\n確認が取れていない項目がある場合は先に修正してください。')) return;
+    alert('✅ 物件を登録しました。\nAIコンプライアンスチェック → 広告確認待ちに移行します。');
+  }
+</script>
+</body>
+</html>

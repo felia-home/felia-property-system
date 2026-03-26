@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  ci:
+    name: Lint・TypeCheck・Test
+    runs-on: ubuntu-latest
+
+    services:
+      # テスト用 PostgreSQL（このシステム専用）
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: felia_property
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: felia_property_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: 依存パッケージのインストール
+        run: npm ci
+
+      - name: 環境変数（CI用）
+        run: |
+          echo "DATABASE_URL=postgresql://felia_property:test_password@localhost:5433/felia_property_test" >> $GITHUB_ENV
+          echo "NEXTAUTH_SECRET=ci-test-secret-not-for-production" >> $GITHUB_ENV
+          echo "NEXTAUTH_URL=http://localhost:3001" >> $GITHUB_ENV
+          echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> $GITHUB_ENV
+
+      - name: Prisma クライアント生成
+        run: npx prisma generate
+
+      - name: DBマイグレーション（テスト用）
+        run: npx prisma migrate deploy
+
+      - name: TypeScript 型チェック
+        run: npm run typecheck
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: テスト実行
+        run: npm run test:ci
