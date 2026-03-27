@@ -1,5 +1,6 @@
 "use client";
-import React from "react";
+import React, { useCallback, useRef, useState } from "react";
+import { TOKYO_WARDS, TOKYO_CITIES, TOKYO_TRAIN_LINES, USE_ZONE_OPTIONS, USE_ZONE_DEFAULTS, ROAD_DIRECTIONS } from "@/lib/master-data";
 
 // ── Numeric fields (stored as numbers, not strings) ──────────────────────────
 export const NUM_FIELDS = new Set([
@@ -92,8 +93,9 @@ export const INITIAL_FORM: Record<string, string> = {
   direction: "", rooms: "", rooms_count: "", ldk_size: "",
   eq_ceiling_height: "", total_units: "",
   // タブ5: 法令・権利
-  city_plan: "", use_zone: "", bcr: "", far: "",
+  city_plan: "", use_zone: "", use_zones: "[]", bcr: "", far: "",
   road_side: "", road_width: "", road_type: "", road_direction: "", road_contact: "",
+  roads: "[]",
   private_road: "false", setback_required: "false", setback_area: "",
   building_conditions: "false", rebuild_allowed: "",
   national_land_act: "false", agricultural_act: "false", landscape_act: "false",
@@ -153,7 +155,9 @@ export function propertyToForm(p: Record<string, unknown>): Record<string, strin
   const form: Record<string, string> = { ...INITIAL_FORM };
   for (const [k, v] of Object.entries(p)) {
     if (v === null || v === undefined) continue;
-    if (DATE_FIELDS.has(k)) {
+    if (k === "use_zones" || k === "roads") {
+      form[k] = Array.isArray(v) ? JSON.stringify(v) : "[]";
+    } else if (DATE_FIELDS.has(k)) {
       form[k] = v ? new Date(v as string).toISOString().split("T")[0] : "";
     } else if (typeof v === "boolean") {
       form[k] = v ? "true" : "false";
@@ -169,6 +173,11 @@ export function formToBody(form: Record<string, string>): Record<string, unknown
   const body: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(form)) {
     if (k === "status") { body[k] = v; continue; }
+    if (k === "use_zones" || k === "roads") {
+      try { const arr = JSON.parse(v); body[k] = Array.isArray(arr) && arr.length > 0 ? arr : null; }
+      catch { body[k] = null; }
+      continue;
+    }
     if (BOOL_FIELDS.has(k)) { body[k] = v === "true"; continue; }
     if (NUM_FIELDS.has(k)) { body[k] = v === "" ? null : Number(v); continue; }
     if (DATE_FIELDS.has(k)) { body[k] = v === "" ? null : v; continue; }
@@ -261,6 +270,372 @@ function FM2({ labelM2, labelTsubo, nameM2, nameTsubo, form, setForm }: {
         <label style={labelSt}>{labelTsubo}</label>
         <input type="number" value={form[nameTsubo] ?? ""} onChange={e => handleTsubo(e.target.value)} style={inputSt} step="0.01" />
       </div>
+    </div>
+  );
+}
+
+// ── CitySelect ────────────────────────────────────────────────────────────────
+// Tokyo 23 wards + 市部 in grouped select; switches to free-text for other prefectures
+function CitySelect({ form, setForm }: { form: Record<string, string>; setForm: SetForm }) {
+  const city = form.city ?? "";
+  const isCustom =
+    city !== "" &&
+    !TOKYO_WARDS.includes(city as typeof TOKYO_WARDS[number]) &&
+    !TOKYO_CITIES.includes(city as typeof TOKYO_CITIES[number]);
+  const [custom, setCustom] = useState(isCustom);
+
+  const handleSelect = (v: string) => {
+    if (v === "__custom__") { setCustom(true); setForm(f => ({ ...f, city: "" })); return; }
+    setCustom(false);
+    setForm(f => ({ ...f, city: v }));
+  };
+
+  return (
+    <div style={rowSt}>
+      <label style={labelSt}>市区町村 *</label>
+      {!custom ? (
+        <select value={city} onChange={e => handleSelect(e.target.value)} style={inputSt}>
+          <option value="">選択してください</option>
+          <optgroup label="東京23区">
+            {TOKYO_WARDS.map(w => <option key={w} value={w}>{w}</option>)}
+          </optgroup>
+          <optgroup label="東京市部">
+            {TOKYO_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </optgroup>
+          <optgroup label="その他">
+            <option value="__custom__">直接入力（他道府県・市区町村）</option>
+          </optgroup>
+        </select>
+      ) : (
+        <div style={{ display: "flex", gap: 6 }}>
+          <input
+            value={city}
+            onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
+            placeholder="市区町村名を入力"
+            style={{ ...inputSt, flex: 1 }}
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={() => { setCustom(false); setForm(f => ({ ...f, city: "" })); }}
+            style={{ fontSize: 11, padding: "4px 8px", border: "1px solid #e0deda", borderRadius: 6, background: "#f7f6f2", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}
+          >リストに戻る</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── PostalInput ───────────────────────────────────────────────────────────────
+// 郵便番号入力 → 住所自動補完
+function PostalInput({ form, setForm }: { form: Record<string, string>; setForm: SetForm }) {
+  const [loading, setLoading] = useState(false);
+  const [hit, setHit] = useState(false);
+
+  const lookup = async (code: string) => {
+    const clean = code.replace(/-/g, "");
+    if (clean.length !== 7) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/address-suggest?postal=${clean}`);
+      const data = await res.json() as { result: { prefecture: string; city: string; town: string } | null };
+      if (data.result) {
+        setForm(f => ({
+          ...f,
+          prefecture: data.result!.prefecture,
+          city: data.result!.city,
+          town: data.result!.town,
+        }));
+        setHit(true);
+        setTimeout(() => setHit(false), 2000);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={rowSt}>
+      <label style={labelSt}>
+        郵便番号
+        {loading && <span style={{ marginLeft: 6, fontSize: 10, color: "#706e68" }}>検索中...</span>}
+        {hit && <span style={{ marginLeft: 6, fontSize: 10, color: "#234f35" }}>✓ 住所を自動補完しました</span>}
+      </label>
+      <input
+        type="text"
+        value={form.postal_code ?? ""}
+        placeholder="150-0033"
+        maxLength={8}
+        onChange={e => {
+          const v = e.target.value;
+          setForm(f => ({ ...f, postal_code: v }));
+          const clean = v.replace(/-/g, "");
+          if (clean.length === 7) lookup(v);
+        }}
+        style={inputSt}
+      />
+    </div>
+  );
+}
+
+// ── TownInput ─────────────────────────────────────────────────────────────────
+// 町名入力 with サジェスト
+function TownInput({ form, setForm }: { form: Record<string, string>; setForm: SetForm }) {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [open, setOpen] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const city = form.city ?? "";
+
+  const search = useCallback(async (q: string) => {
+    if (!q || !city) { setSuggestions([]); setOpen(false); return; }
+    const res = await fetch(`/api/address-suggest?city=${encodeURIComponent(city)}&town=${encodeURIComponent(q)}`);
+    const data = await res.json() as { towns: string[] };
+    setSuggestions(data.towns ?? []);
+    setOpen(data.towns?.length > 0);
+  }, [city]);
+
+  const handleChange = (v: string) => {
+    setForm(f => ({ ...f, town: v }));
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => search(v), 350);
+  };
+
+  return (
+    <div style={{ ...rowSt, position: "relative" }}>
+      <label style={labelSt}>町名・丁目（表示用）</label>
+      <input
+        type="text"
+        value={form.town ?? ""}
+        placeholder="代官山町"
+        onChange={e => handleChange(e.target.value)}
+        onFocus={() => form.town && setOpen(suggestions.length > 0)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        style={inputSt}
+      />
+      {open && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, right: 0, zIndex: 30,
+          background: "#fff", border: "1px solid #e0deda", borderRadius: 7,
+          boxShadow: "0 4px 16px rgba(0,0,0,.1)", maxHeight: 180, overflowY: "auto",
+        }}>
+          {suggestions.map(s => (
+            <button key={s} type="button"
+              onClick={() => { setForm(f => ({ ...f, town: s })); setOpen(false); }}
+              style={{ width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none", cursor: "pointer", fontSize: 13, fontFamily: "inherit", borderBottom: "1px solid #f2f1ed" }}>
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── LineInput ─────────────────────────────────────────────────────────────────
+// 路線名入力 with datalist オートコンプリート
+function LineInput({ name, form, setForm }: { name: string; form: Record<string, string>; setForm: SetForm }) {
+  const listId = `lines_${name}`;
+  return (
+    <div style={rowSt}>
+      <label style={labelSt}>路線</label>
+      <input
+        type="text"
+        list={listId}
+        value={form[name] ?? ""}
+        placeholder="東急東横線"
+        onChange={e => setForm(f => ({ ...f, [name]: e.target.value }))}
+        style={inputSt}
+      />
+      <datalist id={listId}>
+        {TOKYO_TRAIN_LINES.map(l => <option key={l} value={l} />)}
+      </datalist>
+    </div>
+  );
+}
+
+// ── UseZoneEditor ─────────────────────────────────────────────────────────────
+interface UseZoneRow { zone: string; bcr: string; far: string; area_pct: string }
+
+function UseZoneEditor({ form, setForm }: { form: Record<string, string>; setForm: SetForm }) {
+  const parseRows = (): UseZoneRow[] => {
+    try { const v = JSON.parse(form.use_zones ?? "[]"); return Array.isArray(v) ? v : []; }
+    catch { return []; }
+  };
+  const rows = parseRows();
+
+  const sync = (next: UseZoneRow[]) =>
+    setForm(f => ({ ...f, use_zones: JSON.stringify(next) }));
+
+  const addRow = () => sync([...rows, { zone: "", bcr: "", far: "", area_pct: "" }]);
+  const removeRow = (i: number) => sync(rows.filter((_, idx) => idx !== i));
+  const updateRow = (i: number, field: keyof UseZoneRow, val: string) => {
+    const next = rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r);
+    // Auto-fill BCR/FAR defaults when zone is selected
+    if (field === "zone" && val && !next[i].bcr && !next[i].far) {
+      const def = USE_ZONE_DEFAULTS[val];
+      if (def) { next[i].bcr = String(def.bcr); next[i].far = String(def.far); }
+    }
+    sync(next);
+    // Also update single-value fields from first row
+    if (next[0]) {
+      setForm(f => ({
+        ...f,
+        use_zones: JSON.stringify(next),
+        use_zone: next[0].zone || f.use_zone,
+        bcr: next[0].bcr || f.bcr,
+        far: next[0].far || f.far,
+      }));
+    }
+  };
+
+  // Calculate weighted BCR / FAR
+  const hasMultiple = rows.length >= 2;
+  const totalPct = rows.reduce((s, r) => s + (parseFloat(r.area_pct) || 0), 0);
+  const calcBCR = hasMultiple && totalPct > 0
+    ? rows.reduce((s, r) => s + (parseFloat(r.bcr) || 0) * ((parseFloat(r.area_pct) || 0) / totalPct), 0)
+    : null;
+  const calcFAR = hasMultiple && totalPct > 0
+    ? rows.reduce((s, r) => s + (parseFloat(r.far) || 0) * ((parseFloat(r.area_pct) || 0) / totalPct), 0)
+    : null;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <label style={labelSt}>用途地域</label>
+        <button type="button" onClick={addRow}
+          style={{ fontSize: 11, padding: "3px 10px", border: "1px solid #234f35", borderRadius: 5, background: "#f0f7f2", color: "#234f35", cursor: "pointer", fontFamily: "inherit" }}>
+          ＋ 追加
+        </button>
+      </div>
+
+      {rows.length === 0 && (
+        <button type="button" onClick={addRow}
+          style={{ width: "100%", padding: "8px", border: "2px dashed #d0cec8", borderRadius: 7, background: "none", color: "#706e68", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+          用途地域を追加
+        </button>
+      )}
+
+      {rows.map((row, i) => (
+        <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 80px 90px 80px 28px", gap: 6, marginBottom: 6, alignItems: "flex-end" }}>
+          <div style={rowSt}>
+            {i === 0 && <label style={labelSt}>地域種別</label>}
+            <select value={row.zone} onChange={e => updateRow(i, "zone", e.target.value)} style={inputSt}>
+              <option value="">選択</option>
+              {USE_ZONE_OPTIONS.map(z => <option key={z} value={z}>{z}</option>)}
+            </select>
+          </div>
+          <div style={rowSt}>
+            {i === 0 && <label style={labelSt}>建ぺい率%</label>}
+            <input type="number" value={row.bcr} onChange={e => updateRow(i, "bcr", e.target.value)} placeholder="60" style={inputSt} />
+          </div>
+          <div style={rowSt}>
+            {i === 0 && <label style={labelSt}>容積率%</label>}
+            <input type="number" value={row.far} onChange={e => updateRow(i, "far", e.target.value)} placeholder="200" style={inputSt} />
+          </div>
+          <div style={rowSt}>
+            {i === 0 && <label style={labelSt}>面積割合%</label>}
+            <input type="number" value={row.area_pct} onChange={e => updateRow(i, "area_pct", e.target.value)} placeholder="70" style={inputSt} />
+          </div>
+          <button type="button" onClick={() => removeRow(i)}
+            style={{ padding: "5px 6px", border: "1px solid #f5c6c6", borderRadius: 5, background: "#fdeaea", color: "#8c1f1f", cursor: "pointer", fontSize: 12, fontFamily: "inherit", alignSelf: "flex-end" }}>
+            ✕
+          </button>
+        </div>
+      ))}
+
+      {hasMultiple && calcBCR !== null && calcFAR !== null && (
+        <div style={{ marginTop: 8, padding: "8px 12px", background: "#f0f7f2", borderRadius: 7, fontSize: 12 }}>
+          <span style={{ fontWeight: 600, color: "#234f35" }}>按分計算値：</span>
+          <span style={{ marginLeft: 8 }}>建ぺい率 <b>{calcBCR.toFixed(1)}%</b></span>
+          <span style={{ marginLeft: 12 }}>容積率 <b>{calcFAR.toFixed(1)}%</b></span>
+          {Math.abs(totalPct - 100) > 1 && (
+            <span style={{ marginLeft: 12, color: "#8a5200" }}>⚠ 面積割合の合計が{totalPct}%（100%に調整してください）</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── RoadEditor ────────────────────────────────────────────────────────────────
+interface RoadRow { direction: string; width: string; type: string; contact: string }
+
+function RoadEditor({ form, setForm }: { form: Record<string, string>; setForm: SetForm }) {
+  const parseRows = (): RoadRow[] => {
+    try { const v = JSON.parse(form.roads ?? "[]"); return Array.isArray(v) ? v : []; }
+    catch { return []; }
+  };
+  const rows = parseRows();
+
+  const sync = (next: RoadRow[]) =>
+    setForm(f => ({ ...f, roads: JSON.stringify(next) }));
+
+  const addRow = () => sync([...rows, { direction: "", width: "", type: "公道", contact: "" }]);
+  const removeRow = (i: number) => sync(rows.filter((_, idx) => idx !== i));
+  const updateRow = (i: number, field: keyof RoadRow, val: string) => {
+    const next = rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r);
+    sync(next);
+    // Mirror first road into legacy single fields
+    if (next[0]) {
+      setForm(f => ({
+        ...f,
+        roads: JSON.stringify(next),
+        road_direction: next[0].direction || f.road_direction,
+        road_width: next[0].width || f.road_width,
+        road_type: next[0].type || f.road_type,
+        road_contact: next[0].contact || f.road_contact,
+      }));
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <label style={labelSt}>接道状況</label>
+        <button type="button" onClick={addRow}
+          style={{ fontSize: 11, padding: "3px 10px", border: "1px solid #234f35", borderRadius: 5, background: "#f0f7f2", color: "#234f35", cursor: "pointer", fontFamily: "inherit" }}>
+          ＋ 接道を追加
+        </button>
+      </div>
+
+      {rows.length === 0 && (
+        <button type="button" onClick={addRow}
+          style={{ width: "100%", padding: "8px", border: "2px dashed #d0cec8", borderRadius: 7, background: "none", color: "#706e68", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+          接道を追加
+        </button>
+      )}
+
+      {rows.map((row, i) => (
+        <div key={i} style={{ display: "grid", gridTemplateColumns: "90px 80px 100px 1fr 28px", gap: 6, marginBottom: 6, alignItems: "flex-end" }}>
+          <div style={rowSt}>
+            {i === 0 && <label style={labelSt}>方向</label>}
+            <select value={row.direction} onChange={e => updateRow(i, "direction", e.target.value)} style={inputSt}>
+              <option value="">選択</option>
+              {ROAD_DIRECTIONS.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div style={rowSt}>
+            {i === 0 && <label style={labelSt}>幅員(m)</label>}
+            <input type="number" step="0.1" value={row.width} onChange={e => updateRow(i, "width", e.target.value)} placeholder="6.0" style={inputSt} />
+          </div>
+          <div style={rowSt}>
+            {i === 0 && <label style={labelSt}>道路種類</label>}
+            <select value={row.type} onChange={e => updateRow(i, "type", e.target.value)} style={inputSt}>
+              <option value="公道">公道</option>
+              <option value="私道">私道</option>
+              <option value="公道・私道">公道・私道</option>
+            </select>
+          </div>
+          <div style={rowSt}>
+            {i === 0 && <label style={labelSt}>接道状況・備考</label>}
+            <input type="text" value={row.contact} onChange={e => updateRow(i, "contact", e.target.value)} placeholder="南側6m公道に接道" style={inputSt} />
+          </div>
+          <button type="button" onClick={() => removeRow(i)}
+            style={{ padding: "5px 6px", border: "1px solid #f5c6c6", borderRadius: 5, background: "#fdeaea", color: "#8c1f1f", cursor: "pointer", fontSize: 12, fontFamily: "inherit", alignSelf: "flex-end" }}>
+            ✕
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
@@ -417,12 +792,12 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
           </div>
           <div style={sectionTitle}>所在地</div>
           <div style={grid3}>
-            <FI label="郵便番号" name="postal_code" form={form} setForm={setForm} placeholder="150-0001" />
+            <PostalInput form={form} setForm={setForm} />
             <FI label="都道府県" name="prefecture" form={form} setForm={setForm} />
-            <FI label="市区町村 *" name="city" form={form} setForm={setForm} placeholder="渋谷区" />
+            <CitySelect form={form} setForm={setForm} />
           </div>
           <div style={grid3}>
-            <FI label="町名・丁目（表示用）" name="town" form={form} setForm={setForm} placeholder="代官山町" />
+            <TownInput form={form} setForm={setForm} />
             <div style={rowSt}>
               <label style={labelSt}>番地以降 <span style={{ color: "#8c1f1f", fontSize: 10 }}>内部管理・公開不可</span></label>
               <input type="text" value={form.address ?? ""} placeholder="12-3"
@@ -456,7 +831,7 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
             <div key={n}>
               <div style={{ fontSize: 11, color: "#706e68", marginBottom: 6 }}>交通{n}</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px 1fr 80px", gap: 8 }}>
-                <FI label="路線" name={`station_line${n}`} form={form} setForm={setForm} placeholder="東急東横線" />
+                <LineInput name={`station_line${n}`} form={form} setForm={setForm} />
                 <FI label="駅名" name={`station_name${n}`} form={form} setForm={setForm} placeholder="代官山" />
                 <FI label="徒歩(分)" name={`station_walk${n}`} form={form} setForm={setForm} type="number" />
                 <FI label="バス停名" name={`bus_stop${n}`} form={form} setForm={setForm} placeholder="○○バス停" />
@@ -529,31 +904,20 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
               {v:"",l:"選択"},{v:"市街化区域",l:"市街化区域"},{v:"市街化調整区域",l:"市街化調整区域"},
               {v:"非線引区域",l:"非線引区域"},{v:"準都市計画区域",l:"準都市計画区域"},
             ]} />
-            <FS label="用途地域" name="use_zone" form={form} setForm={setForm} options={[
-              {v:"",l:"選択"},{v:"第一種低層住居専用",l:"第一種低層住居専用"},
-              {v:"第二種低層住居専用",l:"第二種低層住居専用"},
-              {v:"第一種中高層住居専用",l:"第一種中高層住居専用"},
-              {v:"第二種中高層住居専用",l:"第二種中高層住居専用"},
-              {v:"第一種住居",l:"第一種住居"},{v:"第二種住居",l:"第二種住居"},
-              {v:"準住居",l:"準住居"},{v:"近隣商業",l:"近隣商業"},{v:"商業",l:"商業"},
-              {v:"準工業",l:"準工業"},{v:"工業",l:"工業"},{v:"工業専用",l:"工業専用"},
-            ]} />
           </div>
-          <div style={grid3}>
-            <FI label="建ぺい率（%）" name="bcr" form={form} setForm={setForm} type="number" placeholder="60" />
-            <FI label="容積率（%）" name="far" form={form} setForm={setForm} type="number" placeholder="200" />
-          </div>
+          <UseZoneEditor form={form} setForm={setForm} />
+          {/* Legacy single-value fallback (used only when use_zones is empty) */}
+          {(JSON.parse(form.use_zones ?? "[]") as unknown[]).length === 0 && (
+            <div style={grid3}>
+              <FI label="建ぺい率（%）" name="bcr" form={form} setForm={setForm} type="number" placeholder="60" />
+              <FI label="容積率（%）" name="far" form={form} setForm={setForm} type="number" placeholder="200" />
+            </div>
+          )}
           <div style={sectionTitle}>接道状況</div>
-          <div style={grid3}>
-            <FI label="接道状況（フリーテキスト）" name="road_contact" form={form} setForm={setForm} placeholder="南側6m公道に接道" />
-            <FI label="接道方向" name="road_direction" form={form} setForm={setForm} placeholder="南" />
-            <FI label="前面道路幅員（m）" name="road_width" form={form} setForm={setForm} type="number" />
-          </div>
-          <div style={grid3}>
-            <FI label="接道方向・幅員（詳細）" name="road_side" form={form} setForm={setForm} placeholder="南側6m" />
-            <FS label="道路種類" name="road_type" form={form} setForm={setForm} options={[
-              {v:"",l:"選択"},{v:"公道",l:"公道"},{v:"私道",l:"私道"},{v:"公道・私道",l:"公道・私道"},
-            ]} />
+          <RoadEditor form={form} setForm={setForm} />
+          {/* Legacy road_side fallback */}
+          <div style={{ marginTop: 4 }}>
+            <FI label="接道メモ（旧フォーマット・補足）" name="road_side" form={form} setForm={setForm} placeholder="南側6m 公道" />
           </div>
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 4 }}>
             <FC label="私道負担あり" name="private_road" form={form} setForm={setForm} />

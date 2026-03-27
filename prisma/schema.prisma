@@ -93,6 +93,7 @@ model Property {
   // 法令・権利
   city_plan             String?
   use_zone              String?
+  use_zones             Json?     // [{zone, bcr, far, area_pct}] 複数用途地域
   bcr                   Float?
   far                   Float?
   land_right            String?
@@ -105,6 +106,7 @@ model Property {
   setback_area          Float?
   road_direction          String?
   road_contact            String?
+  roads                   Json?     // [{direction, width, type, contact}] 複数接道
   building_conditions     Boolean   @default(false)
   rebuild_allowed         String?
   national_land_act       Boolean   @default(false)
