@@ -8,53 +8,167 @@ datasource db {
 }
 
 model Property {
-  id                  String    @id @default(cuid())
-  legacy_id           String?   @unique
-  property_type       String
-  status              String    @default("DRAFT")
-  title               String?
-  catch_copy          String?
-  prefecture          String    @default("東京都")
-  city                String
-  address             String    @default("")
-  price               Int
-  area_land_m2        Float?
-  area_build_m2       Float?
-  area_exclusive_m2   Float?
-  station_line        String?
-  station_name        String
-  station_walk        Int
-  building_year       Int?
-  building_month      Int?
-  structure           String?
-  rooms               String?
-  floors_total        Int?
-  floor_unit          Int?
-  delivery_timing     String?
-  reins_number        String?
-  city_plan           String?
-  use_zone            String?
-  bcr                 Float?
-  far                 Float?
-  private_road        Boolean   @default(false)
-  management_fee      Int?
-  repair_reserve      Int?
-  total_units         Int?
-  description_hp      String?
-  description_portal  String?
-  published_hp        Boolean   @default(false)
-  published_suumo     Boolean   @default(false)
-  published_athome    Boolean   @default(false)
-  published_at        DateTime?
-  compliance_checked  Boolean   @default(false)
+  id                    String    @id @default(cuid())
+  legacy_id             String?   @unique
+
+  // 物件種別・取引態様
+  property_type         String    // NEW_HOUSE, USED_HOUSE, MANSION, NEW_MANSION, LAND
+  transaction_type      String    @default("仲介")
+  brokerage_type        String    @default("専任")
+
+  // ステータス
+  status                String    @default("DRAFT")
+
+  // キャッチコピー・説明
+  title                 String?
+  catch_copy            String?
+  description_hp        String?
+  description_portal    String?
+  description_suumo     String?
+  description_athome    String?
+
+  // 所在地
+  prefecture            String    @default("東京都")
+  city                  String    @default("")
+  address               String    @default("")
+  address_chiban        String?
+  postal_code           String?
+
+  // 価格
+  price                 Int       @default(0)
+  price_land            Int?
+  price_build           Int?
+  price_tax_inc         Boolean   @default(false)
+  price_per_m2          Float?
+
+  // 交通（3駅まで）
+  station_line1         String?
+  station_name1         String?
+  station_walk1         Int?
+  station_line2         String?
+  station_name2         String?
+  station_walk2         Int?
+  station_line3         String?
+  station_name3         String?
+  station_walk3         Int?
+
+  // 面積
+  area_land_m2          Float?
+  area_land_tsubo       Float?
+  area_build_m2         Float?
+  area_build_tsubo      Float?
+  area_exclusive_m2     Float?
+  area_exclusive_tsubo  Float?
+  area_balcony_m2       Float?
+
+  // 建物情報
+  rooms                 String?
+  building_year         Int?
+  building_month        Int?
+  structure             String?
+  floors_total          Int?
+  floors_basement       Int?
+  floor_unit            Int?
+  direction             String?
+  total_units           Int?
+
+  // 法令・権利
+  city_plan             String?
+  use_zone              String?
+  bcr                   Float?
+  far                   Float?
+  land_right            String?
+  land_category         String?
+  road_side             String?
+  road_width            Float?
+  road_type             String?
+  private_road          Boolean   @default(false)
+  setback_required      Boolean   @default(false)
+  setback_area          Float?
+
+  // 費用・管理
+  management_fee        Int?
+  repair_reserve        Int?
+  other_monthly_fee     Int?
+  land_lease_fee        Int?
+  fixed_asset_tax       Int?
+  city_planning_tax     Int?
+  management_type       String?
+  management_company    String?
+
+  // 引渡し・レインズ
+  delivery_timing       String?
+  delivery_status       String?
+  reins_number          String?
+  reins_registered_at   DateTime?
+  ad_valid_until        DateTime?
+
+  // 設備
+  eq_autolock           Boolean   @default(false)
+  eq_elevator           Boolean   @default(false)
+  eq_parking            Boolean   @default(false)
+  eq_parking_fee        Int?
+  eq_bike_parking       Boolean   @default(false)
+  eq_storage            Boolean   @default(false)
+  eq_pet_ok             Boolean   @default(false)
+  eq_system_kitchen     Boolean   @default(false)
+  eq_all_electric       Boolean   @default(false)
+  eq_floor_heating      Boolean   @default(false)
+  eq_ac                 Boolean   @default(false)
+  eq_solar              Boolean   @default(false)
+  eq_home_security      Boolean   @default(false)
+  eq_walk_in_closet     Boolean   @default(false)
+  eq_2f_washroom        Boolean   @default(false)
+  eq_washlet            Boolean   @default(false)
+  eq_bathroom_dryer     Boolean   @default(false)
+  eq_tv_intercom        Boolean   @default(false)
+  eq_fiber_optic        Boolean   @default(false)
+  eq_bs_cs              Boolean   @default(false)
+  eq_gas_city           Boolean   @default(false)
+  eq_gas_prop           Boolean   @default(false)
+  eq_water_city         Boolean   @default(false)
+  eq_water_well         Boolean   @default(false)
+  eq_sewage             Boolean   @default(false)
+  eq_septic             Boolean   @default(false)
+  eq_corner             Boolean   @default(false)
+  eq_top_floor          Boolean   @default(false)
+  eq_new_interior       Boolean   @default(false)
+  eq_new_exterior       Boolean   @default(false)
+  eq_reform_kitchen     Boolean   @default(false)
+  eq_reform_bath        Boolean   @default(false)
+
+  // 掲載設定
+  published_hp          Boolean   @default(false)
+  published_members     Boolean   @default(false)
+  published_suumo       Boolean   @default(false)
+  published_athome      Boolean   @default(false)
+  published_yahoo       Boolean   @default(false)
+  published_homes       Boolean   @default(false)
+  published_at          DateTime?
+
+  // ポータルID
+  suumo_id              String?
+  athome_id             String?
+  yahoo_id              String?
+  homes_id              String?
+
+  // コンプライアンス
+  compliance_checked    Boolean   @default(false)
   compliance_checked_at DateTime?
-  compliance_result   Json?
-  agent_id            String?
-  is_deleted          Boolean   @default(false)
-  deleted_at          DateTime?
-  created_at          DateTime  @default(now())
-  updated_at          DateTime  @updatedAt
-  history             PropertyHistory[]
+  compliance_result     Json?
+
+  // 内部情報
+  agent_id              String?
+  store_id              String?
+  internal_memo         String?
+  source                String?
+
+  is_deleted            Boolean   @default(false)
+  deleted_at            DateTime?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+
+  history               PropertyHistory[]
   @@map("properties")
 }
 

@@ -1,25 +1,20 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
-// GET /api/properties — 物件一覧取得
+// GET /api/properties
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
-    const store = searchParams.get("store");
     const search = searchParams.get("search");
 
-    const where: Record<string, unknown> = {
-      is_deleted: false,
-    };
-
+    const where: Record<string, unknown> = { is_deleted: false };
     if (status) where.status = status;
-    if (store) where.store_id = store;
     if (search) {
       where.OR = [
         { city: { contains: search } },
         { address: { contains: search } },
-        { station_name: { contains: search } },
+        { station_name1: { contains: search } },
       ];
     }
 
@@ -36,50 +31,52 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/properties — 物件新規登録
+// POST /api/properties
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // 必須項目チェック
-    const required = ["property_type", "price", "city", "station_name", "station_walk"];
-    for (const field of required) {
-      if (!body[field]) {
-        return NextResponse.json(
-          { error: `必須項目が不足しています: ${field}` },
-          { status: 400 }
-        );
-      }
+    if (!body.property_type) {
+      return NextResponse.json({ error: "物件種別は必須です" }, { status: 400 });
     }
 
-    const property = await prisma.property.create({
-      data: {
-        property_type: body.property_type,
-        status: "DRAFT",
-        prefecture: body.prefecture ?? "東京都",
-        city: body.city,
-        address: body.address ?? "",
-        price: Number(body.price),
-        station_line: body.station_line ?? "",
-        station_name: body.station_name,
-        station_walk: Number(body.station_walk),
-        area_land_m2: body.area_land_m2 ? Number(body.area_land_m2) : null,
-        area_build_m2: body.area_build_m2 ? Number(body.area_build_m2) : null,
-        area_exclusive_m2: body.area_exclusive_m2 ? Number(body.area_exclusive_m2) : null,
-        rooms: body.rooms ?? "",
-        building_year: body.building_year ? Number(body.building_year) : null,
-        structure: body.structure ?? "",
-        delivery_timing: body.delivery_timing ?? "",
-        management_fee: body.management_fee ? Number(body.management_fee) : null,
-        repair_reserve: body.repair_reserve ? Number(body.repair_reserve) : null,
-        reins_number: body.reins_number ?? null,
-        published_hp: false,
-        published_suumo: false,
-        published_athome: false,
-        compliance_checked: false,
-      },
-    });
+    const BOOL = new Set([
+      "price_tax_inc","private_road","setback_required",
+      "eq_autolock","eq_elevator","eq_parking","eq_bike_parking","eq_storage",
+      "eq_pet_ok","eq_system_kitchen","eq_all_electric","eq_floor_heating","eq_ac",
+      "eq_solar","eq_home_security","eq_walk_in_closet","eq_2f_washroom","eq_washlet",
+      "eq_bathroom_dryer","eq_tv_intercom","eq_fiber_optic","eq_bs_cs",
+      "eq_gas_city","eq_gas_prop","eq_water_city","eq_water_well",
+      "eq_sewage","eq_septic","eq_corner","eq_top_floor",
+      "eq_new_interior","eq_new_exterior","eq_reform_kitchen","eq_reform_bath",
+      "published_hp","published_members","published_suumo","published_athome",
+      "published_yahoo","published_homes","compliance_checked",
+    ]);
+    const NUM = new Set([
+      "price","price_land","price_build","price_per_m2",
+      "station_walk1","station_walk2","station_walk3",
+      "area_land_m2","area_land_tsubo","area_build_m2","area_build_tsubo",
+      "area_exclusive_m2","area_exclusive_tsubo","area_balcony_m2",
+      "building_year","building_month","floors_total","floors_basement","floor_unit","total_units",
+      "bcr","far","road_width","setback_area",
+      "management_fee","repair_reserve","other_monthly_fee","land_lease_fee",
+      "fixed_asset_tax","city_planning_tax","eq_parking_fee",
+    ]);
 
+    const data: Record<string, unknown> = {
+      status: "DRAFT",
+    };
+
+    for (const [k, v] of Object.entries(body)) {
+      if (k === "id" || k === "created_at" || k === "updated_at") continue;
+      if (v === null || v === undefined || v === "") continue;
+      if (BOOL.has(k)) { data[k] = Boolean(v); continue; }
+      if (NUM.has(k)) { data[k] = Number(v); continue; }
+      data[k] = v;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const property = await prisma.property.create({ data: data as any });
     return NextResponse.json({ property }, { status: 201 });
   } catch (error) {
     console.error("POST /api/properties error:", error);

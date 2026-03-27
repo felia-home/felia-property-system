@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(for dir:*)",
+      "Bash(do echo:*)",
+      "Read(//c/Users/User/projects/felia-property-system/src/app/admin/**)",
+      "Bash(done)",
+      "Bash(npx prisma:*)",
+      "Bash(mkdir -p \"c:/Users/User/projects/felia-property-system/src/app/api/customers/[id]\")",
+      "Bash(mkdir -p \"c:/Users/User/projects/felia-property-system/src/app/api/contracts/[id]\")",
+      "Bash(DATABASE_URL=\"postgresql://dummy:dummy@localhost:5432/dummy\" npx prisma generate)"
     ]
   }
 }
