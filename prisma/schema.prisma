@@ -272,6 +272,7 @@ model Property {
   compliance_result     Json?
 
   // 内部情報
+  property_number       String?
   agent_id              String?
   store_id              String?
   internal_memo         String?
@@ -284,6 +285,8 @@ model Property {
 
   history               PropertyHistory[]
   images                PropertyImage[]
+  store                 Store?    @relation(fields: [store_id], references: [id])
+  agent                 Staff?    @relation(fields: [agent_id], references: [id])
   @@map("properties")
 }
 
@@ -487,6 +490,74 @@ model Customer {
   created_at         DateTime  @default(now())
   updated_at         DateTime  @updatedAt
   @@map("customers")
+}
+
+model Company {
+  id                  String    @id @default(cuid())
+  name                String
+  name_kana           String?
+  license_number      String?   // 宅建業免許番号 e.g. "東京都知事(3)第12345号"
+  license_expiry      DateTime? // 免許有効期限
+  postal_code         String?
+  address             String?
+  phone               String?
+  fax                 String?
+  representative      String?
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  stores              Store[]
+  @@map("companies")
+}
+
+model Store {
+  id          String    @id @default(cuid())
+  company_id  String
+  company     Company   @relation(fields: [company_id], references: [id])
+  name        String
+  store_code  String    @unique // e.g. "SHB" → property_number prefix
+  postal_code String?
+  address     String?
+  phone       String?
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  staff       Staff[]
+  properties  Property[]
+  @@map("stores")
+}
+
+model Staff {
+  id            String    @id @default(cuid())
+  store_id      String
+  store         Store     @relation(fields: [store_id], references: [id])
+  name          String
+  name_kana     String?
+  email         String?
+  phone         String?
+  role          String    @default("agent") // agent | manager | admin
+  license_number String?  // 宅建士証番号
+  is_retired    Boolean   @default(false)
+  retired_at    DateTime?
+  successor_id  String?   // 引継ぎ先スタッフID
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  properties    Property[]
+  transfers_from PropertyTransfer[] @relation("TransferFrom")
+  transfers_to   PropertyTransfer[] @relation("TransferTo")
+  @@map("staff")
+}
+
+model PropertyTransfer {
+  id             String   @id @default(cuid())
+  property_id    String
+  from_staff_id  String
+  to_staff_id    String
+  from_staff     Staff    @relation("TransferFrom", fields: [from_staff_id], references: [id])
+  to_staff       Staff    @relation("TransferTo", fields: [to_staff_id], references: [id])
+  reason         String   @default("retirement") // retirement | reassignment
+  note           String?
+  created_at     DateTime @default(now())
+  @@map("property_transfers")
 }
 
 model Contract {

@@ -51,7 +51,7 @@ const UPDATABLE_FIELDS = [
   "published_hp","published_members","published_suumo","published_athome",
   "published_yahoo","published_homes",
   "suumo_id","athome_id","yahoo_id","homes_id",
-  "compliance_checked","agent_id","store_id","internal_memo","source",
+  "compliance_checked","agent_id","store_id","property_number","internal_memo","source",
 ];
 
 export async function GET(

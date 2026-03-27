@@ -1,5 +1,6 @@
 "use client";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef, useState, useEffect } from "react";
+import { getTownsByCity } from "@/lib/tokyo-towns";
 import { TOKYO_WARDS, TOKYO_CITIES, TOKYO_TRAIN_LINES, USE_ZONE_OPTIONS, USE_ZONE_DEFAULTS, ROAD_DIRECTIONS } from "@/lib/master-data";
 
 // ── Numeric fields (stored as numbers, not strings) ──────────────────────────
@@ -69,7 +70,7 @@ export const INITIAL_FORM: Record<string, string> = {
   seller_company: "", seller_contact: "", seller_agent: "",
   seller_transaction_type: "", seller_brokerage_type: "",
   purchase_price: "", purchase_date: "",
-  internal_memo: "", source: "", store_id: "",
+  internal_memo: "", source: "", store_id: "", property_number: "",
   // タブ3: 所在地
   address_display_level: "town",
   address_display_custom: "",
@@ -379,12 +380,26 @@ function PostalInput({ form, setForm }: { form: Record<string, string>; setForm:
 }
 
 // ── TownInput ─────────────────────────────────────────────────────────────────
-// 町名入力 with サジェスト
+// 町名入力: 23区は静的リストの <select>、その他は Nominatim テキスト入力
 function TownInput({ form, setForm }: { form: Record<string, string>; setForm: SetForm }) {
+  const city = form.city ?? "";
+  const staticTowns = getTownsByCity(city);
+  const isWard = staticTowns.length > 0;
+
+  // Nominatim fallback state (non-ward cities)
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const city = form.city ?? "";
+
+  // When city changes to a ward, clear the town if it's not in the static list
+  useEffect(() => {
+    if (isWard && form.town && !staticTowns.includes(form.town)) {
+      setForm(f => ({ ...f, town: "" }));
+    }
+    setSuggestions([]);
+    setOpen(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city]);
 
   const search = useCallback(async (q: string) => {
     if (!q || !city) { setSuggestions([]); setOpen(false); return; }
@@ -394,11 +409,27 @@ function TownInput({ form, setForm }: { form: Record<string, string>; setForm: S
     setOpen(data.towns?.length > 0);
   }, [city]);
 
-  const handleChange = (v: string) => {
+  const handleTextChange = (v: string) => {
     setForm(f => ({ ...f, town: v }));
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => search(v), 350);
   };
+
+  if (isWard) {
+    return (
+      <div style={rowSt}>
+        <label style={labelSt}>町名・丁目（表示用）</label>
+        <select
+          value={form.town ?? ""}
+          onChange={e => setForm(f => ({ ...f, town: e.target.value }))}
+          style={inputSt}
+        >
+          <option value="">選択してください</option>
+          {staticTowns.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </div>
+    );
+  }
 
   return (
     <div style={{ ...rowSt, position: "relative" }}>
@@ -407,7 +438,7 @@ function TownInput({ form, setForm }: { form: Record<string, string>; setForm: S
         type="text"
         value={form.town ?? ""}
         placeholder="代官山町"
-        onChange={e => handleChange(e.target.value)}
+        onChange={e => handleTextChange(e.target.value)}
         onFocus={() => form.town && setOpen(suggestions.length > 0)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         style={inputSt}
@@ -640,6 +671,71 @@ function RoadEditor({ form, setForm }: { form: Record<string, string>; setForm: 
   );
 }
 
+// ── StoreStaffSelector ────────────────────────────────────────────────────────
+interface StoreOpt { id: string; name: string; store_code: string }
+interface StaffOpt { id: string; name: string; store_id: string }
+
+function StoreStaffSelector({ form, setForm }: { form: Record<string, string>; setForm: SetForm }) {
+  const [stores, setStores] = useState<StoreOpt[]>([]);
+  const [allStaff, setAllStaff] = useState<StaffOpt[]>([]);
+  const [propNumPreview, setPropNumPreview] = useState<string>("");
+
+  useEffect(() => {
+    fetch("/api/stores").then(r => r.json()).then((d: { stores: StoreOpt[] }) => setStores(d.stores ?? [])).catch(() => {});
+    fetch("/api/staff").then(r => r.json()).then((d: { staff: StaffOpt[] }) => setAllStaff(d.staff ?? [])).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!form.store_id) { setPropNumPreview(""); return; }
+    fetch(`/api/property-number?store_id=${form.store_id}`)
+      .then(r => r.json())
+      .then((d: { preview: string }) => setPropNumPreview(d.preview ?? ""))
+      .catch(() => setPropNumPreview(""));
+  }, [form.store_id]);
+
+  const filteredStaff = form.store_id ? allStaff.filter(s => s.store_id === form.store_id) : allStaff;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ fontWeight: 600, fontSize: 13, color: "#5a4a3a", marginBottom: 4 }}>担当店舗・スタッフ</div>
+      <div style={grid3}>
+        <div style={rowSt}>
+          <label style={labelSt}>担当店舗</label>
+          <select
+            value={form.store_id ?? ""}
+            onChange={e => setForm(f => ({ ...f, store_id: e.target.value, agent_id: "" }))}
+            style={inputSt}
+          >
+            <option value="">選択してください</option>
+            {stores.map(s => <option key={s.id} value={s.id}>{s.name}（{s.store_code}）</option>)}
+          </select>
+        </div>
+        <div style={rowSt}>
+          <label style={labelSt}>担当スタッフ</label>
+          <select
+            value={form.agent_id ?? ""}
+            onChange={e => setForm(f => ({ ...f, agent_id: e.target.value }))}
+            style={inputSt}
+            disabled={filteredStaff.length === 0}
+          >
+            <option value="">選択してください</option>
+            {filteredStaff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+        <div style={rowSt}>
+          <label style={labelSt}>物件番号プレビュー</label>
+          <div style={{ ...inputSt, background: "#f8f6f3", color: propNumPreview ? "#3a2a1a" : "#aaa", display: "flex", alignItems: "center", fontSize: 13, fontFamily: "monospace" }}>
+            {propNumPreview || "店舗を選択すると表示されます"}
+          </div>
+          {form.property_number && (
+            <div style={{ fontSize: 11, color: "#888", marginTop: 3 }}>現在: {form.property_number}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Tab labels ────────────────────────────────────────────────────────────────
 const TAB_LABELS = [
   "基本・取引","売主情報","所在地・交通","面積・建物","法令・権利",
@@ -736,7 +832,6 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
                 style={{ ...inputSt, resize: "vertical" }} />
             </div>
           </div>
-          <FI label="担当者ID" name="agent_id" form={form} setForm={setForm} placeholder="agent_001" />
         </div>
       )}
 
@@ -764,9 +859,7 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
             <FI label="仕入れ日" name="purchase_date" form={form} setForm={setForm} type="date" />
             <FI label="仕入れ経路" name="source" form={form} setForm={setForm} placeholder="売主直接・業者紹介等" />
           </div>
-          <div style={grid2}>
-            <FI label="ストアID" name="store_id" form={form} setForm={setForm} />
-          </div>
+          <StoreStaffSelector form={form} setForm={setForm} />
           <div style={rowSt}>
             <label style={labelSt}>社内メモ（非公開）</label>
             <textarea value={form.internal_memo ?? ""} rows={5}
