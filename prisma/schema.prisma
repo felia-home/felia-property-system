@@ -137,6 +137,81 @@ model Property {
   eq_reform_kitchen     Boolean   @default(false)
   eq_reform_bath        Boolean   @default(false)
 
+  // ===== 設備拡充（2024-2025年トレンド）=====
+  // キッチン詳細
+  eq_counter_kitchen      Boolean @default(false)
+  eq_cupboard             Boolean @default(false)
+  eq_pantry               Boolean @default(false)
+  eq_touchless_faucet     Boolean @default(false)
+  // 浴室・洗面・トイレ
+  eq_unit_bath            Boolean @default(false)
+  eq_separate_bath_toilet Boolean @default(false)
+  eq_double_wash          Boolean @default(false)
+  eq_laundry_space        Boolean @default(false)
+  eq_laundry_outdoor      Boolean @default(false)
+  eq_toilet_count         Int?
+  eq_washlet_all          Boolean @default(false)
+  // 収納
+  eq_shoe_closet          Boolean @default(false)
+  eq_trunk_room           Boolean @default(false)
+  eq_roof_storage         Boolean @default(false)
+  eq_all_room_storage     Boolean @default(false)
+  // 省エネ・環境
+  eq_high_insulation      Boolean @default(false)
+  eq_long_quality         Boolean @default(false)
+  eq_zeh                  Boolean @default(false)
+  eq_storage_battery      Boolean @default(false)
+  eq_ev_charger           Boolean @default(false)
+  eq_double_glazing       Boolean @default(false)
+  eq_ventilation          Boolean @default(false)
+  // セキュリティ詳細
+  eq_crime_prevention_glass Boolean @default(false)
+  eq_electronic_lock      Boolean @default(false)
+  eq_security_light       Boolean @default(false)
+  // 駐車・駐輪詳細
+  eq_parking_roofed       Boolean @default(false)
+  eq_parking_2cars        Boolean @default(false)
+  eq_electric_shutter     Boolean @default(false)
+  eq_bicycle_count        Int?
+  // 快適性
+  eq_floor_heating_all    Boolean @default(false)
+  eq_ceiling_height       Float?
+  eq_barrier_free         Boolean @default(false)
+  eq_elevator_private     Boolean @default(false)
+  // 通信・AV
+  eq_optical_fiber        Boolean @default(false)
+  eq_cable_tv             Boolean @default(false)
+  eq_interphone_video     Boolean @default(false)
+  // 外構・庭
+  eq_terrace              Boolean @default(false)
+  eq_roof_balcony         Boolean @default(false)
+  eq_patio                Boolean @default(false)
+  eq_wood_deck            Boolean @default(false)
+  // リフォーム・リノベ
+  eq_reformed             Boolean @default(false)
+  eq_renovated            Boolean @default(false)
+  eq_reform_year          Int?
+  eq_new_kitchen          Boolean @default(false)
+  eq_new_bath             Boolean @default(false)
+  eq_new_toilet           Boolean @default(false)
+  eq_new_floor            Boolean @default(false)
+  eq_new_wall             Boolean @default(false)
+  // 耐震
+  eq_earthquake_resistant String?
+  eq_seismic_isolation    Boolean @default(false)
+  eq_vibration_control    Boolean @default(false)
+  // 周辺環境
+  env_elementary_school   String?
+  env_junior_high_school  String?
+  env_supermarket         String?
+  env_hospital            String?
+  env_park                String?
+  env_disaster_risk       String?
+  env_crime_level         String?
+  env_noise_level         String?
+  env_sunlight            String?
+  env_view                String?
+
   // 掲載設定
   published_hp          Boolean   @default(false)
   published_members     Boolean   @default(false)

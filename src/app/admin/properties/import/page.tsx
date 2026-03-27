@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ParseResult } from "@/agents/document-parser";
+import type { ParseResult, GeneratedContent } from "@/agents/document-parser";
 
 // ============================================================
 // 定数
@@ -83,6 +83,10 @@ export default function ImportPage() {
   // Register state
   const [registering, setRegistering] = useState(false);
   const [registerError, setRegisterError] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [generated, setGenerated] = useState<{
+    title: string; catch_copy: string; description_hp: string;
+  } | null>(null);
 
   // ---- ファイル選択ハンドラ ----
   const handleFile = useCallback((file: File) => {
@@ -143,7 +147,7 @@ export default function ImportPage() {
   const handleRegister = async () => {
     if (!result) return;
 
-    const required = ["property_type", "price", "city", "station_name", "station_walk"];
+    const required = ["property_type", "price", "city"];
     for (const f of required) {
       if (!form[f]) {
         setRegisterError(`必須項目「${FIELDS.find((x) => x.key === f)?.label ?? f}」を入力してください`);
@@ -161,6 +165,11 @@ export default function ImportPage() {
         if (!val) continue;
         payload[field.key] = field.type === "number" ? Number(val) : val;
       }
+      // AI生成コンテンツをペイロードに含める
+      if (result.generated?.title) payload.title = result.generated.title;
+      if (result.generated?.catch_copy) payload.catch_copy = result.generated.catch_copy;
+      if (result.generated?.description_hp) payload.description_hp = result.generated.description_hp;
+      if (result.generated?.description_portal) payload.description_portal = result.generated.description_portal;
 
       const res = await fetch("/api/properties", {
         method: "POST",
@@ -172,7 +181,32 @@ export default function ImportPage() {
         setRegisterError(data.error ?? "登録に失敗しました");
         return;
       }
-      router.push("/admin/properties");
+
+      const propertyId: string = data.property.id;
+
+      // AIコンテンツ生成（登録後に非同期実行・失敗しても遷移）
+      setGenerating(true);
+      try {
+        const genRes = await fetch(`/api/properties/${propertyId}/generate-content`, {
+          method: "POST",
+        });
+        if (genRes.ok) {
+          const genData = await genRes.json();
+          setGenerated({
+            title: genData.content?.title ?? "",
+            catch_copy: genData.content?.catch_copy ?? "",
+            description_hp: genData.content?.description_hp ?? "",
+          });
+          // 2秒後に詳細ページへ
+          setTimeout(() => router.push(`/admin/properties/${propertyId}`), 2000);
+        } else {
+          router.push(`/admin/properties/${propertyId}`);
+        }
+      } catch {
+        router.push(`/admin/properties/${propertyId}`);
+      } finally {
+        setGenerating(false);
+      }
     } catch {
       setRegisterError("通信エラーが発生しました");
     } finally {
@@ -315,6 +349,30 @@ export default function ImportPage() {
             </div>
           </div>
 
+          {result.generated && (
+            <div style={{ background: "#e6f4ea", border: "1px solid #a3d4b0", borderRadius: 12, padding: "16px 20px", marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#234f35", letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 10 }}>AI自動生成コンテンツ（プレビュー）</div>
+              {result.generated.title && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 10, color: "#706e68", marginBottom: 2 }}>タイトル</div>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{result.generated.title}</div>
+                </div>
+              )}
+              {result.generated.catch_copy && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 10, color: "#706e68", marginBottom: 2 }}>キャッチコピー</div>
+                  <div style={{ fontSize: 13, color: "#234f35", fontWeight: 500 }}>{result.generated.catch_copy}</div>
+                </div>
+              )}
+              {result.generated.description_hp && (
+                <div>
+                  <div style={{ fontSize: 10, color: "#706e68", marginBottom: 2 }}>HP掲載文（プレビュー）</div>
+                  <div style={{ fontSize: 12, color: "#1c1b18", lineHeight: 1.6, maxHeight: 80, overflow: "hidden" }}>{result.generated.description_hp}</div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Fields form */}
           <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 24, marginBottom: 20 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: "#706e68", letterSpacing: ".06em", textTransform: "uppercase", marginBottom: 16, paddingBottom: 10, borderBottom: "1px solid #e0deda" }}>
@@ -382,6 +440,20 @@ export default function ImportPage() {
           {registerError && (
             <div style={{ background: "#fdeaea", color: "#8c1f1f", padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
               {registerError}
+            </div>
+          )}
+
+          {generating && (
+            <div style={{ background: "#e6f4ea", border: "1px solid #234f35", borderRadius: 8, padding: "14px 20px", marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: "#234f35", marginBottom: 4 }}>✓ 物件登録完了 — AIコンテンツ生成中...</div>
+              <div style={{ fontSize: 12, color: "#706e68" }}>タイトル・キャッチコピー・掲載文を自動生成しています</div>
+            </div>
+          )}
+          {generated && (
+            <div style={{ background: "#e6f4ea", border: "1px solid #234f35", borderRadius: 8, padding: "14px 20px", marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: "#234f35", marginBottom: 10 }}>✓ AIコンテンツ生成完了 — 物件詳細ページへ移動します</div>
+              {generated.title && <div style={{ fontSize: 12, marginBottom: 4 }}><b>タイトル:</b> {generated.title}</div>}
+              {generated.catch_copy && <div style={{ fontSize: 12, marginBottom: 4 }}><b>キャッチ:</b> {generated.catch_copy}</div>}
             </div>
           )}
 

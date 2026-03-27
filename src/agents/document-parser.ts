@@ -67,6 +67,7 @@ export interface ParseResult {
   raw_text: string;
   error?: string;
   agent: "DocumentParserAgent";
+  generated?: GeneratedContent;  // AI自動生成コンテンツ
 }
 
 // ============================================================
@@ -162,6 +163,20 @@ export async function parseDocument(input: ParseInput): Promise<ParseResult> {
       timestamp: new Date().toISOString(),
     }) + "\n");
 
+    // AI コンテンツ自動生成（失敗してもパース結果は返す）
+    let generated: GeneratedContent | undefined;
+    try {
+      generated = await generatePropertyContent(parsed.extracted || {});
+    } catch (genError) {
+      process.stderr.write(JSON.stringify({
+        level: "warn",
+        agent: "DocumentParserAgent",
+        message: "generatePropertyContent failed",
+        error: genError instanceof Error ? genError.message : String(genError),
+        timestamp: new Date().toISOString(),
+      }) + "\n");
+    }
+
     return {
       success: true,
       source_type: input.type,
@@ -172,6 +187,7 @@ export async function parseDocument(input: ParseInput): Promise<ParseResult> {
       low_confidence_fields: lowConfidenceFields,
       raw_text: parsed.raw_text || "",
       agent: "DocumentParserAgent",
+      generated,
     };
 
   } catch (error) {
@@ -196,6 +212,67 @@ export async function parseDocument(input: ParseInput): Promise<ParseResult> {
       raw_text: "",
       error: errorMessage,
       agent: "DocumentParserAgent",
+    };
+  }
+}
+
+// ============================================================
+// AI コンテンツ自動生成
+// ============================================================
+
+export interface GeneratedContent {
+  title: string;
+  catch_copy: string;
+  description_hp: string;
+  description_portal: string;
+  eq_summary: string;
+}
+
+export async function generatePropertyContent(
+  extracted: ExtractedProperty
+): Promise<GeneratedContent> {
+  const response = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 2000,
+    messages: [
+      {
+        role: "user",
+        content: `あなたはフェリアホーム（東京都心・城南・城西エリア専門の不動産仲介会社）の優秀な物件担当者です。以下の物件情報を元に各テキストを生成してください。
+
+## 物件情報
+${JSON.stringify(extracted, null, 2)}
+
+## 生成してください（JSON形式で返答）
+{
+  "title": "物件のタイトル（例: 目黒区平町2丁目 中古戸建｜東急東横線 代官山駅 徒歩8分 3LDK）",
+  "catch_copy": "キャッチコピー（40文字以内・購買意欲を高める・具体的な魅力を訴求）",
+  "description_hp": "HP掲載文（300〜500文字・エリアの特性・生活環境・物件の強みを具体的に）",
+  "description_portal": "ポータルサイト掲載文（200〜300文字・簡潔で検索にヒットしやすい）",
+  "eq_summary": "設備まとめ（「システムキッチン・食洗機・床暖房完備」のような形式）"
+}
+
+## 生成ルール
+- 不動産公正競争規約を遵守（最上級表現・絶対的表現は使わない）
+- 「最高」「絶対」「業界最安値」等の誇大表現は禁止
+- エリアの具体的な魅力を入れる
+- 価格・面積・駅距離などの数値は正確に記載
+- JSONのみ返答（前置きや説明は不要）`,
+      },
+    ],
+  });
+
+  const text =
+    response.content[0].type === "text" ? response.content[0].text : "{}";
+  const cleaned = text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+  try {
+    return JSON.parse(cleaned) as GeneratedContent;
+  } catch {
+    return {
+      title: "",
+      catch_copy: "",
+      description_hp: "",
+      description_portal: "",
+      eq_summary: "",
     };
   }
 }
