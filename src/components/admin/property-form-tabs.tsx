@@ -1,20 +1,28 @@
 "use client";
 import React from "react";
 
+// ── Numeric fields (stored as numbers, not strings) ──────────────────────────
 export const NUM_FIELDS = new Set([
-  "price","price_land","price_build","price_per_m2",
+  "price","price_land","price_build","price_per_m2","purchase_price",
   "station_walk1","station_walk2","station_walk3",
+  "bus_time1","bus_time2","bus_time3",
   "area_land_m2","area_land_tsubo","area_build_m2","area_build_tsubo",
   "area_exclusive_m2","area_exclusive_tsubo","area_balcony_m2",
   "building_year","building_month","floors_total","floors_basement","floor_unit","total_units",
+  "rooms_count","ldk_size",
   "bcr","far","road_width","setback_area",
   "management_fee","repair_reserve","other_monthly_fee","land_lease_fee",
   "fixed_asset_tax","city_planning_tax","eq_parking_fee",
   "eq_toilet_count","eq_bicycle_count","eq_reform_year","eq_ceiling_height",
+  "latitude","longitude",
 ]);
 
+// ── Boolean fields ────────────────────────────────────────────────────────────
 export const BOOL_FIELDS = new Set([
-  "price_tax_inc","private_road","setback_required",
+  "price_tax_inc","price_negotiable",
+  "private_road","setback_required",
+  "building_conditions","national_land_act","agricultural_act","landscape_act",
+  // equipment
   "eq_autolock","eq_elevator","eq_parking","eq_bike_parking","eq_storage",
   "eq_pet_ok","eq_system_kitchen","eq_all_electric","eq_floor_heating","eq_ac",
   "eq_solar","eq_home_security","eq_walk_in_closet","eq_2f_washroom","eq_washlet",
@@ -22,8 +30,6 @@ export const BOOL_FIELDS = new Set([
   "eq_gas_city","eq_gas_prop","eq_water_city","eq_water_well",
   "eq_sewage","eq_septic","eq_corner","eq_top_floor",
   "eq_new_interior","eq_new_exterior","eq_reform_kitchen","eq_reform_bath",
-  "published_hp","published_members","published_suumo","published_athome",
-  "published_yahoo","published_homes","compliance_checked",
   "eq_counter_kitchen","eq_cupboard","eq_pantry","eq_touchless_faucet",
   "eq_unit_bath","eq_separate_bath_toilet","eq_double_wash","eq_laundry_space","eq_laundry_outdoor","eq_washlet_all",
   "eq_shoe_closet","eq_trunk_room","eq_roof_storage","eq_all_room_storage",
@@ -35,46 +41,63 @@ export const BOOL_FIELDS = new Set([
   "eq_terrace","eq_roof_balcony","eq_patio","eq_wood_deck",
   "eq_reformed","eq_renovated","eq_new_kitchen","eq_new_bath","eq_new_toilet","eq_new_floor","eq_new_wall",
   "eq_seismic_isolation","eq_vibration_control",
+  // publish
+  "published_hp","published_members","published_suumo","published_athome",
+  "published_yahoo","published_homes","compliance_checked",
 ]);
 
+// ── Date fields ───────────────────────────────────────────────────────────────
 export const DATE_FIELDS = new Set([
-  "reins_registered_at","ad_valid_until",
+  "reins_registered_at","reins_updated_at","ad_valid_until","purchase_date",
 ]);
 
+// ── Default form values ───────────────────────────────────────────────────────
 export const INITIAL_FORM: Record<string, string> = {
+  // タブ1: 基本
   property_type: "USED_HOUSE",
   transaction_type: "仲介",
   brokerage_type: "専任",
   status: "DRAFT",
-  prefecture: "東京都",
-  city: "",
-  address: "",
-  address_chiban: "",
-  postal_code: "",
-  price: "",
-  price_land: "",
-  price_build: "",
-  price_per_m2: "",
-  price_tax_inc: "false",
+  price: "", price_land: "", price_build: "", price_per_m2: "",
+  price_tax_inc: "false", price_negotiable: "false",
+  ad_transfer_consent: "あり",
+  title: "", catch_copy: "",
+  description_hp: "", description_portal: "", description_suumo: "", description_athome: "",
+  agent_id: "",
+  // タブ2: 売主
+  seller_company: "", seller_contact: "", seller_agent: "",
+  seller_transaction_type: "", seller_brokerage_type: "",
+  purchase_price: "", purchase_date: "",
+  internal_memo: "", source: "", store_id: "",
+  // タブ3: 所在地
+  address_display_level: "town",
+  address_display_custom: "",
+  prefecture: "東京都", city: "", town: "", address: "",
+  address_chiban: "", postal_code: "", building_name: "", room_number: "",
+  latitude: "", longitude: "",
   station_line1: "", station_name1: "", station_walk1: "",
+  bus_stop1: "", bus_time1: "",
   station_line2: "", station_name2: "", station_walk2: "",
+  bus_stop2: "", bus_time2: "",
   station_line3: "", station_name3: "", station_walk3: "",
+  bus_stop3: "", bus_time3: "",
+  // タブ4: 面積・建物
   area_land_m2: "", area_land_tsubo: "",
   area_build_m2: "", area_build_tsubo: "",
   area_exclusive_m2: "", area_exclusive_tsubo: "",
   area_balcony_m2: "",
-  rooms: "", building_year: "", building_month: "",
-  structure: "", floors_total: "", floors_basement: "",
-  floor_unit: "", direction: "", total_units: "",
-  city_plan: "", use_zone: "", bcr: "", far: "",
   land_right: "所有権", land_category: "",
-  road_side: "", road_width: "", road_type: "",
+  building_year: "", building_month: "", structure: "",
+  floors_total: "", floors_basement: "", floor_unit: "",
+  direction: "", rooms: "", rooms_count: "", ldk_size: "",
+  eq_ceiling_height: "", total_units: "",
+  // タブ5: 法令・権利
+  city_plan: "", use_zone: "", bcr: "", far: "",
+  road_side: "", road_width: "", road_type: "", road_direction: "", road_contact: "",
   private_road: "false", setback_required: "false", setback_area: "",
-  management_fee: "", repair_reserve: "", other_monthly_fee: "",
-  land_lease_fee: "", fixed_asset_tax: "", city_planning_tax: "",
-  management_type: "", management_company: "",
-  delivery_timing: "", delivery_status: "空き家",
-  reins_number: "", reins_registered_at: "", ad_valid_until: "",
+  building_conditions: "false", rebuild_allowed: "",
+  national_land_act: "false", agricultural_act: "false", landscape_act: "false",
+  // タブ6: 設備
   eq_autolock: "false", eq_elevator: "false", eq_parking: "false",
   eq_parking_fee: "", eq_bike_parking: "false", eq_storage: "false",
   eq_pet_ok: "false", eq_system_kitchen: "false", eq_all_electric: "false",
@@ -89,34 +112,43 @@ export const INITIAL_FORM: Record<string, string> = {
   eq_corner: "false", eq_top_floor: "false",
   eq_new_interior: "false", eq_new_exterior: "false",
   eq_reform_kitchen: "false", eq_reform_bath: "false",
+  eq_counter_kitchen: "false", eq_cupboard: "false", eq_pantry: "false", eq_touchless_faucet: "false",
+  eq_unit_bath: "false", eq_separate_bath_toilet: "false", eq_double_wash: "false",
+  eq_laundry_space: "false", eq_laundry_outdoor: "false",
+  eq_toilet_count: "", eq_washlet_all: "false",
+  eq_shoe_closet: "false", eq_trunk_room: "false", eq_roof_storage: "false", eq_all_room_storage: "false",
+  eq_high_insulation: "false", eq_long_quality: "false", eq_zeh: "false",
+  eq_storage_battery: "false", eq_ev_charger: "false", eq_double_glazing: "false", eq_ventilation: "false",
+  eq_crime_prevention_glass: "false", eq_electronic_lock: "false", eq_security_light: "false",
+  eq_parking_roofed: "false", eq_parking_2cars: "false", eq_electric_shutter: "false", eq_bicycle_count: "",
+  eq_floor_heating_all: "false", eq_barrier_free: "false", eq_elevator_private: "false",
+  eq_optical_fiber: "false", eq_cable_tv: "false", eq_interphone_video: "false",
+  eq_terrace: "false", eq_roof_balcony: "false", eq_patio: "false", eq_wood_deck: "false",
+  eq_reformed: "false", eq_renovated: "false", eq_reform_year: "",
+  eq_new_kitchen: "false", eq_new_bath: "false", eq_new_toilet: "false",
+  eq_new_floor: "false", eq_new_wall: "false",
+  eq_earthquake_resistant: "", eq_seismic_isolation: "false", eq_vibration_control: "false",
+  // タブ7: マンション・費用
+  management_fee: "", repair_reserve: "", other_monthly_fee: "",
+  management_type: "", management_company: "",
+  land_lease_fee: "", fixed_asset_tax: "", city_planning_tax: "",
+  // タブ8: 引渡し・レインズ・掲載
+  delivery_timing: "", delivery_condition: "", delivery_status: "空き家",
+  reins_number: "", reins_registered_at: "", reins_updated_at: "", reins_status: "",
+  ad_valid_until: "",
   published_hp: "false", published_members: "false",
   published_suumo: "false", published_athome: "false",
   published_yahoo: "false", published_homes: "false",
-  compliance_checked: "false",
   suumo_id: "", athome_id: "", yahoo_id: "", homes_id: "",
-  agent_id: "", store_id: "", internal_memo: "", source: "",
-  title: "", catch_copy: "",
-  description_hp: "", description_portal: "",
-  description_suumo: "", description_athome: "",
-  eq_counter_kitchen:"false", eq_cupboard:"false", eq_pantry:"false", eq_touchless_faucet:"false",
-  eq_unit_bath:"false", eq_separate_bath_toilet:"false", eq_double_wash:"false", eq_laundry_space:"false",
-  eq_laundry_outdoor:"false", eq_toilet_count:"", eq_washlet_all:"false",
-  eq_shoe_closet:"false", eq_trunk_room:"false", eq_roof_storage:"false", eq_all_room_storage:"false",
-  eq_high_insulation:"false", eq_long_quality:"false", eq_zeh:"false", eq_storage_battery:"false",
-  eq_ev_charger:"false", eq_double_glazing:"false", eq_ventilation:"false",
-  eq_crime_prevention_glass:"false", eq_electronic_lock:"false", eq_security_light:"false",
-  eq_parking_roofed:"false", eq_parking_2cars:"false", eq_electric_shutter:"false", eq_bicycle_count:"",
-  eq_floor_heating_all:"false", eq_ceiling_height:"", eq_barrier_free:"false", eq_elevator_private:"false",
-  eq_optical_fiber:"false", eq_cable_tv:"false", eq_interphone_video:"false",
-  eq_terrace:"false", eq_roof_balcony:"false", eq_patio:"false", eq_wood_deck:"false",
-  eq_reformed:"false", eq_renovated:"false", eq_reform_year:"", eq_new_kitchen:"false",
-  eq_new_bath:"false", eq_new_toilet:"false", eq_new_floor:"false", eq_new_wall:"false",
-  eq_earthquake_resistant:"", eq_seismic_isolation:"false", eq_vibration_control:"false",
-  env_elementary_school:"", env_junior_high_school:"", env_supermarket:"", env_hospital:"",
-  env_park:"", env_disaster_risk:"", env_crime_level:"", env_noise_level:"", env_sunlight:"", env_view:"",
+  compliance_checked: "false",
+  // タブ9: 周辺環境
+  env_elementary_school: "", env_junior_high_school: "",
+  env_supermarket: "", env_hospital: "", env_park: "",
+  env_disaster_risk: "", env_crime_level: "",
+  env_noise_level: "", env_sunlight: "", env_view: "",
 };
 
-// Convert a DB property record to form string values
+// ── DB → form converter ────────────────────────────────────────────────────────
 export function propertyToForm(p: Record<string, unknown>): Record<string, string> {
   const form: Record<string, string> = { ...INITIAL_FORM };
   for (const [k, v] of Object.entries(p)) {
@@ -132,54 +164,57 @@ export function propertyToForm(p: Record<string, unknown>): Record<string, strin
   return form;
 }
 
-// Convert form string values to DB-ready object
+// ── form → body converter ──────────────────────────────────────────────────────
 export function formToBody(form: Record<string, string>): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(form)) {
     if (k === "status") { body[k] = v; continue; }
     if (BOOL_FIELDS.has(k)) { body[k] = v === "true"; continue; }
-    if (NUM_FIELDS.has(k)) {
-      body[k] = v === "" ? null : Number(v);
-      continue;
-    }
-    if (DATE_FIELDS.has(k)) {
-      body[k] = v === "" ? null : v;
-      continue;
-    }
+    if (NUM_FIELDS.has(k)) { body[k] = v === "" ? null : Number(v); continue; }
+    if (DATE_FIELDS.has(k)) { body[k] = v === "" ? null : v; continue; }
     body[k] = v === "" ? null : v;
   }
   return body;
 }
 
+// ── Shared styles ─────────────────────────────────────────────────────────────
 const inputSt: React.CSSProperties = {
   padding: "6px 10px", border: "1px solid #e0deda", borderRadius: 6,
   fontSize: 12, fontFamily: "inherit", width: "100%", boxSizing: "border-box",
 };
-const labelSt: React.CSSProperties = {
-  fontSize: 11, color: "#706e68", display: "block", marginBottom: 3,
-};
+const labelSt: React.CSSProperties = { fontSize: 11, color: "#706e68", display: "block", marginBottom: 3 };
 const rowSt: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 3 };
+const grid3: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 };
+const grid2: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 };
+const sectionTitle: React.CSSProperties = {
+  fontSize: 11, fontWeight: 600, color: "#706e68", letterSpacing: ".06em",
+  textTransform: "uppercase" as const, margin: "18px 0 10px",
+  paddingBottom: 6, borderBottom: "1px solid #e0deda",
+};
+const warningBox: React.CSSProperties = {
+  background: "#fdeaea", border: "1px solid #f5c6c6", borderRadius: 8,
+  padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#8c1f1f", fontWeight: 500,
+};
 
-function FI({ label, name, form, setForm, type = "text", placeholder }: {
-  label: string; name: string; form: Record<string, string>;
-  setForm: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  type?: string; placeholder?: string;
+// ── Form primitives ───────────────────────────────────────────────────────────
+type SetForm = React.Dispatch<React.SetStateAction<Record<string, string>>>;
+
+function FI({ label, name, form, setForm, type = "text", placeholder, disabled }: {
+  label: string; name: string; form: Record<string, string>; setForm: SetForm;
+  type?: string; placeholder?: string; disabled?: boolean;
 }) {
   return (
     <div style={rowSt}>
       <label style={labelSt}>{label}</label>
-      <input
-        type={type} value={form[name] ?? ""} placeholder={placeholder}
+      <input type={type} value={form[name] ?? ""} placeholder={placeholder} disabled={disabled}
         onChange={(e) => setForm(f => ({ ...f, [name]: e.target.value }))}
-        style={inputSt}
-      />
+        style={{ ...inputSt, background: disabled ? "#f7f6f2" : "#fff" }} />
     </div>
   );
 }
 
 function FS({ label, name, form, setForm, options }: {
-  label: string; name: string; form: Record<string, string>;
-  setForm: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  label: string; name: string; form: Record<string, string>; setForm: SetForm;
   options: { v: string; l: string }[];
 }) {
   return (
@@ -193,98 +228,89 @@ function FS({ label, name, form, setForm, options }: {
 }
 
 function FC({ label, name, form, setForm }: {
-  label: string; name: string; form: Record<string, string>;
-  setForm: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  label: string; name: string; form: Record<string, string>; setForm: SetForm;
 }) {
   return (
     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, cursor: "pointer" }}>
-      <input
-        type="checkbox"
-        checked={form[name] === "true"}
-        onChange={(e) => setForm(f => ({ ...f, [name]: e.target.checked ? "true" : "false" }))}
-      />
+      <input type="checkbox" checked={form[name] === "true"}
+        onChange={(e) => setForm(f => ({ ...f, [name]: e.target.checked ? "true" : "false" }))} />
       {label}
     </label>
   );
 }
 
-// m2 + tsubo dual input with auto-conversion
 function FM2({ labelM2, labelTsubo, nameM2, nameTsubo, form, setForm }: {
   labelM2: string; labelTsubo: string; nameM2: string; nameTsubo: string;
-  form: Record<string, string>;
-  setForm: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  form: Record<string, string>; setForm: SetForm;
 }) {
-  const handleM2Change = (v: string) => {
+  const handleM2 = (v: string) => {
     const n = parseFloat(v);
-    setForm(f => ({
-      ...f,
-      [nameM2]: v,
-      [nameTsubo]: isNaN(n) ? "" : String(Math.round(n * 0.3025 * 100) / 100),
-    }));
+    setForm(f => ({ ...f, [nameM2]: v, [nameTsubo]: isNaN(n) ? "" : String(Math.round(n * 0.3025 * 100) / 100) }));
   };
-  const handleTsuboChange = (v: string) => {
+  const handleTsubo = (v: string) => {
     const n = parseFloat(v);
-    setForm(f => ({
-      ...f,
-      [nameTsubo]: v,
-      [nameM2]: isNaN(n) ? "" : String(Math.round(n / 0.3025 * 100) / 100),
-    }));
+    setForm(f => ({ ...f, [nameTsubo]: v, [nameM2]: isNaN(n) ? "" : String(Math.round(n / 0.3025 * 100) / 100) }));
   };
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
       <div style={rowSt}>
         <label style={labelSt}>{labelM2}</label>
-        <input type="number" value={form[nameM2] ?? ""} onChange={e => handleM2Change(e.target.value)}
-          style={inputSt} step="0.01" />
+        <input type="number" value={form[nameM2] ?? ""} onChange={e => handleM2(e.target.value)} style={inputSt} step="0.01" />
       </div>
       <div style={rowSt}>
         <label style={labelSt}>{labelTsubo}</label>
-        <input type="number" value={form[nameTsubo] ?? ""} onChange={e => handleTsuboChange(e.target.value)}
-          style={inputSt} step="0.01" />
+        <input type="number" value={form[nameTsubo] ?? ""} onChange={e => handleTsubo(e.target.value)} style={inputSt} step="0.01" />
       </div>
     </div>
   );
 }
 
-const grid3: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 };
-const grid2: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 };
-const sectionTitle: React.CSSProperties = {
-  fontSize: 11, fontWeight: 600, color: "#706e68", letterSpacing: ".06em",
-  textTransform: "uppercase", margin: "20px 0 10px", paddingBottom: 6,
-  borderBottom: "1px solid #e0deda",
-};
+// ── Tab labels ────────────────────────────────────────────────────────────────
+const TAB_LABELS = [
+  "基本・取引","売主情報","所在地・交通","面積・建物","法令・権利",
+  "設備・仕様","マンション・費用","引渡し・掲載","地図・周辺環境",
+];
 
-const TAB_LABELS = ["基本情報","所在地・交通","面積・建物","法令・権利","設備・仕様","費用・管理","引渡し・レインズ","掲載設定"];
-
+// ── Main component ────────────────────────────────────────────────────────────
 interface TabsProps {
   tab: number;
   setTab: (n: number) => void;
   form: Record<string, string>;
-  setForm: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  setForm: SetForm;
 }
 
 export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
   const isLand = form.property_type === "LAND";
   const isMansion = form.property_type === "MANSION" || form.property_type === "NEW_MANSION";
 
+  const handleGeocode = async () => {
+    const addr = [form.prefecture, form.city, form.town, form.address].filter(Boolean).join("");
+    if (!addr) return;
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1`;
+      const res = await fetch(url);
+      const data = await res.json() as Array<{ lat: string; lon: string }>;
+      if (data[0]) {
+        setForm(f => ({ ...f, latitude: String(parseFloat(data[0].lat).toFixed(6)), longitude: String(parseFloat(data[0].lon).toFixed(6)) }));
+      }
+    } catch { /* ignore */ }
+  };
+
   return (
     <div>
       {/* Tab bar */}
-      <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e0deda", marginBottom: 20 }}>
+      <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e0deda", marginBottom: 20, flexWrap: "wrap" }}>
         {TAB_LABELS.map((l, i) => (
-          <button key={i} onClick={() => setTab(i)}
-            style={{
-              padding: "10px 16px", fontSize: 12, fontFamily: "inherit",
-              border: "none", borderBottom: tab === i ? "2px solid #234f35" : "2px solid transparent",
-              background: "none", cursor: "pointer", color: tab === i ? "#234f35" : "#706e68",
-              fontWeight: tab === i ? 600 : 400, whiteSpace: "nowrap",
-            }}>
-            {l}
-          </button>
+          <button key={i} onClick={() => setTab(i)} style={{
+            padding: "10px 14px", fontSize: 11, fontFamily: "inherit",
+            border: "none", borderBottom: tab === i ? "2px solid #234f35" : "2px solid transparent",
+            background: "none", cursor: "pointer", color: tab === i ? "#234f35" : "#706e68",
+            fontWeight: tab === i ? 600 : 400, whiteSpace: "nowrap",
+          }}>{l}</button>
         ))}
       </div>
 
-      {/* Tab 0: Basic info */}
+      {/* ── Tab 0: 基本・取引情報 ── */}
       {tab === 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={grid3}>
@@ -292,10 +318,10 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
               {v:"USED_HOUSE",l:"中古戸建"},{v:"NEW_HOUSE",l:"新築戸建"},
               {v:"MANSION",l:"中古マンション"},{v:"NEW_MANSION",l:"新築マンション"},{v:"LAND",l:"土地"},
             ]} />
-            <FS label="取引態様" name="transaction_type" form={form} setForm={setForm} options={[
+            <FS label="取引態様（フェリアホーム） *" name="transaction_type" form={form} setForm={setForm} options={[
               {v:"仲介",l:"仲介"},{v:"売主",l:"売主"},{v:"代理",l:"代理"},
             ]} />
-            <FS label="媒介契約種別" name="brokerage_type" form={form} setForm={setForm} options={[
+            <FS label="媒介種別" name="brokerage_type" form={form} setForm={setForm} options={[
               {v:"専任",l:"専任媒介"},{v:"専属専任",l:"専属専任媒介"},{v:"一般",l:"一般媒介"},
             ]} />
           </div>
@@ -304,13 +330,20 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
             <FI label="土地価格（万円）" name="price_land" form={form} setForm={setForm} type="number" />
             <FI label="建物価格（万円）" name="price_build" form={form} setForm={setForm} type="number" />
           </div>
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+            <FC label="価格応相談" name="price_negotiable" form={form} setForm={setForm} />
+            <FC label="消費税込み" name="price_tax_inc" form={form} setForm={setForm} />
+            <FS label="広告転載承諾" name="ad_transfer_consent" form={form} setForm={setForm} options={[
+              {v:"あり",l:"あり"},{v:"なし",l:"なし"},
+            ]} />
+          </div>
           <div style={grid2}>
-            <FI label="タイトル" name="title" form={form} setForm={setForm} placeholder="物件タイトル" />
-            <FI label="キャッチコピー" name="catch_copy" form={form} setForm={setForm} placeholder="駅徒歩5分・角地・南向き" />
+            <FI label="タイトル" name="title" form={form} setForm={setForm} placeholder="○○区○○ 中古戸建｜○○駅 徒歩5分 3LDK" />
+            <FI label="キャッチコピー（40文字以内）" name="catch_copy" form={form} setForm={setForm} placeholder="南向き角地・駅徒歩5分の閑静な住宅街" />
           </div>
           <div style={rowSt}>
             <label style={labelSt}>HP掲載文</label>
-            <textarea value={form.description_hp ?? ""} rows={3}
+            <textarea value={form.description_hp ?? ""} rows={4}
               onChange={(e) => setForm(f => ({ ...f, description_hp: e.target.value }))}
               style={{ ...inputSt, resize: "vertical" }} />
           </div>
@@ -332,31 +365,110 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
         </div>
       )}
 
-      {/* Tab 1: Location & Transport */}
+      {/* ── Tab 1: 売主情報（内部管理・非公開） ── */}
       {tab === 1 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={warningBox}>
+            このタブの情報はHP・ポータルに掲載されません。内部管理専用です。
+          </div>
+          <div style={grid3}>
+            <FI label="売主・元付業者名" name="seller_company" form={form} setForm={setForm} placeholder="○○不動産株式会社" />
+            <FI label="売主担当者名" name="seller_agent" form={form} setForm={setForm} placeholder="山田太郎" />
+            <FI label="連絡先（電話・メール）" name="seller_contact" form={form} setForm={setForm} placeholder="03-XXXX-XXXX" />
+          </div>
+          <div style={grid3}>
+            <FS label="販売図面の取引態様（元付）" name="seller_transaction_type" form={form} setForm={setForm} options={[
+              {v:"",l:"選択"},{v:"仲介",l:"仲介"},{v:"売主",l:"売主"},{v:"代理",l:"代理"},
+            ]} />
+            <FS label="媒介種別（元付）" name="seller_brokerage_type" form={form} setForm={setForm} options={[
+              {v:"",l:"選択"},{v:"専任",l:"専任媒介"},{v:"専属専任",l:"専属専任媒介"},{v:"一般",l:"一般媒介"},
+            ]} />
+          </div>
+          <div style={grid3}>
+            <FI label="仕入れ価格（万円）" name="purchase_price" form={form} setForm={setForm} type="number" />
+            <FI label="仕入れ日" name="purchase_date" form={form} setForm={setForm} type="date" />
+            <FI label="仕入れ経路" name="source" form={form} setForm={setForm} placeholder="売主直接・業者紹介等" />
+          </div>
+          <div style={grid2}>
+            <FI label="ストアID" name="store_id" form={form} setForm={setForm} />
+          </div>
+          <div style={rowSt}>
+            <label style={labelSt}>社内メモ（非公開）</label>
+            <textarea value={form.internal_memo ?? ""} rows={5}
+              onChange={(e) => setForm(f => ({ ...f, internal_memo: e.target.value }))}
+              style={{ ...inputSt, resize: "vertical" }} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Tab 2: 所在地・交通 ── */}
+      {tab === 2 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={sectionTitle}>住所表示設定</div>
+          <div style={grid3}>
+            <FS label="公開時の表示レベル" name="address_display_level" form={form} setForm={setForm} options={[
+              {v:"town",l:"丁目まで表示（推奨）"},
+              {v:"city",l:"市区町村のみ"},
+              {v:"custom",l:"カスタム表示"},
+            ]} />
+            {form.address_display_level === "custom" && (
+              <FI label="カスタム表示住所" name="address_display_custom" form={form} setForm={setForm} placeholder="渋谷区代官山エリア" />
+            )}
+          </div>
+          <div style={sectionTitle}>所在地</div>
           <div style={grid3}>
             <FI label="郵便番号" name="postal_code" form={form} setForm={setForm} placeholder="150-0001" />
             <FI label="都道府県" name="prefecture" form={form} setForm={setForm} />
             <FI label="市区町村 *" name="city" form={form} setForm={setForm} placeholder="渋谷区" />
           </div>
-          <div style={grid2}>
-            <FI label="町名・番地" name="address" form={form} setForm={setForm} placeholder="代官山町12-3" />
-            <FI label="地番" name="address_chiban" form={form} setForm={setForm} placeholder="地番（登記簿）" />
+          <div style={grid3}>
+            <FI label="町名・丁目（表示用）" name="town" form={form} setForm={setForm} placeholder="代官山町" />
+            <div style={rowSt}>
+              <label style={labelSt}>番地以降 <span style={{ color: "#8c1f1f", fontSize: 10 }}>内部管理・公開不可</span></label>
+              <input type="text" value={form.address ?? ""} placeholder="12-3"
+                onChange={(e) => setForm(f => ({ ...f, address: e.target.value }))}
+                style={{ ...inputSt, borderColor: "#f0ad4e" }} />
+            </div>
+            <FI label="地番（登記簿）" name="address_chiban" form={form} setForm={setForm} />
           </div>
-          <div style={sectionTitle}>最寄駅（最大3駅）</div>
-          {[1,2,3].map(n => (
-            <div key={n} style={grid3}>
-              <FI label={`路線${n}`} name={`station_line${n}`} form={form} setForm={setForm} placeholder="東急東横線" />
-              <FI label={`駅名${n}`} name={`station_name${n}`} form={form} setForm={setForm} placeholder="代官山" />
-              <FI label={`徒歩${n}（分）`} name={`station_walk${n}`} form={form} setForm={setForm} type="number" placeholder="5" />
+          {isMansion && (
+            <div style={grid3}>
+              <FI label="建物名" name="building_name" form={form} setForm={setForm} placeholder="○○マンション" />
+              <FI label="部屋番号" name="room_number" form={form} setForm={setForm} placeholder="301" />
+            </div>
+          )}
+          <div style={sectionTitle}>緯度・経度</div>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
+            <div style={{ flex: 1 }}>
+              <FI label="緯度" name="latitude" form={form} setForm={setForm} type="number" placeholder="35.658581" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <FI label="経度" name="longitude" form={form} setForm={setForm} type="number" placeholder="139.745433" />
+            </div>
+            <button onClick={handleGeocode} style={{
+              padding: "7px 14px", borderRadius: 7, fontSize: 12, fontWeight: 500,
+              background: "#234f35", color: "#fff", border: "none", cursor: "pointer",
+              fontFamily: "inherit", whiteSpace: "nowrap", marginBottom: 1,
+            }}>住所から自動取得</button>
+          </div>
+          <div style={sectionTitle}>最寄駅・交通（最大3件）</div>
+          {([1,2,3] as const).map(n => (
+            <div key={n}>
+              <div style={{ fontSize: 11, color: "#706e68", marginBottom: 6 }}>交通{n}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px 1fr 80px", gap: 8 }}>
+                <FI label="路線" name={`station_line${n}`} form={form} setForm={setForm} placeholder="東急東横線" />
+                <FI label="駅名" name={`station_name${n}`} form={form} setForm={setForm} placeholder="代官山" />
+                <FI label="徒歩(分)" name={`station_walk${n}`} form={form} setForm={setForm} type="number" />
+                <FI label="バス停名" name={`bus_stop${n}`} form={form} setForm={setForm} placeholder="○○バス停" />
+                <FI label="バス(分)" name={`bus_time${n}`} form={form} setForm={setForm} type="number" />
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Tab 2: Area & Building */}
-      {tab === 2 && (
+      {/* ── Tab 3: 面積・建物 ── */}
+      {tab === 3 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <FM2 labelM2="土地面積（㎡）" labelTsubo="土地面積（坪）" nameM2="area_land_m2" nameTsubo="area_land_tsubo" form={form} setForm={setForm} />
           {!isLand && (
@@ -368,29 +480,40 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
               <FI label="バルコニー面積（㎡）" name="area_balcony_m2" form={form} setForm={setForm} type="number" />
             </>
           )}
+          <div style={grid3}>
+            <FS label="土地権利" name="land_right" form={form} setForm={setForm} options={[
+              {v:"所有権",l:"所有権"},{v:"借地権",l:"借地権（地上権）"},{v:"賃借権",l:"借地権（賃借権）"},
+            ]} />
+            <FI label="地目" name="land_category" form={form} setForm={setForm} placeholder="宅地" />
+          </div>
           {!isLand && (
             <>
               <div style={sectionTitle}>建物情報</div>
               <div style={grid3}>
                 <FI label="間取り" name="rooms" form={form} setForm={setForm} placeholder="3LDK" />
-                <FI label="築年（西暦）" name="building_year" form={form} setForm={setForm} type="number" placeholder="2005" />
-                <FI label="築月" name="building_month" form={form} setForm={setForm} type="number" placeholder="3" />
+                <FI label="居室数" name="rooms_count" form={form} setForm={setForm} type="number" placeholder="3" />
+                <FI label="LDK帖数" name="ldk_size" form={form} setForm={setForm} type="number" placeholder="18" />
               </div>
               <div style={grid3}>
+                <FI label="築年（西暦）" name="building_year" form={form} setForm={setForm} type="number" placeholder="2005" />
+                <FI label="築月" name="building_month" form={form} setForm={setForm} type="number" placeholder="3" />
                 <FS label="構造" name="structure" form={form} setForm={setForm} options={[
                   {v:"",l:"選択"},{v:"木造",l:"木造"},{v:"軽量鉄骨",l:"軽量鉄骨"},
                   {v:"重量鉄骨",l:"重量鉄骨"},{v:"RC",l:"RC（鉄筋コンクリート）"},
                   {v:"SRC",l:"SRC（鉄骨鉄筋コンクリート）"},{v:"その他",l:"その他"},
                 ]} />
-                <FI label="地上階数" name="floors_total" form={form} setForm={setForm} type="number" />
-                <FI label="地下階数" name="floors_basement" form={form} setForm={setForm} type="number" />
               </div>
               <div style={grid3}>
+                <FI label="地上階数" name="floors_total" form={form} setForm={setForm} type="number" />
+                <FI label="地下階数" name="floors_basement" form={form} setForm={setForm} type="number" />
                 {isMansion && <FI label="所在階" name="floor_unit" form={form} setForm={setForm} type="number" />}
+              </div>
+              <div style={grid3}>
                 <FS label="向き" name="direction" form={form} setForm={setForm} options={[
                   {v:"",l:"選択"},{v:"南",l:"南"},{v:"南東",l:"南東"},{v:"南西",l:"南西"},
                   {v:"東",l:"東"},{v:"西",l:"西"},{v:"北東",l:"北東"},{v:"北西",l:"北西"},{v:"北",l:"北"},
                 ]} />
+                <FI label="天井高（m）" name="eq_ceiling_height" form={form} setForm={setForm} type="number" placeholder="2.4" />
                 {isMansion && <FI label="総戸数" name="total_units" form={form} setForm={setForm} type="number" />}
               </div>
             </>
@@ -398,8 +521,8 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
         </div>
       )}
 
-      {/* Tab 3: Legal & Rights */}
-      {tab === 3 && (
+      {/* ── Tab 4: 法令・権利 ── */}
+      {tab === 4 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={grid3}>
             <FS label="都市計画" name="city_plan" form={form} setForm={setForm} options={[
@@ -415,37 +538,50 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
               {v:"準住居",l:"準住居"},{v:"近隣商業",l:"近隣商業"},{v:"商業",l:"商業"},
               {v:"準工業",l:"準工業"},{v:"工業",l:"工業"},{v:"工業専用",l:"工業専用"},
             ]} />
-            <FS label="土地権利" name="land_right" form={form} setForm={setForm} options={[
-              {v:"所有権",l:"所有権"},{v:"借地権",l:"借地権（地上権）"},{v:"賃借権",l:"借地権（賃借権）"},
-            ]} />
           </div>
           <div style={grid3}>
             <FI label="建ぺい率（%）" name="bcr" form={form} setForm={setForm} type="number" placeholder="60" />
             <FI label="容積率（%）" name="far" form={form} setForm={setForm} type="number" placeholder="200" />
-            <FI label="地目" name="land_category" form={form} setForm={setForm} placeholder="宅地" />
           </div>
           <div style={sectionTitle}>接道状況</div>
           <div style={grid3}>
-            <FI label="接道方向・幅員" name="road_side" form={form} setForm={setForm} placeholder="南側6m" />
+            <FI label="接道状況（フリーテキスト）" name="road_contact" form={form} setForm={setForm} placeholder="南側6m公道に接道" />
+            <FI label="接道方向" name="road_direction" form={form} setForm={setForm} placeholder="南" />
             <FI label="前面道路幅員（m）" name="road_width" form={form} setForm={setForm} type="number" />
+          </div>
+          <div style={grid3}>
+            <FI label="接道方向・幅員（詳細）" name="road_side" form={form} setForm={setForm} placeholder="南側6m" />
             <FS label="道路種類" name="road_type" form={form} setForm={setForm} options={[
               {v:"",l:"選択"},{v:"公道",l:"公道"},{v:"私道",l:"私道"},{v:"公道・私道",l:"公道・私道"},
             ]} />
           </div>
-          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 4 }}>
             <FC label="私道負担あり" name="private_road" form={form} setForm={setForm} />
             <FC label="セットバック要" name="setback_required" form={form} setForm={setForm} />
-            {form.setback_required === "true" && (
+            <FC label="建築条件あり" name="building_conditions" form={form} setForm={setForm} />
+          </div>
+          {form.setback_required === "true" && (
+            <div style={{ width: "33%" }}>
               <FI label="セットバック面積（㎡）" name="setback_area" form={form} setForm={setForm} type="number" />
-            )}
+            </div>
+          )}
+          <div style={grid3}>
+            <FS label="再建築可否" name="rebuild_allowed" form={form} setForm={setForm} options={[
+              {v:"",l:"選択"},{v:"可",l:"再建築可"},{v:"不可",l:"再建築不可"},{v:"要確認",l:"要確認"},
+            ]} />
+          </div>
+          <div style={sectionTitle}>法令制限</div>
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+            <FC label="国土利用計画法届出" name="national_land_act" form={form} setForm={setForm} />
+            <FC label="農地法" name="agricultural_act" form={form} setForm={setForm} />
+            <FC label="景観法" name="landscape_act" form={form} setForm={setForm} />
           </div>
         </div>
       )}
 
-      {/* Tab 4: 設備・仕様 */}
-      {tab === 4 && (
+      {/* ── Tab 5: 設備・仕様 ── */}
+      {tab === 5 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* キッチン */}
           <div>
             <div style={sectionTitle}>キッチン</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
@@ -458,7 +594,6 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
               <FC label="全室床暖房" name="eq_floor_heating_all" form={form} setForm={setForm} />
             </div>
           </div>
-          {/* バス・洗面・トイレ */}
           <div>
             <div style={sectionTitle}>バス・洗面・トイレ</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
@@ -472,11 +607,10 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
               <FC label="全室温水洗浄便座" name="eq_washlet_all" form={form} setForm={setForm} />
               <FC label="2F洗面台" name="eq_2f_washroom" form={form} setForm={setForm} />
             </div>
-            <div style={{ marginTop: 8, width: "33%" }}>
+            <div style={{ marginTop: 8, width: "25%" }}>
               <FI label="トイレ数" name="eq_toilet_count" form={form} setForm={setForm} type="number" placeholder="2" />
             </div>
           </div>
-          {/* 収納 */}
           <div>
             <div style={sectionTitle}>収納</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
@@ -488,10 +622,10 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
               <FC label="物置あり" name="eq_storage" form={form} setForm={setForm} />
             </div>
           </div>
-          {/* 省エネ・環境 */}
           <div>
-            <div style={sectionTitle}>省エネ・環境</div>
+            <div style={sectionTitle}>冷暖房・省エネ</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+              <FC label="エアコン付き" name="eq_ac" form={form} setForm={setForm} />
               <FC label="高気密高断熱" name="eq_high_insulation" form={form} setForm={setForm} />
               <FC label="長期優良住宅" name="eq_long_quality" form={form} setForm={setForm} />
               <FC label="ZEH" name="eq_zeh" form={form} setForm={setForm} />
@@ -503,7 +637,6 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
               <FC label="24時間換気システム" name="eq_ventilation" form={form} setForm={setForm} />
             </div>
           </div>
-          {/* セキュリティ */}
           <div>
             <div style={sectionTitle}>セキュリティ</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
@@ -515,7 +648,6 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
               <FC label="TVモニタホン" name="eq_tv_intercom" form={form} setForm={setForm} />
             </div>
           </div>
-          {/* 駐車・駐輪 */}
           <div>
             <div style={sectionTitle}>駐車・駐輪</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
@@ -525,49 +657,24 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
               <FC label="電動シャッターガレージ" name="eq_electric_shutter" form={form} setForm={setForm} />
               <FC label="バイク置場" name="eq_bike_parking" form={form} setForm={setForm} />
             </div>
-            <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr 2fr", gap: 8 }}>
               <FI label="駐車場月額（円）" name="eq_parking_fee" form={form} setForm={setForm} type="number" />
               <FI label="駐輪台数" name="eq_bicycle_count" form={form} setForm={setForm} type="number" />
             </div>
           </div>
-          {/* 快適性・構造 */}
           <div>
-            <div style={sectionTitle}>快適性・構造</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-              <FC label="エアコン付き" name="eq_ac" form={form} setForm={setForm} />
-              <FC label="バリアフリー" name="eq_barrier_free" form={form} setForm={setForm} />
-              <FC label="ホームエレベーター" name="eq_elevator_private" form={form} setForm={setForm} />
-              <FC label="エレベーター（共用）" name="eq_elevator" form={form} setForm={setForm} />
-              <FC label="角部屋" name="eq_corner" form={form} setForm={setForm} />
-              <FC label="最上階" name="eq_top_floor" form={form} setForm={setForm} />
-              <FC label="ペット可" name="eq_pet_ok" form={form} setForm={setForm} />
+            <div style={sectionTitle}>耐震</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 8 }}>
+              <FC label="免震構造" name="eq_seismic_isolation" form={form} setForm={setForm} />
+              <FC label="制震装置" name="eq_vibration_control" form={form} setForm={setForm} />
             </div>
-            <div style={{ marginTop: 8, width: "33%" }}>
-              <FI label="天井高（m）" name="eq_ceiling_height" form={form} setForm={setForm} type="number" placeholder="2.4" />
+            <div style={{ width: "40%" }}>
+              <FS label="耐震基準" name="eq_earthquake_resistant" form={form} setForm={setForm} options={[
+                {v:"",l:"選択"},{v:"新耐震",l:"新耐震（1981年以降）"},{v:"旧耐震",l:"旧耐震（1981年以前）"},
+                {v:"耐震補強済み",l:"耐震補強済み"},
+              ]} />
             </div>
           </div>
-          {/* 通信・AV */}
-          <div>
-            <div style={sectionTitle}>通信・AV</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-              <FC label="光ファイバー" name="eq_optical_fiber" form={form} setForm={setForm} />
-              <FC label="ケーブルTV" name="eq_cable_tv" form={form} setForm={setForm} />
-              <FC label="テレビドアホン" name="eq_interphone_video" form={form} setForm={setForm} />
-              <FC label="BS・CS対応" name="eq_bs_cs" form={form} setForm={setForm} />
-              <FC label="インターネット光ファイバー" name="eq_fiber_optic" form={form} setForm={setForm} />
-            </div>
-          </div>
-          {/* 外構・庭 */}
-          <div>
-            <div style={sectionTitle}>外構・庭</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-              <FC label="テラス" name="eq_terrace" form={form} setForm={setForm} />
-              <FC label="ルーフバルコニー" name="eq_roof_balcony" form={form} setForm={setForm} />
-              <FC label="パティオ（中庭）" name="eq_patio" form={form} setForm={setForm} />
-              <FC label="ウッドデッキ" name="eq_wood_deck" form={form} setForm={setForm} />
-            </div>
-          </div>
-          {/* リフォーム・リノベ */}
           <div>
             <div style={sectionTitle}>リフォーム・リノベーション</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
@@ -581,73 +688,36 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
               <FC label="床新規張替済" name="eq_new_floor" form={form} setForm={setForm} />
               <FC label="クロス新規張替済" name="eq_new_wall" form={form} setForm={setForm} />
             </div>
-            <div style={{ marginTop: 8, width: "33%" }}>
+            <div style={{ marginTop: 8, width: "25%" }}>
               <FI label="リフォーム実施年" name="eq_reform_year" form={form} setForm={setForm} type="number" placeholder="2023" />
             </div>
           </div>
-          {/* 耐震 */}
           <div>
-            <div style={sectionTitle}>耐震</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 8 }}>
-              <FC label="免震構造" name="eq_seismic_isolation" form={form} setForm={setForm} />
-              <FC label="制震装置" name="eq_vibration_control" form={form} setForm={setForm} />
-            </div>
-            <div style={{ width: "50%" }}>
-              <FS label="耐震基準" name="eq_earthquake_resistant" form={form} setForm={setForm} options={[
-                {v:"",l:"選択"},{v:"新耐震",l:"新耐震（1981年以降）"},{v:"旧耐震",l:"旧耐震（1981年以前）"},
-                {v:"耐震補強済み",l:"耐震補強済み"},
-              ]} />
-            </div>
-          </div>
-          {/* ガス・水道（既存） */}
-          <div>
-            <div style={sectionTitle}>ガス・水道・下水</div>
+            <div style={sectionTitle}>その他・外構</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+              <FC label="テラス" name="eq_terrace" form={form} setForm={setForm} />
+              <FC label="ルーフバルコニー" name="eq_roof_balcony" form={form} setForm={setForm} />
+              <FC label="パティオ（中庭）" name="eq_patio" form={form} setForm={setForm} />
+              <FC label="ウッドデッキ" name="eq_wood_deck" form={form} setForm={setForm} />
+              <FC label="バリアフリー" name="eq_barrier_free" form={form} setForm={setForm} />
+              <FC label="ホームエレベーター" name="eq_elevator_private" form={form} setForm={setForm} />
+              <FC label="エレベーター（共用）" name="eq_elevator" form={form} setForm={setForm} />
+              <FC label="角部屋" name="eq_corner" form={form} setForm={setForm} />
+              <FC label="最上階" name="eq_top_floor" form={form} setForm={setForm} />
+              <FC label="ペット可" name="eq_pet_ok" form={form} setForm={setForm} />
+              <FC label="光ファイバー" name="eq_optical_fiber" form={form} setForm={setForm} />
+              <FC label="BS・CS対応" name="eq_bs_cs" form={form} setForm={setForm} />
               <FC label="都市ガス" name="eq_gas_city" form={form} setForm={setForm} />
               <FC label="プロパンガス" name="eq_gas_prop" form={form} setForm={setForm} />
               <FC label="公営水道" name="eq_water_city" form={form} setForm={setForm} />
-              <FC label="井戸水" name="eq_water_well" form={form} setForm={setForm} />
               <FC label="公共下水" name="eq_sewage" form={form} setForm={setForm} />
-              <FC label="浄化槽" name="eq_septic" form={form} setForm={setForm} />
-            </div>
-          </div>
-          {/* 周辺環境 */}
-          <div>
-            <div style={sectionTitle}>周辺環境情報</div>
-            <div style={grid2}>
-              <FI label="最寄り小学校（名称・距離）" name="env_elementary_school" form={form} setForm={setForm} placeholder="○○小学校 徒歩5分" />
-              <FI label="最寄り中学校（名称・距離）" name="env_junior_high_school" form={form} setForm={setForm} placeholder="○○中学校 徒歩8分" />
-              <FI label="最寄りスーパー（名称・距離）" name="env_supermarket" form={form} setForm={setForm} placeholder="○○スーパー 徒歩3分" />
-              <FI label="最寄り病院（名称・距離）" name="env_hospital" form={form} setForm={setForm} placeholder="○○クリニック 徒歩5分" />
-              <FI label="最寄り公園（名称・距離）" name="env_park" form={form} setForm={setForm} placeholder="○○公園 徒歩2分" />
-              <FI label="眺望" name="env_view" form={form} setForm={setForm} placeholder="富士山・スカイラインなど" />
-            </div>
-            <div style={{ marginTop: 12 }}>
-              <div style={grid2}>
-                <FS label="日当たり" name="env_sunlight" form={form} setForm={setForm} options={[
-                  {v:"",l:"選択"},{v:"良好",l:"良好"},{v:"普通",l:"普通"},{v:"やや暗い",l:"やや暗い"},
-                ]} />
-                <FS label="騒音レベル" name="env_noise_level" form={form} setForm={setForm} options={[
-                  {v:"",l:"選択"},{v:"静か",l:"静か"},{v:"普通",l:"普通"},{v:"やや騒がしい",l:"やや騒がしい"},
-                ]} />
-              </div>
-            </div>
-            <div style={{ marginTop: 12, ...rowSt }}>
-              <label style={labelSt}>ハザードマップ情報（洪水・土砂・地震）</label>
-              <input value={form.env_disaster_risk ?? ""} onChange={(e) => setForm(f => ({ ...f, env_disaster_risk: e.target.value }))}
-                placeholder="洪水リスク低・土砂災害区域外" style={inputSt} />
-            </div>
-            <div style={{ marginTop: 8, ...rowSt }}>
-              <label style={labelSt}>治安情報</label>
-              <input value={form.env_crime_level ?? ""} onChange={(e) => setForm(f => ({ ...f, env_crime_level: e.target.value }))}
-                placeholder="閑静な住宅街・防犯灯整備済み" style={inputSt} />
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab 5: Fees & Management */}
-      {tab === 5 && (
+      {/* ── Tab 6: マンション・費用 ── */}
+      {tab === 6 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {isMansion && (
             <>
@@ -659,15 +729,17 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
               </div>
               <div style={grid2}>
                 <FS label="管理形態" name="management_type" form={form} setForm={setForm} options={[
-                  {v:"",l:"選択"},{v:"全部委託",l:"全部委託"},{v:"一部委託",l:"一部委託"},
-                  {v:"自主管理",l:"自主管理"},
+                  {v:"",l:"選択"},{v:"全部委託",l:"全部委託"},{v:"一部委託",l:"一部委託"},{v:"自主管理",l:"自主管理"},
                 ]} />
                 <FI label="管理会社" name="management_company" form={form} setForm={setForm} />
               </div>
             </>
           )}
           {form.land_right !== "所有権" && (
-            <FI label="地代（月額・円）" name="land_lease_fee" form={form} setForm={setForm} type="number" />
+            <>
+              <div style={sectionTitle}>借地</div>
+              <FI label="地代（月額・円）" name="land_lease_fee" form={form} setForm={setForm} type="number" />
+            </>
           )}
           <div style={sectionTitle}>税金</div>
           <div style={grid2}>
@@ -677,11 +749,13 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
         </div>
       )}
 
-      {/* Tab 6: Delivery & REINS */}
-      {tab === 6 && (
+      {/* ── Tab 7: 引渡し・レインズ・掲載 ── */}
+      {tab === 7 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={sectionTitle}>引渡し</div>
           <div style={grid3}>
             <FI label="引渡し時期" name="delivery_timing" form={form} setForm={setForm} placeholder="即時・相談" />
+            <FI label="引渡し条件" name="delivery_condition" form={form} setForm={setForm} placeholder="更地渡し等" />
             <FS label="現況" name="delivery_status" form={form} setForm={setForm} options={[
               {v:"空き家",l:"空き家"},{v:"居住中",l:"居住中"},{v:"賃貸中",l:"賃貸中"},
               {v:"建築中",l:"建築中"},{v:"その他",l:"その他"},
@@ -691,47 +765,81 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
           <div style={grid3}>
             <FI label="レインズ番号" name="reins_number" form={form} setForm={setForm} />
             <FI label="レインズ登録日" name="reins_registered_at" form={form} setForm={setForm} type="date" />
+            <FI label="レインズ更新日" name="reins_updated_at" form={form} setForm={setForm} type="date" />
+          </div>
+          <div style={grid2}>
+            <FS label="レインズ状況" name="reins_status" form={form} setForm={setForm} options={[
+              {v:"",l:"選択"},{v:"登録済",l:"登録済"},{v:"未登録",l:"未登録"},{v:"登録予定",l:"登録予定"},
+            ]} />
             <FI label="広告有効期限" name="ad_valid_until" form={form} setForm={setForm} type="date" />
           </div>
+          <div style={sectionTitle}>掲載設定</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+            <FC label="フェリアホームHP（一般）" name="published_hp" form={form} setForm={setForm} />
+            <FC label="フェリアホームHP（会員限定）" name="published_members" form={form} setForm={setForm} />
+            <FC label="SUUMO" name="published_suumo" form={form} setForm={setForm} />
+            <FC label="athome" name="published_athome" form={form} setForm={setForm} />
+            <FC label="Yahoo不動産" name="published_yahoo" form={form} setForm={setForm} />
+            <FC label="HOME&apos;S" name="published_homes" form={form} setForm={setForm} />
+          </div>
+          <div style={grid2}>
+            <FI label="SUUMO物件ID" name="suumo_id" form={form} setForm={setForm} />
+            <FI label="athome物件ID" name="athome_id" form={form} setForm={setForm} />
+            <FI label="Yahoo不動産ID" name="yahoo_id" form={form} setForm={setForm} />
+            <FI label="HOME&apos;S物件ID" name="homes_id" form={form} setForm={setForm} />
+          </div>
+          <FC label="コンプライアンス確認済" name="compliance_checked" form={form} setForm={setForm} />
         </div>
       )}
 
-      {/* Tab 7: Publish settings & internal */}
-      {tab === 7 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <div>
-            <div style={sectionTitle}>掲載設定</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-              <FC label="フェリアホームHP（一般）" name="published_hp" form={form} setForm={setForm} />
-              <FC label="フェリアホームHP（会員限定）" name="published_members" form={form} setForm={setForm} />
-              <FC label="SUUMO" name="published_suumo" form={form} setForm={setForm} />
-              <FC label="athome" name="published_athome" form={form} setForm={setForm} />
-              <FC label="Yahoo不動産" name="published_yahoo" form={form} setForm={setForm} />
-              <FC label="HOME&apos;S" name="published_homes" form={form} setForm={setForm} />
+      {/* ── Tab 8: 地図・周辺環境 ── */}
+      {tab === 8 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* 地図プレビュー */}
+          {form.latitude && form.longitude ? (
+            <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid #e0deda" }}>
+              <iframe
+                src={`https://maps.google.com/maps?q=${form.latitude},${form.longitude}&z=16&output=embed`}
+                width="100%" height="360" style={{ border: 0, display: "block" }}
+                loading="lazy"
+                title="物件地図"
+              />
             </div>
+          ) : (
+            <div style={{ background: "#f7f6f2", borderRadius: 10, border: "1px solid #e0deda", padding: "40px 20px", textAlign: "center" }}>
+              <div style={{ fontSize: 13, color: "#706e68", marginBottom: 8 }}>地図を表示するには「所在地・交通」タブで緯度経度を設定してください</div>
+              <button onClick={() => setTab(2)} style={{
+                padding: "7px 16px", borderRadius: 7, fontSize: 12,
+                background: "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit",
+              }}>所在地タブへ</button>
+            </div>
+          )}
+          <div style={sectionTitle}>周辺施設</div>
+          <div style={grid2}>
+            <FI label="最寄り小学校（名称・距離）" name="env_elementary_school" form={form} setForm={setForm} placeholder="○○小学校 徒歩5分" />
+            <FI label="最寄り中学校（名称・距離）" name="env_junior_high_school" form={form} setForm={setForm} placeholder="○○中学校 徒歩8分" />
+            <FI label="最寄りスーパー（名称・距離）" name="env_supermarket" form={form} setForm={setForm} placeholder="○○スーパー 徒歩3分" />
+            <FI label="最寄り病院（名称・距離）" name="env_hospital" form={form} setForm={setForm} placeholder="○○クリニック 徒歩5分" />
+            <FI label="最寄り公園（名称・距離）" name="env_park" form={form} setForm={setForm} placeholder="○○公園 徒歩2分" />
+            <FI label="眺望" name="env_view" form={form} setForm={setForm} placeholder="富士山・スカイラインなど" />
           </div>
-          <div>
-            <div style={sectionTitle}>ポータルID</div>
-            <div style={grid2}>
-              <FI label="SUUMO物件ID" name="suumo_id" form={form} setForm={setForm} />
-              <FI label="athome物件ID" name="athome_id" form={form} setForm={setForm} />
-              <FI label="Yahoo不動産ID" name="yahoo_id" form={form} setForm={setForm} />
-              <FI label="HOME&apos;S物件ID" name="homes_id" form={form} setForm={setForm} />
-            </div>
+          <div style={grid2}>
+            <FS label="日当たり" name="env_sunlight" form={form} setForm={setForm} options={[
+              {v:"",l:"選択"},{v:"良好",l:"良好"},{v:"普通",l:"普通"},{v:"やや暗い",l:"やや暗い"},
+            ]} />
+            <FS label="騒音レベル" name="env_noise_level" form={form} setForm={setForm} options={[
+              {v:"",l:"選択"},{v:"静か",l:"静か"},{v:"普通",l:"普通"},{v:"やや騒がしい",l:"やや騒がしい"},
+            ]} />
           </div>
-          <div>
-            <div style={sectionTitle}>内部情報</div>
-            <div style={grid3}>
-              <FI label="ストアID" name="store_id" form={form} setForm={setForm} />
-              <FI label="仕入れ経路" name="source" form={form} setForm={setForm} placeholder="売主直接・業者紹介等" />
-              <FC label="コンプライアンス確認済" name="compliance_checked" form={form} setForm={setForm} />
-            </div>
-            <div style={{ marginTop: 12, ...rowSt }}>
-              <label style={labelSt}>社内メモ（非公開）</label>
-              <textarea value={form.internal_memo ?? ""} rows={4}
-                onChange={(e) => setForm(f => ({ ...f, internal_memo: e.target.value }))}
-                style={{ ...inputSt, resize: "vertical" }} />
-            </div>
+          <div style={rowSt}>
+            <label style={labelSt}>ハザードマップ情報（洪水・土砂・地震）</label>
+            <input value={form.env_disaster_risk ?? ""} placeholder="洪水リスク低・土砂災害区域外"
+              onChange={(e) => setForm(f => ({ ...f, env_disaster_risk: e.target.value }))} style={inputSt} />
+          </div>
+          <div style={rowSt}>
+            <label style={labelSt}>治安情報</label>
+            <input value={form.env_crime_level ?? ""} placeholder="閑静な住宅街・防犯灯整備済み"
+              onChange={(e) => setForm(f => ({ ...f, env_crime_level: e.target.value }))} style={inputSt} />
           </div>
         </div>
       )}

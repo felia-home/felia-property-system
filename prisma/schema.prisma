@@ -33,6 +33,14 @@ model Property {
   address               String    @default("")
   address_chiban        String?
   postal_code           String?
+  // 住所表示設定
+  address_display_level   String    @default("town") // town | city | custom
+  address_display_custom  String?
+  town                    String?   // 町名丁目（表示用）
+  building_name           String?
+  room_number             String?
+  latitude                Float?
+  longitude               Float?
 
   // 価格
   price                 Int       @default(0)
@@ -40,6 +48,8 @@ model Property {
   price_build           Int?
   price_tax_inc         Boolean   @default(false)
   price_per_m2          Float?
+  price_negotiable        Boolean   @default(false)
+  ad_transfer_consent     String    @default("あり")
 
   // 交通（3駅まで）
   station_line1         String?
@@ -51,6 +61,12 @@ model Property {
   station_line3         String?
   station_name3         String?
   station_walk3         Int?
+  bus_stop1               String?
+  bus_time1               Int?
+  bus_stop2               String?
+  bus_time2               Int?
+  bus_stop3               String?
+  bus_time3               Int?
 
   // 面積
   area_land_m2          Float?
@@ -71,6 +87,8 @@ model Property {
   floor_unit            Int?
   direction             String?
   total_units           Int?
+  rooms_count             Int?
+  ldk_size                Float?
 
   // 法令・権利
   city_plan             String?
@@ -85,6 +103,13 @@ model Property {
   private_road          Boolean   @default(false)
   setback_required      Boolean   @default(false)
   setback_area          Float?
+  road_direction          String?
+  road_contact            String?
+  building_conditions     Boolean   @default(false)
+  rebuild_allowed         String?
+  national_land_act       Boolean   @default(false)
+  agricultural_act        Boolean   @default(false)
+  landscape_act           Boolean   @default(false)
 
   // 費用・管理
   management_fee        Int?
@@ -102,6 +127,18 @@ model Property {
   reins_number          String?
   reins_registered_at   DateTime?
   ad_valid_until        DateTime?
+  reins_updated_at        DateTime?
+  reins_status            String?
+  delivery_condition      String?
+
+  // 売主情報（内部管理・非公開）
+  seller_company          String?
+  seller_contact          String?
+  seller_agent            String?
+  seller_transaction_type String?
+  seller_brokerage_type   String?
+  purchase_price          Int?
+  purchase_date           DateTime?
 
   // 設備
   eq_autolock           Boolean   @default(false)
