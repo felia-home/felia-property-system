@@ -22,6 +22,14 @@ export async function GET(request: NextRequest) {
       where,
       orderBy: { created_at: "desc" },
       take: 100,
+      include: {
+        images: {
+          select: { id: true, url: true, is_main: true },
+          orderBy: [{ is_main: "desc" }, { order: "asc" }],
+          take: 1,
+        },
+        _count: { select: { images: true } },
+      },
     });
 
     return NextResponse.json({ properties, total: properties.length });

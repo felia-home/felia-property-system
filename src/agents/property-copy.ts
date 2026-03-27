@@ -1,11 +1,31 @@
 /**
  * PropertyCopyAgent
  * ライフスタイル別訴求文・周辺環境サマリーを生成するエージェント
+ * 写真AI分析結果を活用してより具体的なHP掲載文を生成
  */
 
 import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic();
+
+export interface PhotoContext {
+  room_type: string;
+  ai_pr_text: string;
+}
+
+// Build a photo summary string from PropertyImage AI analysis results
+export function buildPhotoContext(photos: PhotoContext[]): string {
+  if (!photos.length) return "";
+  const grouped: Record<string, string[]> = {};
+  for (const p of photos) {
+    if (!p.ai_pr_text) continue;
+    if (!grouped[p.room_type]) grouped[p.room_type] = [];
+    grouped[p.room_type].push(p.ai_pr_text);
+  }
+  return Object.entries(grouped)
+    .map(([type, texts]) => `[${type}] ${texts[0]}`)
+    .join("\n");
+}
 
 export interface LifestyleContent {
   family_appeal: string;
@@ -24,8 +44,13 @@ export interface EnvironmentSummary {
 type PropertyInput = Record<string, unknown>;
 
 export async function generateLifestyleContent(
-  property: PropertyInput
+  property: PropertyInput,
+  photos?: PhotoContext[]
 ): Promise<LifestyleContent> {
+  const photoSection = photos?.length
+    ? `\n## 写真AI分析結果（これらを訴求文に自然に組み込んでください）\n${buildPhotoContext(photos)}\n`
+    : "";
+
   const response = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 1500,
@@ -36,7 +61,7 @@ export async function generateLifestyleContent(
 
 ## 物件情報
 ${JSON.stringify(property, null, 2)}
-
+${photoSection}
 ## 生成形式（JSONのみ返答）
 {
   "family_appeal": "ファミリー向け訴求文（150文字以内・子育て環境・広さ・収納・学区など）",

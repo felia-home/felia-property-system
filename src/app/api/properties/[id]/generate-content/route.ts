@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generatePropertyContent } from "@/agents/document-parser";
-import { generateLifestyleContent, generateEnvironmentSummary } from "@/agents/property-copy";
+import { generateLifestyleContent, generateEnvironmentSummary, buildPhotoContext } from "@/agents/property-copy";
 
 // POST /api/properties/[id]/generate-content
 export async function POST(
@@ -11,6 +11,13 @@ export async function POST(
   try {
     const property = await prisma.property.findUnique({
       where: { id: params.id },
+      include: {
+        images: {
+          where: { ai_analyzed_at: { not: null } },
+          select: { room_type: true, ai_pr_text: true },
+          orderBy: { order: "asc" },
+        },
+      },
     });
     if (!property) {
       return NextResponse.json({ error: "物件が見つかりません" }, { status: 404 });
@@ -18,9 +25,14 @@ export async function POST(
 
     const propertyData = property as Record<string, unknown>;
 
+    // Build photo context from AI-analyzed images
+    const photos = (property.images ?? [])
+      .filter(img => img.room_type && img.ai_pr_text)
+      .map(img => ({ room_type: img.room_type!, ai_pr_text: img.ai_pr_text! }));
+
     const [content, lifestyle, environment] = await Promise.all([
       generatePropertyContent(propertyData),
-      generateLifestyleContent(propertyData),
+      generateLifestyleContent(propertyData, photos),
       generateEnvironmentSummary(propertyData),
     ]);
 

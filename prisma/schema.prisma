@@ -281,7 +281,80 @@ model Property {
   updated_at            DateTime  @updatedAt
 
   history               PropertyHistory[]
+  images                PropertyImage[]
   @@map("properties")
+}
+
+model PropertyImage {
+  id              String   @id @default(cuid())
+  property_id     String
+  property        Property @relation(fields: [property_id], references: [id])
+  url             String
+  filename        String
+  file_size       Int?
+  mime_type       String?
+  order           Int      @default(0)
+  room_type       String?  // LIVING, KITCHEN, BEDROOM, BATHROOM, ENTRANCE, EXTERIOR, FLOOR_PLAN, BALCONY, OTHER
+  caption         String?
+  ai_caption      String?
+  ai_pr_text      String?
+  ai_confidence   Float?
+  ai_analyzed_at  DateTime?
+  is_main         Boolean  @default(false)
+  uploaded_by     String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  @@map("property_images")
+}
+
+model MansionBuilding {
+  id                 String   @id @default(cuid())
+  name               String
+  name_kana          String?
+  prefecture         String?
+  city               String?
+  address            String?
+  total_units        Int?
+  built_year         Int?
+  built_month        Int?
+  structure          String?
+  floors_total       Int?
+  floors_basement    Int?
+  management_company String?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+  exterior_images    MansionExteriorImage[]
+  @@map("mansion_buildings")
+}
+
+model MansionExteriorImage {
+  id         String          @id @default(cuid())
+  mansion_id String
+  mansion    MansionBuilding @relation(fields: [mansion_id], references: [id])
+  url        String
+  filename   String
+  caption    String?
+  is_primary Boolean  @default(false)
+  created_at DateTime @default(now())
+  @@map("mansion_exterior_images")
+}
+
+model PropertyEnvironmentImage {
+  id            String   @id @default(cuid())
+  url           String
+  filename      String
+  facility_type String   // SCHOOL, SUPERMARKET, PARK, STATION, HOSPITAL, CONVENIENCE_STORE, OTHER
+  facility_name String?
+  prefecture    String?
+  city          String?
+  address       String?
+  latitude      Float?
+  longitude     Float?
+  caption       String?
+  ai_caption    String?
+  uploaded_by   String?
+  created_at    DateTime @default(now())
+  @@map("property_environment_images")
 }
 
 model PropertyHistory {

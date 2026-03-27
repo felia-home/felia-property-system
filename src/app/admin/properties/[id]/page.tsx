@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import {
   PropertyFormTabs, propertyToForm, formToBody,
 } from "@/components/admin/property-form-tabs";
+import PhotoManager from "@/components/admin/photo-manager";
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "下書き", REVIEW: "AI確認中", PENDING: "承認待ち",
@@ -47,6 +48,7 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
   const [property, setProperty] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
+  const [mainTab, setMainTab] = useState<"info" | "photos">("info");
   const [form, setForm] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -161,8 +163,37 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
 
       {error && <div style={{ background: "#fdeaea", color: "#8c1f1f", padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>{error}</div>}
 
+      {/* Main tab switcher: 物件情報 / 写真管理 */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
+        {(["info", "photos"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setMainTab(t)}
+            style={{
+              padding: "8px 20px", fontSize: 13, borderRadius: 8,
+              border: "1px solid " + (mainTab === t ? "#234f35" : "#e0deda"),
+              background: mainTab === t ? "#234f35" : "#fff",
+              color: mainTab === t ? "#fff" : "#706e68",
+              fontWeight: mainTab === t ? 600 : 400,
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            {t === "info" ? "物件情報" : "写真管理"}
+          </button>
+        ))}
+      </div>
+
       <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 24 }}>
-        <PropertyFormTabs tab={tab} setTab={setTab} form={form} setForm={setForm} />
+        {mainTab === "info" ? (
+          <PropertyFormTabs tab={tab} setTab={setTab} form={form} setForm={setForm} />
+        ) : (
+          <PhotoManager
+            propertyId={params.id}
+            lat={property.latitude as number | null}
+            lng={property.longitude as number | null}
+            propertyType={String(property.property_type ?? "")}
+          />
+        )}
       </div>
     </div>
   );

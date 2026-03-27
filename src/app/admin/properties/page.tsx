@@ -44,6 +44,8 @@ interface Property {
   area_build_m2: number | null;
   agent_id: string | null;
   created_at: string;
+  images: Array<{ id: string; url: string; is_main: boolean }>;
+  _count: { images: number };
 }
 
 function daysAgo(dateStr: string): number {
@@ -125,7 +127,7 @@ export default function PropertiesPage() {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#f7f6f2" }}>
-              {["物件情報", "担当者", "ステータス", "価格", "掲載日数", "操作"].map((h) => (
+              {["", "物件情報", "写真", "ステータス", "価格", "掲載日数", "操作"].map((h) => (
                 <th key={h} style={{
                   textAlign: "left", fontSize: 10, fontWeight: 500,
                   color: "#706e68", letterSpacing: ".07em", textTransform: "uppercase",
@@ -137,54 +139,81 @@ export default function PropertiesPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>
+                <td colSpan={7} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>
                   読み込み中...
                 </td>
               </tr>
             ) : properties.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>
+                <td colSpan={7} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>
                   物件データがありません。PDF取込または新規登録から追加してください。
                 </td>
               </tr>
             ) : (
-              properties.map((p) => (
-                <tr key={p.id} style={{ borderBottom: "1px solid #f3f2ef" }}>
-                  <td style={{ padding: "14px 16px" }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>
-                      {TYPE_LABELS[p.property_type] ?? p.property_type}｜{p.city}{p.address}
-                    </div>
-                    <div style={{ fontSize: 11, color: "#706e68", marginTop: 3 }}>
-                      {p.station_name} 徒歩{p.station_walk}分
-                      {p.rooms ? `｜${p.rooms}` : ""}
-                      {p.area_build_m2 ? `｜${p.area_build_m2}㎡` : ""}
-                    </div>
-                  </td>
-                  <td style={{ padding: "14px 16px", fontSize: 12, color: "#706e68" }}>
-                    {p.agent_id ?? "—"}
-                  </td>
-                  <td style={{ padding: "14px 16px" }}>
-                    <span style={{
-                      ...badge(p.status),
-                      padding: "3px 10px", borderRadius: 99,
-                      fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
-                    }}>
-                      {STATUS_LABELS[p.status] ?? p.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: "14px 16px", fontSize: 13, fontWeight: 500, whiteSpace: "nowrap" }}>
-                    {p.price.toLocaleString()}万円
-                  </td>
-                  <td style={{ padding: "14px 16px", fontSize: 12, color: "#706e68" }}>
-                    {daysAgo(p.created_at)}日
-                  </td>
-                  <td style={{ padding: "14px 16px" }}>
-                    <a href={`/admin/properties/${p.id}`} style={{ fontSize: 12, color: "#234f35", textDecoration: "none", fontWeight: 500 }}>
-                      詳細
-                    </a>
-                  </td>
-                </tr>
-              ))
+              properties.map((p) => {
+                const mainImg = p.images?.[0];
+                const photoCount = p._count?.images ?? 0;
+                return (
+                  <tr key={p.id} style={{ borderBottom: "1px solid #f3f2ef" }}>
+                    {/* Thumbnail */}
+                    <td style={{ padding: "10px 12px 10px 16px", width: 72 }}>
+                      {mainImg ? (
+                        <img
+                          src={mainImg.url}
+                          alt=""
+                          style={{ width: 64, height: 48, objectFit: "cover", borderRadius: 6, display: "block" }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: 64, height: 48, borderRadius: 6,
+                          background: "#f3f2ef", display: "flex", alignItems: "center",
+                          justifyContent: "center", fontSize: 18, color: "#d0cec8",
+                        }}>🏠</div>
+                      )}
+                    </td>
+                    <td style={{ padding: "14px 16px" }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>
+                        {TYPE_LABELS[p.property_type] ?? p.property_type}｜{p.city}{p.address}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#706e68", marginTop: 3 }}>
+                        {p.station_name} 徒歩{p.station_walk}分
+                        {p.rooms ? `｜${p.rooms}` : ""}
+                        {p.area_build_m2 ? `｜${p.area_build_m2}㎡` : ""}
+                      </div>
+                    </td>
+                    {/* Photo count */}
+                    <td style={{ padding: "14px 12px", whiteSpace: "nowrap" }}>
+                      {photoCount === 0 ? (
+                        <span style={{ background: "#fdeaea", color: "#8c1f1f", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 10 }}>
+                          写真なし
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 12, color: "#706e68" }}>{photoCount}枚</span>
+                      )}
+                    </td>
+                    <td style={{ padding: "14px 16px" }}>
+                      <span style={{
+                        ...badge(p.status),
+                        padding: "3px 10px", borderRadius: 99,
+                        fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
+                      }}>
+                        {STATUS_LABELS[p.status] ?? p.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: "14px 16px", fontSize: 13, fontWeight: 500, whiteSpace: "nowrap" }}>
+                      {p.price.toLocaleString()}万円
+                    </td>
+                    <td style={{ padding: "14px 16px", fontSize: 12, color: "#706e68" }}>
+                      {daysAgo(p.created_at)}日
+                    </td>
+                    <td style={{ padding: "14px 16px" }}>
+                      <a href={`/admin/properties/${p.id}`} style={{ fontSize: 12, color: "#234f35", textDecoration: "none", fontWeight: 500 }}>
+                        詳細
+                      </a>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

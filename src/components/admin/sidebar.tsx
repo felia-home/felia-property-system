@@ -10,6 +10,8 @@ const navItems = [
   { href: "/admin/customers", label: "顧客管理", icon: "人" },
   { href: "/admin/contracts", label: "契約管理", icon: "📄" },
   { href: "/admin/sales", label: "売上管理", icon: "¥" },
+  { href: "/admin/mansions", label: "マンションマスタ", icon: "🏢" },
+  { href: "/admin/environment-images", label: "周辺環境写真", icon: "🌳" },
 ];
 
 export default function Sidebar() {
