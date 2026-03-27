@@ -2,40 +2,34 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
 const UPDATABLE_FIELDS = [
-  "property_type", "status", "title", "catch_copy",
-  "city", "address", "price",
-  "station_line", "station_name", "station_walk",
-  "area_land_m2", "area_build_m2", "area_exclusive_m2",
-  "rooms", "building_year", "building_month", "structure",
-  "floors_total", "floor_unit",
-  "delivery_timing", "reins_number", "city_plan", "use_zone",
-  "bcr", "far", "private_road",
-  "management_fee", "repair_reserve", "total_units",
-  "description_hp", "description_portal",
-  "published_hp", "published_suumo", "published_athome",
-  "compliance_checked", "agent_id",
+  "name", "name_kana", "email", "phone",
+  "budget_min", "budget_max",
+  "area_preferences", "property_type_pref", "rooms_pref", "area_m2_pref",
+  "status", "notes", "source", "assigned_agent_id",
+  "last_contacted_at", "next_action_date", "next_action_note",
 ];
 
-// GET /api/properties/[id]
+// GET /api/customers/[id]
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const property = await prisma.property.findUnique({
+    const customer = await prisma.customer.findUnique({
       where: { id: params.id },
+      include: { contracts: true },
     });
-    if (!property) {
-      return NextResponse.json({ error: "物件が見つかりません" }, { status: 404 });
+    if (!customer || customer.is_deleted) {
+      return NextResponse.json({ error: "顧客が見つかりません" }, { status: 404 });
     }
-    return NextResponse.json({ property });
+    return NextResponse.json({ customer });
   } catch (error) {
-    console.error("GET /api/properties/[id] error:", error);
+    console.error("GET /api/customers/[id] error:", error);
     return NextResponse.json({ error: "取得に失敗しました" }, { status: 500 });
   }
 }
 
-// PATCH /api/properties/[id]
+// PATCH /api/customers/[id]
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -52,31 +46,31 @@ export async function PATCH(
       return NextResponse.json({ error: "更新するフィールドがありません" }, { status: 400 });
     }
 
-    const property = await prisma.property.update({
+    const customer = await prisma.customer.update({
       where: { id: params.id },
       data,
     });
 
-    return NextResponse.json({ property });
+    return NextResponse.json({ customer });
   } catch (error) {
-    console.error("PATCH /api/properties/[id] error:", error);
+    console.error("PATCH /api/customers/[id] error:", error);
     return NextResponse.json({ error: "更新に失敗しました" }, { status: 500 });
   }
 }
 
-// DELETE /api/properties/[id] — 論理削除のみ
+// DELETE /api/customers/[id] — 論理削除
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    await prisma.property.update({
+    await prisma.customer.update({
       where: { id: params.id },
       data: { is_deleted: true, deleted_at: new Date() },
     });
     return NextResponse.json({ message: "削除しました" });
   } catch (error) {
-    console.error("DELETE /api/properties/[id] error:", error);
+    console.error("DELETE /api/customers/[id] error:", error);
     return NextResponse.json({ error: "削除に失敗しました" }, { status: 500 });
   }
 }

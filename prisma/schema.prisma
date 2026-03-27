@@ -159,3 +159,50 @@ model AuditLog {
   created_at  DateTime @default(now())
   @@map("audit_logs")
 }
+
+model Customer {
+  id                 String    @id @default(cuid())
+  crm_id             String?   @unique
+  name               String
+  name_kana          String?
+  email              String?
+  phone              String?
+  budget_min         Int?
+  budget_max         Int?
+  area_preferences   Json?
+  property_type_pref String?
+  rooms_pref         String?
+  area_m2_pref       Float?
+  status             String    @default("lead")
+  notes              String?
+  source             String?
+  assigned_agent_id  String?
+  last_contacted_at  DateTime?
+  next_action_date   DateTime?
+  next_action_note   String?
+  is_deleted         Boolean   @default(false)
+  deleted_at         DateTime?
+  contracts          Contract[]
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+  @@map("customers")
+}
+
+model Contract {
+  id                String    @id @default(cuid())
+  property_id       String
+  customer_id       String?
+  customer          Customer? @relation(fields: [customer_id], references: [id])
+  agent_id          String?
+  status            String    @default("draft")
+  contract_price    Int
+  commission_type   String    @default("both")
+  commission_amount Int?
+  commission_rate   Float?
+  contract_date     DateTime?
+  settlement_date   DateTime?
+  notes             String?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+  @@map("contracts")
+}
