@@ -6,10 +6,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const company_id = searchParams.get("company_id");
     const stores = await prisma.store.findMany({
-      where: { ...(company_id ? { company_id } : {}), is_active: true },
-      include: {
-        _count: { select: { staff: { where: { is_active: true } } } },
-      },
+      where: { ...(company_id ? { company_id } : {}) },
       orderBy: { name: "asc" },
     });
     return NextResponse.json({ stores });

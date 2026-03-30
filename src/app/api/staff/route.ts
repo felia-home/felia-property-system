@@ -49,10 +49,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as Record<string, unknown>;
+
+    // company_idが未指定の場合は最初の会社を自動取得
+    let companyId = body.company_id as string | null ?? null;
+    if (!companyId) {
+      const firstCompany = await prisma.company.findFirst({ select: { id: true } });
+      companyId = firstCompany?.id ?? null;
+    }
+
     const member = await prisma.staff.create({
       data: {
         store_id: body.store_id as string ?? null,
-        company_id: body.company_id as string ?? null,
+        company_id: companyId,
         name: body.name as string,
         name_kana: body.name_kana as string ?? null,
         permission: body.permission as string ?? "AGENT",
