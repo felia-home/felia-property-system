@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -40,6 +40,139 @@ const FIELD_LABELS: Record<string, string> = {
   status: "ステータス", seller_company: "元付業者名", seller_contact: "元付連絡先",
   internal_memo: "社内メモ",
 };
+
+// ── Felia HP Import Component ─────────────────────────────────────────────────
+
+interface HpProgressEvent {
+  type: "status" | "total" | "progress" | "done" | "error";
+  message?: string;
+  total?: number;
+  index?: number;
+  status?: "created" | "updated" | "skipped" | "error";
+  created?: number;
+  updated?: number;
+  skipped?: number;
+}
+
+function FeliahpImportSection() {
+  const [running, setRunning] = useState(false);
+  const [logs, setLogs] = useState<HpProgressEvent[]>([]);
+  const [done, setDone] = useState<{ created: number; updated: number; skipped: number; total: number } | null>(null);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs]);
+
+  const startImport = async () => {
+    setRunning(true);
+    setLogs([]);
+    setDone(null);
+
+    const res = await fetch("/api/import/from-felia-hp", { method: "POST" });
+    if (!res.ok || !res.body) {
+      setLogs([{ type: "error", message: "接続に失敗しました" }]);
+      setRunning(false);
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+
+    while (true) {
+      const { done: streamDone, value } = await reader.read();
+      if (streamDone) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split("\n\n");
+      buf = parts.pop() ?? "";
+      for (const part of parts) {
+        const line = part.replace(/^data: /, "").trim();
+        if (!line) continue;
+        try {
+          const evt = JSON.parse(line) as HpProgressEvent;
+          setLogs(prev => [...prev, evt]);
+          if (evt.type === "done") {
+            setDone({ created: evt.created ?? 0, updated: evt.updated ?? 0, skipped: evt.skipped ?? 0, total: evt.total ?? 0 });
+          }
+        } catch { /* ignore malformed */ }
+      }
+    }
+    setRunning(false);
+  };
+
+  const totalCount = logs.find(l => l.type === "total")?.total ?? 0;
+  const progressCount = logs.filter(l => l.type === "progress").length;
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 24, marginBottom: 20 }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: "#3a2a1a", marginBottom: 4 }}>自社HPから一括取込</div>
+      <div style={{ fontSize: 12, color: "#706e68", marginBottom: 16 }}>
+        フェリアホームHP（felia-home.co.jp）に掲載中の全物件をハトサポシステム経由で取込します。<br />
+        既存物件は物件番号で照合し上書き更新、新規物件は新規登録します。
+      </div>
+
+      {!running && !done && (
+        <button onClick={startImport}
+          style={{ padding: "9px 24px", borderRadius: 8, background: "#234f35", color: "#fff", border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+          取込を開始する
+        </button>
+      )}
+
+      {(running || logs.length > 0) && (
+        <div>
+          {totalCount > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#706e68", marginBottom: 4 }}>
+                <span>{running ? `処理中: ${progressCount} / ${totalCount}件` : "完了"}</span>
+                <span>{totalCount > 0 ? Math.round((progressCount / totalCount) * 100) : 0}%</span>
+              </div>
+              <div style={{ height: 6, background: "#f2f1ed", borderRadius: 99 }}>
+                <div style={{ height: "100%", borderRadius: 99, background: "#234f35", width: `${totalCount > 0 ? Math.min(100, Math.round((progressCount / totalCount) * 100)) : 0}%`, transition: "width .3s" }} />
+              </div>
+            </div>
+          )}
+
+          <div style={{ background: "#1c1b18", borderRadius: 8, padding: "12px 14px", maxHeight: 240, overflowY: "auto", fontSize: 11, fontFamily: "monospace", color: "#d4d0c8" }}>
+            {logs.map((l, i) => (
+              <div key={i} style={{ marginBottom: 2, color: l.type === "error" || l.status === "error" ? "#f08080" : l.status === "created" ? "#90ee90" : l.status === "updated" ? "#87ceeb" : "#d4d0c8" }}>
+                {l.message ?? JSON.stringify(l)}
+              </div>
+            ))}
+            <div ref={logsEndRef} />
+          </div>
+        </div>
+      )}
+
+      {done && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 12 }}>
+            {[
+              { label: "合計", value: done.total, color: "#3a2a1a" },
+              { label: "新規登録", value: done.created, color: "#234f35" },
+              { label: "更新", value: done.updated, color: "#1a56a0" },
+              { label: "スキップ", value: done.skipped, color: done.skipped > 0 ? "#8c1f1f" : "#888" },
+            ].map(({ label, value, color }) => (
+              <div key={label} style={{ background: "#f8f6f3", borderRadius: 10, padding: "12px 16px", textAlign: "center" }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color, fontFamily: "monospace" }}>{value}</div>
+                <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={() => { setLogs([]); setDone(null); }}
+              style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #e0deda", background: "#fff", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+              再実行
+            </button>
+            <Link href="/admin/properties" style={{ padding: "8px 18px", borderRadius: 8, background: "#234f35", color: "#fff", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
+              物件一覧を確認
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function CsvImportPage() {
@@ -130,6 +263,11 @@ export default function CsvImportPage() {
         </div>
         <Link href="/admin/properties" style={{ fontSize: 13, color: "#8c1f1f", textDecoration: "none" }}>← 物件一覧</Link>
       </div>
+
+      {/* Felia HP import */}
+      <FeliahpImportSection />
+
+      <div style={{ fontSize: 14, fontWeight: 600, color: "#3a2a1a", marginBottom: 16 }}>CSVファイルからインポート</div>
 
       {/* Step indicator */}
       <div style={{ display: "flex", gap: 0, marginBottom: 24 }}>

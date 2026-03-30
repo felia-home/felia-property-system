@@ -222,8 +222,8 @@ interface TextParseResult {
 function ImportPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") === "url" ? "url" : "pdf";
-  const [tab, setTab] = useState<"pdf" | "url">(initialTab);
+  const initialTab = searchParams.get("tab") === "scrape" ? "scrape" : searchParams.get("tab") === "url" ? "url" : "pdf";
+  const [tab, setTab] = useState<"pdf" | "url" | "scrape">(initialTab);
 
   // ── PDF state ──
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -232,6 +232,12 @@ function ImportPageInner() {
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState("");
   const [pdfResult, setPdfResult] = useState<ParseResult | null>(null);
+
+  // ── Scrape (URL auto-fetch) state ──
+  const [scrapeUrl, setScrapeUrl] = useState("");
+  const [scraping, setScraping] = useState(false);
+  const [scrapeError, setScrapeError] = useState("");
+  const [scrapeResult, setScrapeResult] = useState<TextParseResult | null>(null);
 
   // ── URL/Text state ──
   const [pastedText, setPastedText] = useState("");
@@ -355,8 +361,33 @@ function ImportPageInner() {
     finally { setRegistering(false); }
   };
 
+  // ── Scrape ──
+  const handleScrape = async () => {
+    if (!scrapeUrl.startsWith("http")) { setScrapeError("有効なURLを入力してください"); return; }
+    setScraping(true);
+    setScrapeError("");
+    setScrapeResult(null);
+    try {
+      const res = await fetch("/api/documents/scrape-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: scrapeUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setScrapeError(data.error ?? "取得に失敗しました"); return; }
+      setScrapeResult(data as TextParseResult);
+      const initial: Record<string, string> = {};
+      for (const [k, v] of Object.entries(data.extracted ?? {})) {
+        initial[k] = v !== null && v !== undefined ? String(v) : "";
+      }
+      setForm(initial);
+    } catch { setScrapeError("通信エラーが発生しました"); }
+    finally { setScraping(false); }
+  };
+
   const resetPdf = () => { setSelectedFile(null); setPdfResult(null); setForm({}); setParseError(""); };
   const resetText = () => { setPastedText(""); setSourceUrl(""); setTextResult(null); setForm({}); setExtractError(""); };
+  const resetScrape = () => { setScrapeUrl(""); setScrapeResult(null); setForm({}); setScrapeError(""); };
 
   // ============================================================
   // Render
@@ -372,7 +403,7 @@ function ImportPageInner() {
 
       {/* Tab switcher */}
       <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottom: "2px solid #e0deda" }}>
-        {([["pdf", "📄 PDFから取込"], ["url", "🔗 URLテキストから取込"]] as const).map(([t, label]) => (
+        {([["pdf", "📄 PDFから取込"], ["url", "📋 テキストから取込"], ["scrape", "🔗 URLから自動取得"]] as const).map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)}
             style={{ padding: "10px 24px", fontSize: 13, fontWeight: tab === t ? 600 : 400, color: tab === t ? "#8c1f1f" : "#706e68", background: "none", border: "none", borderBottom: tab === t ? "2px solid #8c1f1f" : "2px solid transparent", marginBottom: -2, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>
             {label}
@@ -425,6 +456,58 @@ function ImportPageInner() {
               generating={generating} generatedContent={generatedContent}
               onRegister={handleRegister}
               onReset={resetPdf}
+            />
+          )}
+        </>
+      )}
+
+      {/* ── Scrape Tab ── */}
+      {tab === "scrape" && (
+        <>
+          {!scrapeResult ? (
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 24, marginBottom: 20 }}>
+              <div style={{ background: "#f8f6f3", borderRadius: 10, padding: 16, marginBottom: 20, fontSize: 13, color: "#3a2a1a" }}>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>対応サイト</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <span style={{ background: "#e6f4ea", color: "#234f35", padding: "2px 8px", borderRadius: 99, fontSize: 11, fontWeight: 600 }}>✓ 対応</span>
+                  <span>ハトサポシステム使用サイト（東宝ハウス各社・多数の不動産会社）</span>
+                </div>
+                <div style={{ fontSize: 11, color: "#706e68", marginTop: 8 }}>
+                  URL例: https://www.toho-setagaya.co.jp/realestate/detail.php?k_number=...
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 16 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#5a4a3a" }}>物件詳細ページのURLを入力してください</label>
+                <input
+                  type="url"
+                  value={scrapeUrl}
+                  onChange={e => setScrapeUrl(e.target.value)}
+                  placeholder="https://www.toho-setagaya.co.jp/realestate/detail.php?k_number=H001..."
+                  style={{ border: "1px solid #e0deda", borderRadius: 7, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", width: "100%", boxSizing: "border-box" }}
+                  onKeyDown={e => { if (e.key === "Enter") handleScrape(); }}
+                />
+              </div>
+
+              {scrapeError && <div style={{ background: "#fdeaea", color: "#8c1f1f", padding: "8px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>{scrapeError}</div>}
+
+              <div style={{ textAlign: "center" }}>
+                <button onClick={handleScrape} disabled={scraping || !scrapeUrl.startsWith("http")}
+                  style={{ padding: "10px 36px", borderRadius: 8, fontSize: 14, fontWeight: 600, background: scraping ? "#888" : "#8c1f1f", color: "#fff", border: "none", cursor: (scraping || !scrapeUrl.startsWith("http")) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: !scrapeUrl.startsWith("http") ? 0.6 : 1 }}>
+                  {scraping ? "取得中..." : "物件情報を取得する"}
+                </button>
+                {scraping && <p style={{ fontSize: 12, color: "#706e68", marginTop: 8 }}>物件ページから情報を取得しています...</p>}
+              </div>
+            </div>
+          ) : (
+            <ResultForm
+              result={scrapeResult}
+              form={form} setForm={setForm}
+              generated={undefined}
+              registering={registering} registerError={registerError}
+              generating={generating} generatedContent={generatedContent}
+              onRegister={handleRegister}
+              onReset={resetScrape}
             />
           )}
         </>

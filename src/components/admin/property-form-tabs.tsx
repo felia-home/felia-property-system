@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useRef, useState, useEffect } from "react";
+import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { getTownsByCity } from "@/lib/tokyo-towns";
 import { TOKYO_WARDS, TOKYO_CITIES, TOKYO_TRAIN_LINES, USE_ZONE_OPTIONS, USE_ZONE_DEFAULTS, ROAD_DIRECTIONS } from "@/lib/master-data";
 
@@ -380,76 +380,79 @@ function PostalInput({ form, setForm }: { form: Record<string, string>; setForm:
 }
 
 // ── TownInput ─────────────────────────────────────────────────────────────────
-// 町名入力: 23区は静的リストの <select>、その他は Nominatim テキスト入力
+// コンボボックス: 区→静的候補を表示しつつフリーテキスト入力も可能
+// その他→Nominatim候補表示
 function TownInput({ form, setForm }: { form: Record<string, string>; setForm: SetForm }) {
   const city = form.city ?? "";
   const staticTowns = getTownsByCity(city);
   const isWard = staticTowns.length > 0;
 
-  // Nominatim fallback state (non-ward cities)
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [nominatimSuggestions, setNominatimSuggestions] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // When city changes to a ward, clear the town if it's not in the static list
+  const inputVal = form.town ?? "";
+
+  // Filtered static candidates: prefix match first, then substring
+  const filteredStatic = useMemo(() => {
+    if (!isWard) return [];
+    if (!inputVal) return staticTowns.slice(0, 15);
+    const prefix = staticTowns.filter(t => t.startsWith(inputVal));
+    const sub = staticTowns.filter(t => !t.startsWith(inputVal) && t.includes(inputVal));
+    return [...prefix, ...sub].slice(0, 15);
+  }, [isWard, inputVal, staticTowns]);
+
+  // Clear suggestions when city changes (do NOT clear the town text)
   useEffect(() => {
-    if (isWard && form.town && !staticTowns.includes(form.town)) {
-      setForm(f => ({ ...f, town: "" }));
-    }
-    setSuggestions([]);
+    setNominatimSuggestions([]);
     setOpen(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [city]);
 
-  const search = useCallback(async (q: string) => {
-    if (!q || !city) { setSuggestions([]); setOpen(false); return; }
+  const searchNominatim = useCallback(async (q: string) => {
+    if (!q || !city || isWard) { setNominatimSuggestions([]); setOpen(false); return; }
     const res = await fetch(`/api/address-suggest?city=${encodeURIComponent(city)}&town=${encodeURIComponent(q)}`);
     const data = await res.json() as { towns: string[] };
-    setSuggestions(data.towns ?? []);
-    setOpen(data.towns?.length > 0);
-  }, [city]);
+    setNominatimSuggestions(data.towns ?? []);
+    setOpen((data.towns?.length ?? 0) > 0);
+  }, [city, isWard]);
 
-  const handleTextChange = (v: string) => {
+  const handleChange = (v: string) => {
     setForm(f => ({ ...f, town: v }));
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => search(v), 350);
+    setOpen(true);
+    if (!isWard) {
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => searchNominatim(v), 350);
+    }
   };
 
-  if (isWard) {
-    return (
-      <div style={rowSt}>
-        <label style={labelSt}>町名・丁目（表示用）</label>
-        <select
-          value={form.town ?? ""}
-          onChange={e => setForm(f => ({ ...f, town: e.target.value }))}
-          style={inputSt}
-        >
-          <option value="">選択してください</option>
-          {staticTowns.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-      </div>
-    );
-  }
+  const candidates = isWard ? filteredStatic : nominatimSuggestions;
 
   return (
     <div style={{ ...rowSt, position: "relative" }}>
       <label style={labelSt}>町名・丁目（表示用）</label>
       <input
         type="text"
-        value={form.town ?? ""}
+        value={inputVal}
         placeholder="代官山町"
-        onChange={e => handleTextChange(e.target.value)}
-        onFocus={() => form.town && setOpen(suggestions.length > 0)}
+        onChange={e => handleChange(e.target.value)}
+        onFocus={() => { if (filteredStatic.length > 0 || nominatimSuggestions.length > 0) setOpen(true); }}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={e => { if (e.key === "Enter") { setOpen(false); } }}
         style={inputSt}
       />
-      {open && (
+      {isWard && (
+        <div style={{ fontSize: 10, color: "#999", marginTop: 3 }}>
+          ※リストにない場合はそのまま入力できます
+        </div>
+      )}
+      {open && candidates.length > 0 && (
         <div style={{
-          position: "absolute", top: "100%", left: 0, right: 0, zIndex: 30,
+          position: "absolute", top: "calc(100% + 2px)", left: 0, right: 0, zIndex: 30,
           background: "#fff", border: "1px solid #e0deda", borderRadius: 7,
-          boxShadow: "0 4px 16px rgba(0,0,0,.1)", maxHeight: 180, overflowY: "auto",
+          boxShadow: "0 4px 16px rgba(0,0,0,.1)", maxHeight: 200, overflowY: "auto",
         }}>
-          {suggestions.map(s => (
+          {candidates.map(s => (
             <button key={s} type="button"
               onClick={() => { setForm(f => ({ ...f, town: s })); setOpen(false); }}
               style={{ width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none", cursor: "pointer", fontSize: 13, fontFamily: "inherit", borderBottom: "1px solid #f2f1ed" }}>
