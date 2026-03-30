@@ -642,7 +642,7 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
             style={{ padding: "8px 20px", fontSize: 13, borderRadius: 8, border: "1px solid " + (mainTab === t ? "#234f35" : "#e0deda"), background: mainTab === t ? "#234f35" : "#fff", color: mainTab === t ? "#fff" : "#706e68", fontWeight: mainTab === t ? 600 : 400, cursor: "pointer", fontFamily: "inherit" }}>
             {label}
             {t === "workflow" && needsAdConfirm && (
-              <span style={{ marginLeft: 5, fontSize: 10, background: "#e65100", color: "#fff", borderRadius: 99, padding: "1px 5px" }}>!</span>
+              <span title="広告確認が未完了です。アクションタブで対応してください" style={{ marginLeft: 5, fontSize: 10, background: "#e65100", color: "#fff", borderRadius: 99, padding: "1px 5px" }}>!</span>
             )}
           </button>
         ))}

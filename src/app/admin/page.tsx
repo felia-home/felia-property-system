@@ -250,16 +250,16 @@ export default function DashboardPage() {
                           </div>
                           <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
                             {photoCount === 0 && !["DRAFT", "AD_PENDING", "AD_SENT"].includes(statusKey) && (
-                              <span style={{ fontSize: 9, background: "#fdeaea", color: "#8c1f1f", padding: "1px 5px", borderRadius: 4, fontWeight: 600 }}>📷なし</span>
+                              <span title="写真が登録されていません" style={{ fontSize: 9, background: "#fdeaea", color: "#8c1f1f", padding: "1px 5px", borderRadius: 4, fontWeight: 600 }}>📷なし</span>
                             )}
                             {photoCount > 0 && (
                               <span style={{ fontSize: 9, color: "#888" }}>📷{photoCount}</span>
                             )}
                             {isOverdue && (
-                              <span style={{ fontSize: 9, background: "#fff0e0", color: "#e65100", padding: "1px 5px", borderRadius: 4, fontWeight: 600 }}>⚠️{sentDays}日</span>
+                              <span title={`広告確認書を送付してから${sentDays}日経過しています`} style={{ fontSize: 9, background: "#fff0e0", color: "#e65100", padding: "1px 5px", borderRadius: 4, fontWeight: 600 }}>⚠️{sentDays}日</span>
                             )}
                             {(p.pending_tasks?.length ?? 0) > 0 && (
-                              <span style={{ fontSize: 9, color: "#8c1f1f" }}>❌{p.pending_tasks.length}</span>
+                              <span title={`未完了タスク: ${p.pending_tasks.join(", ")}`} style={{ fontSize: 9, color: "#8c1f1f" }}>❌{p.pending_tasks.length}</span>
                             )}
                           </div>
                         </div>

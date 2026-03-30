@@ -207,10 +207,10 @@ export default function PropertiesPage() {
                     {/* Photos */}
                     <td style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>
                       {photoCount === 0 ? (
-                        <span style={{ background: "#fdeaea", color: "#8c1f1f", fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 10 }}>📷なし</span>
+                        <span title="写真が登録されていません。写真管理から追加してください" style={{ background: "#fdeaea", color: "#8c1f1f", fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 10 }}>📷なし</span>
                       ) : (
                         <span style={{ fontSize: 12, color: photoCount < 5 ? "#e65100" : "#706e68" }}>
-                          📷{photoCount}枚{photoCount < 5 ? " △" : ""}
+                          📷{photoCount}枚{photoCount < 5 ? <span title="掲載には5枚以上の写真が推奨されます"> △</span> : ""}
                           {adOk && <span style={{ marginLeft: 4, fontSize: 10, color: "#234f35" }}>✅広告OK</span>}
                         </span>
                       )}
