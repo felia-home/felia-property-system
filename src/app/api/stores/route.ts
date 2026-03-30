@@ -8,14 +8,14 @@ export async function GET(request: NextRequest) {
     const stores = await prisma.store.findMany({
       where: { ...(company_id ? { company_id } : {}), is_active: true },
       include: {
-        _count: { select: { staff: { where: { is_retired: false } } } },
+        _count: { select: { staff: { where: { is_active: true } } } },
       },
       orderBy: { name: "asc" },
     });
     return NextResponse.json({ stores });
   } catch (error) {
     console.error("GET /api/stores error:", error);
-    return NextResponse.json({ error: "取得に失敗しました" }, { status: 500 });
+    return NextResponse.json({ stores: [] });
   }
 }
 

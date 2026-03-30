@@ -93,10 +93,17 @@ export default function StaffNewPage() {
 
         <div style={rowSt}>
           <label style={labelSt}>所属店舗</label>
-          <select value={form.store_id} onChange={e => setForm(f => ({ ...f, store_id: e.target.value }))} style={inputSt}>
-            <option value="">未設定</option>
-            {stores.map(s => <option key={s.id} value={s.id}>{s.name}（{s.store_code}）</option>)}
-          </select>
+          {stores.length === 0 ? (
+            <div style={{ padding: "12px 16px", background: "#fff8e1", border: "1px solid #f39c12", borderRadius: 8, fontSize: 13, color: "#8a5200" }}>
+              ⚠️ 店舗が登録されていません。
+              <a href="/admin/settings" style={{ color: "#1565c0", marginLeft: 4 }}>会社・店舗設定から店舗を登録してください</a>
+            </div>
+          ) : (
+            <select value={form.store_id} onChange={e => setForm(f => ({ ...f, store_id: e.target.value }))} style={inputSt}>
+              <option value="">未設定</option>
+              {stores.map(s => <option key={s.id} value={s.id}>{s.name}（{s.store_code}）</option>)}
+            </select>
+          )}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
