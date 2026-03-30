@@ -37,27 +37,31 @@ export default function StaffNewPage() {
     if (!form.name) { setError("氏名は必須です"); return; }
     setSaving(true);
     setError("");
-    const payload = {
-      store_id: form.store_id || null,
-      name: form.name,
-      name_kana: form.name_kana || null,
-      permission: form.permission,
-      email_work: form.email_work || null,
-      tel_mobile: form.tel_mobile || null,
-      employment_type: form.employment_type || null,
-      hire_date: form.hire_date || null,
-    };
-    const res = await fetch("/api/staff", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (res.ok) {
-      const d = await res.json() as { staff: { id: string } };
-      router.push(`/admin/staff/${d.staff.id}`);
-    } else {
-      const d = await res.json() as { error?: string };
-      setError(d.error ?? "作成に失敗しました");
+    try {
+      const payload = {
+        store_id: form.store_id || null,
+        name: form.name,
+        name_kana: form.name_kana || null,
+        permission: form.permission,
+        email_work: form.email_work || null,
+        tel_mobile: form.tel_mobile || null,
+        employment_type: form.employment_type || null,
+        hire_date: form.hire_date || null,
+      };
+      const res = await fetch("/api/staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const d = await res.json() as { staff?: { id: string }; error?: string };
+      if (res.ok && d.staff?.id) {
+        router.push(`/admin/staff/${d.staff.id}`);
+      } else {
+        setError(d.error ?? "作成に失敗しました");
+        setSaving(false);
+      }
+    } catch {
+      setError("通信エラーが発生しました");
       setSaving(false);
     }
   };

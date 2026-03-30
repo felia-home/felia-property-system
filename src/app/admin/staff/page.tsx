@@ -33,16 +33,21 @@ export default function StaffListPage() {
 
   const load = async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (permFilter !== "all") params.set("permission", permFilter);
-    if (storeFilter) params.set("store_id", storeFilter);
-    params.set("active", activeFilter === "active" ? "true" : "false");
-    params.set("includeStats", "true");
-    if (search) params.set("search", search);
-    const res = await fetch(`/api/staff?${params}`);
-    const data = await res.json() as { staff: StaffMember[] };
-    setStaff(data.staff ?? []);
-    setLoading(false);
+    try {
+      const params = new URLSearchParams();
+      if (permFilter !== "all") params.set("permission", permFilter);
+      if (storeFilter) params.set("store_id", storeFilter);
+      params.set("active", activeFilter === "active" ? "true" : "false");
+      params.set("includeStats", "true");
+      if (search) params.set("search", search);
+      const res = await fetch(`/api/staff?${params}`);
+      const data = await res.json() as { staff?: StaffMember[] };
+      setStaff(data.staff ?? []);
+    } catch {
+      setStaff([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -143,8 +148,8 @@ export default function StaffListPage() {
 
               <PermissionBadge permission={s.permission} />
 
-              {s.qualifications.length > 0 && (
-                <div style={{ fontSize: 11, color: "#706e68" }}>{s.qualifications.slice(0, 2).join("・")}{s.qualifications.length > 2 ? `他${s.qualifications.length - 2}件` : ""}</div>
+              {(s.qualifications ?? []).length > 0 && (
+                <div style={{ fontSize: 11, color: "#706e68" }}>{(s.qualifications ?? []).slice(0, 2).join("・")}{(s.qualifications ?? []).length > 2 ? `他${(s.qualifications ?? []).length - 2}件` : ""}</div>
               )}
 
               {s._count && (
