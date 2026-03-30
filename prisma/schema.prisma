@@ -300,6 +300,7 @@ model Property {
   // 内部情報
   property_number       String?
   agent_id              String?
+  successor_agent_id    String?
   store_id              String?
   internal_memo         String?
   source                String?
@@ -312,7 +313,8 @@ model Property {
   history               PropertyHistory[]
   images                PropertyImage[]
   store                 Store?    @relation(fields: [store_id], references: [id])
-  agent                 Staff?    @relation(fields: [agent_id], references: [id])
+  agent                 Staff?    @relation("PropertyAgent", fields: [agent_id], references: [id])
+  successor_agent       Staff?    @relation("PropertySuccessor", fields: [successor_agent_id], references: [id])
   @@map("properties")
 }
 
@@ -532,6 +534,7 @@ model Company {
   created_at          DateTime  @default(now())
   updated_at          DateTime  @updatedAt
   stores              Store[]
+  staffs              Staff[]
   @@map("companies")
 }
 
@@ -553,24 +556,87 @@ model Store {
 }
 
 model Staff {
-  id            String    @id @default(cuid())
-  store_id      String
-  store         Store     @relation(fields: [store_id], references: [id])
-  name          String
-  name_kana     String?
-  email         String?
-  phone         String?
-  role          String    @default("agent") // agent | manager | admin
-  license_number String?  // 宅建士証番号
-  is_retired    Boolean   @default(false)
-  retired_at    DateTime?
-  successor_id  String?   // 引継ぎ先スタッフID
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
-  properties    Property[]
+  id                String    @id @default(cuid())
+  company_id        String?
+  company           Company?  @relation(fields: [company_id], references: [id])
+  store_id          String?
+  store             Store?    @relation(fields: [store_id], references: [id])
+
+  // ===== 権限 =====
+  permission        String    @default("AGENT")
+
+  // ===== 基本情報 =====
+  employee_number   String?   @unique
+  name              String
+  name_kana         String?
+  name_en           String?
+  nickname          String?
+
+  // ===== 役職・資格 =====
+  position          String?
+  qualifications    String[]
+  takken_number     String?
+  takken_prefecture String?
+  takken_expires_at DateTime?
+
+  // ===== 業務用連絡先 =====
+  email_work        String?   @unique
+  tel_work          String?
+  tel_mobile        String?
+  extension         String?
+
+  // ===== 個人情報 =====
+  email_personal    String?
+  tel_personal      String?
+  postal_code       String?
+  prefecture        String?
+  city              String?
+  address           String?
+  birth_date        DateTime?
+  gender            String?
+  blood_type        String?
+  emergency_contact String?
+  emergency_tel     String?
+  emergency_relation String?
+
+  // ===== 雇用情報 =====
+  employment_type   String?
+  hire_date         DateTime?
+  trial_end_date    DateTime?
+  department        String?
+  annual_salary     Int?
+
+  // ===== 不動産業務スキル =====
+  specialty_areas   String[]
+  specialty_types   String[]
+  monthly_target    Int?
+  career_history    String?
+
+  // ===== HP・プロフィール公開情報 =====
+  photo_url         String?
+  bio               String?
+  catchphrase       String?
+  published_hp      Boolean   @default(false)
+  hp_order          Int       @default(0)
+
+  // ===== 在籍・退職 =====
+  is_active         Boolean   @default(true)
+  retirement_date   DateTime?
+  retirement_reason String?
+  successor_id      String?
+
+  // ===== システム =====
+  last_login_at     DateTime?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  // ===== リレーション =====
+  properties_as_agent     Property[] @relation("PropertyAgent")
+  properties_as_successor Property[] @relation("PropertySuccessor")
   transfers_from PropertyTransfer[] @relation("TransferFrom")
   transfers_to   PropertyTransfer[] @relation("TransferTo")
-  @@map("staff")
+
+  @@map("staffs")
 }
 
 model PropertyTransfer {

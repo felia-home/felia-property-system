@@ -40,6 +40,7 @@ export default function DashboardPage() {
   const [properties, setProperties] = useState<PropertySummary[]>([]);
   const [loadingProps, setLoadingProps] = useState(true);
   const [licenseAlerts, setLicenseAlerts] = useState<{ company: string; expiry: Date; daysLeft: number }[]>([]);
+  const [takkenAlerts, setTakkenAlerts] = useState<{ name: string; daysLeft: number }[]>([]);
 
   useEffect(() => {
     fetch("/api/properties?take=300")
@@ -60,6 +61,23 @@ export default function DashboardPage() {
           }] : []
         ).filter(a => a.daysLeft <= 90);
         setLicenseAlerts(alerts);
+      })
+      .catch(() => {});
+
+    // Takken expiry check
+    fetch("/api/staff?active=true&includeStats=false")
+      .then(r => r.json())
+      .then((d: { staff: { id: string; name: string; takken_expires_at: string | null }[] }) => {
+        const today = Date.now();
+        const alerts = (d.staff ?? []).filter(s => {
+          if (!s.takken_expires_at) return false;
+          const daysLeft = Math.floor((new Date(s.takken_expires_at).getTime() - today) / 86400000);
+          return daysLeft <= 90 && daysLeft >= 0;
+        }).map(s => ({
+          name: s.name,
+          daysLeft: Math.floor((new Date(s.takken_expires_at!).getTime() - today) / 86400000),
+        }));
+        setTakkenAlerts(alerts);
       })
       .catch(() => {});
   }, []);
@@ -146,6 +164,20 @@ export default function DashboardPage() {
           </div>
         </Link>
       ))}
+
+      {takkenAlerts.length > 0 && (
+        <div style={{ background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 10, padding: "12px 16px", marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#664d03", marginBottom: 6 }}>
+            ⚠️ 宅建士証の更新期限が近いスタッフがいます（{takkenAlerts.length}名）
+          </div>
+          {takkenAlerts.map(a => (
+            <div key={a.name} style={{ fontSize: 12, color: "#664d03" }}>
+              {a.name} — あと <strong>{a.daysLeft}日</strong>
+            </div>
+          ))}
+          <a href="/admin/staff" style={{ fontSize: 12, color: "#8c1f1f", marginTop: 6, display: "inline-block" }}>スタッフ管理で確認 →</a>
+        </div>
+      )}
 
       {/* Alert banner */}
       {(hasCritical || hasWarning) && (
