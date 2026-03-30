@@ -12,6 +12,7 @@ const navItems = [
   { href: "/admin/sales", label: "売上管理", icon: "¥" },
   { href: "/admin/mansions", label: "マンションマスタ", icon: "🏢" },
   { href: "/admin/environment-images", label: "周辺環境写真", icon: "🌳" },
+  { href: "/admin/import", label: "データインポート", icon: "📥" },
   { href: "/admin/staff", label: "スタッフ管理", icon: "👤" },
   { href: "/admin/settings", label: "会社・店舗設定", icon: "⚙" },
 ];

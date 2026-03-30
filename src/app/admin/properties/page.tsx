@@ -90,10 +90,18 @@ export default function PropertiesPage() {
           <p style={{ fontSize: 12, color: "#706e68", marginTop: 4 }}>登録物件の管理・掲載設定</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          <a href="/admin/import" style={{
+            padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500,
+            background: "#fff", border: "1px solid #e0deda", color: "#1c1b18", textDecoration: "none",
+          }}>📥 CSVインポート</a>
+          <a href="/admin/properties/import?tab=url" style={{
+            padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500,
+            background: "#fff", border: "1px solid #e0deda", color: "#1c1b18", textDecoration: "none",
+          }}>🔗 URLから取込</a>
           <a href="/admin/properties/import" style={{
             padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500,
             background: "#fff", border: "1px solid #e0deda", color: "#1c1b18", textDecoration: "none",
-          }}>PDF取込</a>
+          }}>📄 PDF取込</a>
           <a href="/admin/properties/new" style={{
             padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500,
             background: "#234f35", color: "#fff", textDecoration: "none",

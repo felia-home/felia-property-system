@@ -31,6 +31,15 @@ export interface ExtractedProperty {
   address?: string;
   prefecture?: string;
   city?: string;
+  town?: string;
+  address_detail?: string;
+  station_line1?: string;
+  station_name1?: string;
+  station_walk1?: number;
+  station_line2?: string;
+  station_name2?: string;
+  station_walk2?: number;
+  // legacy single-field names (kept for backward compat)
   station_line?: string;
   station_name?: string;
   station_walk?: number;
@@ -43,6 +52,7 @@ export interface ExtractedProperty {
   structure?: string;
   floors_total?: number;
   floor_unit?: number;
+  direction?: string;
   delivery_timing?: string;
   reins_number?: string;
   bcr?: number;
@@ -52,8 +62,21 @@ export interface ExtractedProperty {
   total_units?: number;
   city_plan?: string;
   use_zone?: string;
+  use_zones?: Array<{ use_zone: string; bcr: number; far: number }>;
+  roads?: Array<{ direction: string; road_type: string; width_m: number; is_front: boolean }>;
+  land_right?: string;
+  land_category?: string;
   private_road?: boolean;
   features?: string[];
+  equipment_list?: string[];
+  // 売主・元付業者情報（内部管理・非公開）
+  seller_company?: string;
+  seller_contact?: string;
+  seller_transaction_type?: string;
+  seller_brokerage_type?: string;
+  our_transaction_type?: string;
+  ad_transfer_ok?: boolean;
+  current_status?: string;
 }
 
 export interface ParseResult {
@@ -283,48 +306,120 @@ ${JSON.stringify(extracted, null, 2)}
 
 function buildExtractionPrompt(): string {
   return `
-あなたは不動産の販売図面・物件資料から情報を抽出する専門家です。
-添付されたPDFまたは画像から物件情報を読み取り、以下のJSON形式で出力してください。
+あなたは不動産販売図面・物件資料の専門的な解析AIです。
+添付された画像/PDFから物件情報を漏れなく抽出してください。
 
-## 出力形式（このJSONのみ出力。前置き・説明不要）
+## 最重要: 売主・元付業者情報の抽出
+
+販売図面には必ず以下のいずれかの形式で不動産会社情報が記載されています。
+**これを見落とさず必ず抽出してください。**
+
+### 探すべき情報の場所
+1. 図面の右下・左下・下部フッター部分
+2. 「問い合わせ先」「お問合せ」「取扱会社」セクション
+3. 会社のロゴ・社名が印刷されている部分
+4. 「媒介」「取引態様」と一緒に記載されている会社名
+5. 電話番号・FAX番号の近く
+
+### 抽出する情報
+- 会社名（例: 株式会社〇〇不動産、〇〇ホーム 渋谷店）
+- 電話番号・FAX番号
+- 担当者名（記載があれば）
+- 宅建業免許番号（記載があれば）
+- 取引態様（専任媒介・専属専任媒介・一般媒介・売主・代理）
+
+### 重要な区別
+- この情報は「元付業者（販売図面を作成した不動産会社）」の情報です
+- フェリアホーム（買付け側）の取引態様は必ず「仲介」として our_transaction_type に設定
+- 図面記載の取引態様は seller_transaction_type に設定
+
+---
+
+## 全項目の抽出ルール
+
+### 価格
+- 「販売価格」「売出価格」「価格」の数値を抽出（万円単位）
+
+### 所在地
+- 都道府県・市区町村・町名・丁目を分離
+- 番地以降は address_detail に格納（内部管理・公開不可）
+- 丁目まで（番地なし）を town に格納
+
+### 交通
+- 「交通」「アクセス」セクションから最大3路線分
+- station_line1/name1/walk1, station_line2/name2/walk2, station_line3/name3/walk3 で格納
+
+### 面積
+- 土地面積・建物面積・専有面積を㎡単位で数値として抽出
+- 「約◯◯㎡」の「約」は除いて数値のみ
+
+### 用途地域・接道
+- 複数の用途地域が記載されている場合は use_zones 配列で全て抽出
+- 接道状況は roads 配列で格納（方向・道路種別・幅員）
+
+### 設備
+- 設備一覧・仕様一覧から全項目を equipment_list 配列で抽出
+
+---
+
+## 返却JSON形式（このJSONのみ出力。前置き・説明不要）
 
 {
   "extracted": {
-    "property_type": "NEW_HOUSE|USED_HOUSE|MANSION|NEW_MANSION|LAND|OTHER",
-    "price": 価格（万円・数値のみ）,
-    "address": "所在地（都道府県〜番地）",
+    "property_type": "NEW_HOUSE|USED_HOUSE|MANSION|NEW_MANSION|LAND",
+    "price": 8280,
     "prefecture": "東京都",
-    "city": "区市町村名",
-    "station_line": "路線名",
-    "station_name": "最寄駅名",
-    "station_walk": 徒歩分数（数値のみ）,
-    "area_land_m2": 土地面積（㎡・数値のみ）,
-    "area_build_m2": 建物面積（㎡・数値のみ）,
-    "area_exclusive_m2": 専有面積（㎡・マンション用）,
-    "rooms": "間取り（例: 3LDK）",
-    "building_year": 築年（西暦・数値のみ）,
-    "building_month": 築月（数値のみ）,
-    "structure": "構造（例: 木造2階建）",
-    "floors_total": 総階数（数値のみ）,
-    "floor_unit": 所在階（数値のみ）,
-    "delivery_timing": "引渡し時期（例: 即時・2025年3月）",
-    "reins_number": "レインズ番号",
-    "bcr": 建ぺい率（%・数値のみ）,
-    "far": 容積率（%・数値のみ）,
-    "management_fee": 管理費（円/月・数値のみ）,
-    "repair_reserve": 修繕積立金（円/月・数値のみ）,
-    "total_units": 総戸数（数値のみ）,
-    "city_plan": "都市計画（例: 市街化区域）",
-    "use_zone": "用途地域（例: 第一種低層住居専用地域）",
-    "private_road": false,
-    "features": ["特徴1", "特徴2"]
+    "city": "目黒区",
+    "town": "平町2丁目",
+    "address_detail": "3番15号",
+    "building_name": null,
+    "station_line1": "東急東横線",
+    "station_name1": "都立大学",
+    "station_walk1": 8,
+    "station_line2": null,
+    "station_name2": null,
+    "station_walk2": null,
+    "area_land_m2": 120.5,
+    "area_build_m2": 90.64,
+    "area_exclusive_m2": null,
+    "building_year": 2015,
+    "building_month": 3,
+    "structure": "木造",
+    "floors_total": 2,
+    "floor_unit": null,
+    "direction": "南",
+    "rooms": "3LDK",
+    "use_zone": "第一種低層住居専用地域",
+    "use_zones": [{"use_zone": "第一種低層住居専用地域", "bcr": 40, "far": 80}],
+    "bcr": 40,
+    "far": 80,
+    "roads": [{"direction": "南", "road_type": "公道", "width_m": 6.0, "is_front": true}],
+    "land_right": "所有権",
+    "city_plan": "市街化区域",
+    "management_fee": null,
+    "repair_reserve": null,
+    "total_units": null,
+    "delivery_timing": "即時",
+    "current_status": "空家",
+    "reins_number": "3001234567",
+    "our_transaction_type": "仲介",
+    "seller_company": "株式会社〇〇不動産 目黒店",
+    "seller_contact": "03-1234-5678",
+    "seller_transaction_type": "専任媒介",
+    "seller_brokerage_type": "専任",
+    "ad_transfer_ok": true,
+    "equipment_list": ["システムキッチン", "食洗機", "床暖房", "追い焚き", "浴室乾燥機"],
+    "features": ["南向き", "角地", "駐車場2台"]
   },
   "confidence": {
-    "price": "high|medium|low",
-    "station_walk": "high|medium|low",
-    ... 抽出した全フィールド分
+    "price": "high",
+    "seller_company": "high",
+    "address": "high",
+    "station_walk1": "high",
+    "reins_number": "low"
   },
-  "raw_text": "資料から読み取ったテキスト全文"
+  "raw_text": "資料から読み取ったテキスト全文（売主会社名・電話番号を含む）",
+  "raw_notes": "図面下部に会社名あり。電話番号が2つ記載（本社・支店）"
 }
 
 ## 確信度の基準
