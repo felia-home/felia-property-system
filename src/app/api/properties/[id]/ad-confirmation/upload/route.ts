@@ -76,11 +76,10 @@ export async function POST(
     await prisma.propertyHistory.create({
       data: {
         property_id: params.id,
-        action: "STATUS_CHANGE",
-        from_status: currentStatus,
-        to_status: newStatus,
-        note: `広告確認結果: ${result === "ok" ? "承諾" : "不可"}${confirmedBy ? ` (確認者: ${confirmedBy})` : ""}`,
         changed_by: confirmedBy ?? "system",
+        change_type: "STATUS_CHANGE",
+        changed_fields: { from: currentStatus, to: newStatus },
+        note: `広告確認結果: ${result === "ok" ? "承諾" : "不可"}${confirmedBy ? ` (確認者: ${confirmedBy})` : ""}`,
       },
     });
 

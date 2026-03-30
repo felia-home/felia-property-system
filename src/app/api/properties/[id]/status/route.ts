@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { canTransition, type PropertyStatus } from "@/lib/workflow-status";
+import { canTransition, type WorkflowStatus } from "@/lib/workflow";
 import { generateChecklist, getPendingTasks } from "@/lib/property-checklist";
 
 /**
  * POST /api/properties/[id]/status
- * body: { status: PropertyStatus, note?: string, metadata?: {
+ * body: { status: WorkflowStatus, note?: string, metadata?: {
  *   method?: string, confirmed_by?: string, file_url?: string
  * }}
  *
  * 処理:
- * 1. 遷移可否チェック
+ * 1. 遷移可否チェック（workflow.ts の ALLOWED_TRANSITIONS に基づく）
  * 2. ステータス更新 + 関連フィールド更新
  * 3. PropertyHistoryに記録
  * 4. pending_tasks 再計算
@@ -35,8 +35,8 @@ export async function POST(
       return NextResponse.json({ error: "物件が見つかりません" }, { status: 404 });
     }
 
-    const currentStatus = property.status as PropertyStatus;
-    const targetStatus = newStatus as PropertyStatus;
+    const currentStatus = property.status as WorkflowStatus;
+    const targetStatus = newStatus as WorkflowStatus;
 
     if (!canTransition(currentStatus, targetStatus)) {
       return NextResponse.json({
@@ -49,38 +49,36 @@ export async function POST(
     const updateData: Record<string, unknown> = { status: targetStatus };
 
     switch (targetStatus) {
-      case "AD_SENT":
+      case "AD_REQUEST":
         updateData.ad_confirmation_sent_at = new Date();
         if (metadata.method) updateData.ad_confirmation_method = metadata.method;
-        if (metadata.file_url) updateData.ad_confirmation_file = metadata.file_url;
         break;
+
       case "AD_OK":
         updateData.ad_confirmed_at = new Date();
         if (metadata.confirmed_by) updateData.ad_confirmed_by = metadata.confirmed_by;
-        // Auto-transition: check photo requirements
-        {
-          const imgCount = property.images.length;
-          const hasExterior = property.images.some(i => i.room_type === "外観");
-          const hasFloorPlan = property.images.some(i => i.room_type === "間取り図");
-          if (imgCount >= 5 && hasExterior && hasFloorPlan) {
-            updateData.status = "PUBLISHING";
-          } else {
-            updateData.status = "PHOTO_NEEDED";
-          }
-        }
+        if (metadata.file_url) updateData.ad_confirmation_file = metadata.file_url;
         break;
+
+      case "READY_TO_PUBLISH":
+        // No special fields — transition is manual, photo checks done on frontend
+        break;
+
       case "PUBLISHED":
         if (!property.published_at) updateData.published_at = new Date();
         updateData.last_confirmed_at = new Date();
         break;
+
       case "SOLD":
       case "CLOSED":
         updateData.published_hp = false;
+        updateData.published_members = false;
         updateData.published_suumo = false;
         updateData.published_athome = false;
         updateData.published_yahoo = false;
         updateData.published_homes = false;
         break;
+
       default:
         break;
     }
@@ -103,7 +101,7 @@ export async function POST(
     await prisma.propertyHistory.create({
       data: {
         property_id: params.id,
-        changed_by: "admin",
+        changed_by: metadata.confirmed_by ?? "admin",
         change_type: "STATUS_CHANGE",
         changed_fields: { from: currentStatus, to: updated.status },
         note: note ?? null,
@@ -112,12 +110,14 @@ export async function POST(
 
     // Build next-action guide
     const guides: Record<string, string> = {
-      AD_PENDING: "広告確認タブから確認書を送付してください",
-      AD_SENT: "元付業者からの返信をお待ちください（3営業日以内が目安）",
-      PHOTO_NEEDED: "写真タブから現地写真・間取り図をアップロードしてください",
-      PUBLISHING: "掲載設定を確認し、各媒体に掲載を開始してください",
-      PUBLISHED: "掲載中です。問い合わせが入り次第対応してください",
-      SOLD: "成約登録を完了し、各媒体から掲載を取り下げてください",
+      AD_REQUEST: "広告確認書を元付業者に送付し、承諾の返答をお待ちください",
+      AD_OK: "写真・原稿を準備して「掲載準備完了」に進めてください",
+      AD_NG: "下書きに戻して物件情報を修正するか、取扱いを中止してください",
+      READY_TO_PUBLISH: "掲載内容を最終確認の上、「掲載する」で公開してください",
+      PUBLISHED: "掲載開始しました。問い合わせが入り次第対応してください",
+      SOLD_ALERT: "元付業者に物件確認（物確）を行ってください",
+      SOLD: "成約データを記録の上、クローズしてください",
+      CLOSED: "物件をアーカイブしました",
     };
 
     return NextResponse.json({
