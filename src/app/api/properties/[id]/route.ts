@@ -52,6 +52,10 @@ const UPDATABLE_FIELDS = [
   "published_yahoo","published_homes",
   "suumo_id","athome_id","yahoo_id","homes_id",
   "compliance_checked","agent_id","store_id","property_number","internal_memo","source",
+  "ad_confirmation_sent_at","ad_confirmation_method","ad_confirmed_at","ad_confirmed_by","ad_confirmation_file",
+  "photo_count","photo_has_exterior","photo_has_floor_plan","photo_has_interior","photo_last_updated_at",
+  "last_confirmed_at","days_on_market","inquiry_count","pending_tasks",
+  "published_at",
 ];
 
 export async function GET(

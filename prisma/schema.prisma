@@ -271,6 +271,28 @@ model Property {
   compliance_checked_at DateTime?
   compliance_result     Json?
 
+  // ワークフロー・広告確認
+  ad_confirmation_sent_at DateTime?
+  ad_confirmation_method  String?   // FAX | EMAIL | VISIT
+  ad_confirmed_at         DateTime?
+  ad_confirmed_by         String?
+  ad_confirmation_file    String?
+
+  // 写真集計キャッシュ
+  photo_count             Int       @default(0)
+  photo_has_exterior      Boolean   @default(false)
+  photo_has_floor_plan    Boolean   @default(false)
+  photo_has_interior      Boolean   @default(false)
+  photo_last_updated_at   DateTime?
+
+  // 掲載管理
+  last_confirmed_at       DateTime?
+  days_on_market          Int?
+  inquiry_count           Int       @default(0)
+
+  // タスク管理
+  pending_tasks           String[]
+
   // 内部情報
   property_number       String?
   agent_id              String?

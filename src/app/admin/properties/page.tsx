@@ -1,48 +1,34 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "下書き",
-  REVIEW: "AI確認中",
-  PENDING: "承認待ち",
-  APPROVED: "承認済み",
-  PUBLISHED_HP: "HP掲載中",
-  PUBLISHED_ALL: "全媒体掲載",
-  SUSPENDED: "一時停止",
-  SOLD: "成約済み",
-};
-
-const STATUS_BADGE: Record<string, { bg: string; color: string }> = {
-  DRAFT:        { bg: "#f3f2ef", color: "#706e68" },
-  REVIEW:       { bg: "#fff7cc", color: "#7a5c00" },
-  PENDING:      { bg: "#fff0e5", color: "#c05600" },
-  APPROVED:     { bg: "#e6f4ea", color: "#1a7737" },
-  PUBLISHED_HP: { bg: "#e3f0ff", color: "#1a56a0" },
-  PUBLISHED_ALL:{ bg: "#234f35", color: "#fff" },
-  SUSPENDED:    { bg: "#f3f2ef", color: "#706e68" },
-  SOLD:         { bg: "#fdeaea", color: "#8c1f1f" },
-};
+import { PROPERTY_STATUS, getStatusDef } from "@/lib/workflow-status";
 
 const TYPE_LABELS: Record<string, string> = {
-  NEW_HOUSE:    "新築戸建",
-  USED_HOUSE:   "中古戸建",
-  MANSION:      "マンション",
-  NEW_MANSION:  "新築マンション",
-  LAND:         "土地",
+  NEW_HOUSE: "新築戸建", USED_HOUSE: "中古戸建", MANSION: "マンション",
+  NEW_MANSION: "新築マンション", LAND: "土地",
 };
+
+// Build status options from workflow definition
+const STATUS_OPTIONS = Object.entries(PROPERTY_STATUS).map(([k, v]) => ({ value: k, label: v.label }));
 
 interface Property {
   id: string;
   property_type: string;
   status: string;
   city: string;
+  town: string | null;
   address: string;
-  station_name: string;
-  station_walk: number;
+  station_name1: string | null;
+  station_walk1: number | null;
   price: number;
   rooms: string | null;
   area_build_m2: number | null;
-  agent_id: string | null;
+  property_number: string | null;
+  photo_count: number;
+  photo_has_exterior: boolean;
+  photo_has_floor_plan: boolean;
+  ad_confirmed_at: string | null;
+  pending_tasks: string[];
+  published_at: string | null;
   created_at: string;
   images: Array<{ id: string; url: string; is_main: boolean }>;
   _count: { images: number };
@@ -50,6 +36,12 @@ interface Property {
 
 function daysAgo(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000);
+}
+
+function completionColor(photoCount: number, adOk: boolean, pendingCount: number): string {
+  if (pendingCount === 0) return "#1b5e20";
+  if (pendingCount <= 2 && adOk) return "#f57c00";
+  return "#8c1f1f";
 }
 
 export default function PropertiesPage() {
@@ -69,18 +61,11 @@ export default function PropertiesPage() {
       const data = await res.json();
       setProperties(data.properties ?? []);
       setTotal(data.total ?? 0);
-    } catch {
-      // ネットワークエラーは無視
-    } finally {
-      setLoading(false);
-    }
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
   }, [search, status]);
 
-  useEffect(() => {
-    fetchProperties();
-  }, [fetchProperties]);
-
-  const badge = (s: string) => STATUS_BADGE[s] ?? { bg: "#f3f2ef", color: "#706e68" };
+  useEffect(() => { fetchProperties(); }, [fetchProperties]);
 
   return (
     <div style={{ padding: 28 }}>
@@ -90,22 +75,10 @@ export default function PropertiesPage() {
           <p style={{ fontSize: 12, color: "#706e68", marginTop: 4 }}>登録物件の管理・掲載設定</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <a href="/admin/import" style={{
-            padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500,
-            background: "#fff", border: "1px solid #e0deda", color: "#1c1b18", textDecoration: "none",
-          }}>📥 CSVインポート</a>
-          <a href="/admin/properties/import?tab=url" style={{
-            padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500,
-            background: "#fff", border: "1px solid #e0deda", color: "#1c1b18", textDecoration: "none",
-          }}>🔗 URLから取込</a>
-          <a href="/admin/properties/import" style={{
-            padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500,
-            background: "#fff", border: "1px solid #e0deda", color: "#1c1b18", textDecoration: "none",
-          }}>📄 PDF取込</a>
-          <a href="/admin/properties/new" style={{
-            padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500,
-            background: "#234f35", color: "#fff", textDecoration: "none",
-          }}>+ 新規登録</a>
+          <a href="/admin/import" style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#fff", border: "1px solid #e0deda", color: "#1c1b18", textDecoration: "none" }}>📥 CSVインポート</a>
+          <a href="/admin/properties/import?tab=scrape" style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#fff", border: "1px solid #e0deda", color: "#1c1b18", textDecoration: "none" }}>🔗 URLから取込</a>
+          <a href="/admin/properties/import" style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#fff", border: "1px solid #e0deda", color: "#1c1b18", textDecoration: "none" }}>📄 PDF取込</a>
+          <a href="/admin/properties/new" style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#234f35", color: "#fff", textDecoration: "none" }}>+ 新規登録</a>
         </div>
       </div>
 
@@ -114,17 +87,17 @@ export default function PropertiesPage() {
           <input
             placeholder="住所・駅名で検索"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={e => setSearch(e.target.value)}
             style={{ padding: "6px 12px", border: "1px solid #e0deda", borderRadius: 7, fontSize: 12, width: 200, fontFamily: "inherit" }}
           />
           <select
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={e => setStatus(e.target.value)}
             style={{ padding: "6px 10px", border: "1px solid #e0deda", borderRadius: 7, fontSize: 12, fontFamily: "inherit" }}
           >
             <option value="">全ステータス</option>
-            {Object.entries(STATUS_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
+            {STATUS_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
           {!loading && (
@@ -135,88 +108,98 @@ export default function PropertiesPage() {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#f7f6f2" }}>
-              {["", "物件情報", "写真", "ステータス", "価格", "掲載日数", "操作"].map((h) => (
-                <th key={h} style={{
-                  textAlign: "left", fontSize: 10, fontWeight: 500,
-                  color: "#706e68", letterSpacing: ".07em", textTransform: "uppercase",
-                  padding: "10px 16px", borderBottom: "1px solid #e0deda",
-                }}>{h}</th>
+              {["", "物件情報", "ステータス", "写真", "完成度", "価格", "掲載日数", ""].map(h => (
+                <th key={h} style={{ textAlign: "left", fontSize: 10, fontWeight: 500, color: "#706e68", letterSpacing: ".07em", textTransform: "uppercase", padding: "10px 14px", borderBottom: "1px solid #e0deda", whiteSpace: "nowrap" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={7} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>
-                  読み込み中...
-                </td>
-              </tr>
+              <tr><td colSpan={8} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>読み込み中...</td></tr>
             ) : properties.length === 0 ? (
-              <tr>
-                <td colSpan={7} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>
-                  物件データがありません。PDF取込または新規登録から追加してください。
-                </td>
-              </tr>
+              <tr><td colSpan={8} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>物件データがありません。</td></tr>
             ) : (
-              properties.map((p) => {
+              properties.map(p => {
+                const def = getStatusDef(p.status);
                 const mainImg = p.images?.[0];
-                const photoCount = p._count?.images ?? 0;
+                const photoCount = p.photo_count ?? p._count?.images ?? 0;
+                const adOk = !!p.ad_confirmed_at;
+                const pendingCount = p.pending_tasks?.length ?? 0;
+                const cc = completionColor(photoCount, adOk, pendingCount);
+                // Rough completion %
+                const completionPct = Math.max(0, 100 - pendingCount * 10);
+                const daysListed = p.published_at ? daysAgo(p.published_at) : null;
+
                 return (
                   <tr key={p.id} style={{ borderBottom: "1px solid #f3f2ef" }}>
                     {/* Thumbnail */}
-                    <td style={{ padding: "10px 12px 10px 16px", width: 72 }}>
+                    <td style={{ padding: "10px 12px 10px 14px", width: 72 }}>
                       {mainImg ? (
-                        <img
-                          src={mainImg.url}
-                          alt=""
-                          style={{ width: 64, height: 48, objectFit: "cover", borderRadius: 6, display: "block" }}
-                        />
+                        <img src={mainImg.url} alt="" style={{ width: 64, height: 48, objectFit: "cover", borderRadius: 6 }} />
                       ) : (
-                        <div style={{
-                          width: 64, height: 48, borderRadius: 6,
-                          background: "#f3f2ef", display: "flex", alignItems: "center",
-                          justifyContent: "center", fontSize: 18, color: "#d0cec8",
-                        }}>🏠</div>
+                        <div style={{ width: 64, height: 48, borderRadius: 6, background: "#f3f2ef", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: "#d0cec8" }}>🏠</div>
                       )}
                     </td>
-                    <td style={{ padding: "14px 16px" }}>
+
+                    {/* Property info */}
+                    <td style={{ padding: "12px 14px" }}>
                       <div style={{ fontSize: 13, fontWeight: 500 }}>
-                        {TYPE_LABELS[p.property_type] ?? p.property_type}｜{p.city}{p.address}
+                        {TYPE_LABELS[p.property_type] ?? p.property_type}｜{p.city}{p.town ?? ""}{p.address}
                       </div>
                       <div style={{ fontSize: 11, color: "#706e68", marginTop: 3 }}>
-                        {p.station_name} 徒歩{p.station_walk}分
+                        {p.station_name1 ? `${p.station_name1} 徒歩${p.station_walk1}分` : ""}
                         {p.rooms ? `｜${p.rooms}` : ""}
                         {p.area_build_m2 ? `｜${p.area_build_m2}㎡` : ""}
                       </div>
-                    </td>
-                    {/* Photo count */}
-                    <td style={{ padding: "14px 12px", whiteSpace: "nowrap" }}>
-                      {photoCount === 0 ? (
-                        <span style={{ background: "#fdeaea", color: "#8c1f1f", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 10 }}>
-                          写真なし
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: 12, color: "#706e68" }}>{photoCount}枚</span>
+                      {p.property_number && (
+                        <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{p.property_number}</div>
                       )}
                     </td>
-                    <td style={{ padding: "14px 16px" }}>
-                      <span style={{
-                        ...badge(p.status),
-                        padding: "3px 10px", borderRadius: 99,
-                        fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
-                      }}>
-                        {STATUS_LABELS[p.status] ?? p.status}
+
+                    {/* Status badge */}
+                    <td style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>
+                      <span style={{ background: def.bg, color: def.color, padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: 500 }}>
+                        {def.icon} {def.label}
                       </span>
                     </td>
-                    <td style={{ padding: "14px 16px", fontSize: 13, fontWeight: 500, whiteSpace: "nowrap" }}>
+
+                    {/* Photos */}
+                    <td style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>
+                      {photoCount === 0 ? (
+                        <span style={{ background: "#fdeaea", color: "#8c1f1f", fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 10 }}>📷なし</span>
+                      ) : (
+                        <span style={{ fontSize: 12, color: photoCount < 5 ? "#e65100" : "#706e68" }}>
+                          📷{photoCount}枚{photoCount < 5 ? " △" : ""}
+                          {adOk && <span style={{ marginLeft: 4, fontSize: 10, color: "#234f35" }}>✅広告OK</span>}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Completion */}
+                    <td style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ width: 50, height: 5, background: "#f2f1ed", borderRadius: 99, overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${completionPct}%`, background: cc, borderRadius: 99 }} />
+                        </div>
+                        <span style={{ fontSize: 11, color: cc, fontWeight: 600 }}>{completionPct}%</span>
+                      </div>
+                    </td>
+
+                    {/* Price */}
+                    <td style={{ padding: "12px 14px", fontSize: 13, fontWeight: 500, whiteSpace: "nowrap" }}>
                       {p.price.toLocaleString()}万円
                     </td>
-                    <td style={{ padding: "14px 16px", fontSize: 12, color: "#706e68" }}>
-                      {daysAgo(p.created_at)}日
+
+                    {/* Days on market */}
+                    <td style={{ padding: "12px 14px", fontSize: 12, color: "#706e68", whiteSpace: "nowrap" }}>
+                      {daysListed !== null ? `${daysListed}日` : "—"}
                     </td>
-                    <td style={{ padding: "14px 16px" }}>
-                      <a href={`/admin/properties/${p.id}`} style={{ fontSize: 12, color: "#234f35", textDecoration: "none", fontWeight: 500 }}>
-                        詳細
+
+                    {/* Action */}
+                    <td style={{ padding: "12px 14px" }}>
+                      <a href={`/admin/properties/${p.id}`}
+                        style={{ fontSize: 12, color: pendingCount > 0 ? "#8c1f1f" : "#234f35", textDecoration: "none", fontWeight: 600 }}>
+                        {pendingCount > 0 ? "対応" : "詳細"}
                       </a>
                     </td>
                   </tr>

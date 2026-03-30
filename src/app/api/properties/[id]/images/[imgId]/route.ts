@@ -1,6 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { deleteFile } from "@/lib/storage";
+import { generateChecklist, getPendingTasks } from "@/lib/property-checklist";
+
+async function updatePhotoStats(propertyId: string) {
+  const images = await prisma.propertyImage.findMany({
+    where: { property_id: propertyId },
+    select: { room_type: true },
+  });
+  const property = await prisma.property.findUnique({ where: { id: propertyId } });
+  if (!property) return;
+  const hasExterior = images.some(i => i.room_type === "外観");
+  const hasFloorPlan = images.some(i => i.room_type === "間取り図");
+  const hasInterior = images.some(i =>
+    ["リビング", "キッチン", "洋室", "和室", "主寝室", "バスルーム"].includes(i.room_type ?? "")
+  );
+  await prisma.property.update({
+    where: { id: propertyId },
+    data: {
+      photo_count: images.length,
+      photo_has_exterior: hasExterior,
+      photo_has_floor_plan: hasFloorPlan,
+      photo_has_interior: hasInterior,
+      photo_last_updated_at: new Date(),
+    },
+  });
+  const updatedProp = await prisma.property.findUnique({ where: { id: propertyId } });
+  if (updatedProp) {
+    const checks = generateChecklist({ ...updatedProp, images });
+    const pending = getPendingTasks(checks);
+    await prisma.property.update({ where: { id: propertyId }, data: { pending_tasks: pending } });
+  }
+}
 
 // PATCH /api/properties/[id]/images/[imgId]
 // Updates: caption, room_type, order, is_main
@@ -32,6 +63,12 @@ export async function PATCH(
       where: { id: params.imgId },
       data,
     });
+
+    // If room_type changed, recalculate photo stats
+    if ("room_type" in data) {
+      await updatePhotoStats(params.id);
+    }
+
     return NextResponse.json({ image });
   } catch (error) {
     console.error("PATCH /api/properties/[id]/images/[imgId] error:", error);
@@ -61,6 +98,9 @@ export async function DELETE(
         await prisma.propertyImage.update({ where: { id: first.id }, data: { is_main: true } });
       }
     }
+
+    // Update photo stats after deletion
+    await updatePhotoStats(params.id);
 
     return NextResponse.json({ message: "削除しました" });
   } catch (error) {
