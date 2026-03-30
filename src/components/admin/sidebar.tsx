@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 const navItems = [
   { href: "/admin", label: "ダッシュボード", icon: "▦" },
   { href: "/admin/properties", label: "物件一覧", icon: "⌂" },
-  { href: "/admin/approvals", label: "広告確認待ち", icon: "✓", badge: 3 },
-  { href: "/admin/sold", label: "成約アラート", icon: "!", badge: 2 },
+  { href: "/admin/approvals", label: "広告確認待ち", icon: "✓" },
+  { href: "/admin/sold", label: "成約アラート", icon: "!" },
   { href: "/admin/customers", label: "顧客管理", icon: "人" },
   { href: "/admin/contracts", label: "契約管理", icon: "📄" },
   { href: "/admin/sales", label: "売上管理", icon: "¥" },
