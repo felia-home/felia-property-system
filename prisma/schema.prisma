@@ -293,6 +293,10 @@ model Property {
   // タスク管理
   pending_tasks           String[]
 
+  // AIチェック結果
+  last_confirmed_by       String?
+  last_check_result       Json?
+
   // 内部情報
   property_number       String?
   agent_id              String?

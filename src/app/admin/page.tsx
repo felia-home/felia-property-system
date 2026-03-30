@@ -95,11 +95,41 @@ export default function DashboardPage() {
   const hasWarning = adSentOverdue.length > 0 || lowPhotoProps.length > 0;
   const actionRequired = properties.filter(p => (p.pending_tasks?.length ?? 0) > 0 && !["SOLD", "CLOSED"].includes(p.status));
 
+  // Role tabs
+  const [roleTab, setRoleTab] = useState<"all" | "sales" | "admin">("all");
+
+  // 営業向け: ad_request, sold_alert, action-required
+  const salesAlerts = [
+    ...(byStatus.get("AD_REQUEST") ?? []),
+    ...(byStatus.get("SOLD_ALERT") ?? []),
+  ];
+  const salesActionRequired = actionRequired.filter(p =>
+    ["DRAFT", "AD_REQUEST", "SOLD_ALERT", "PUBLISHED"].includes(p.status)
+  );
+
+  // 内勤向け: ad confirmation needed, low photos, overdue
+  const adminTasks = [
+    ...adSentOverdue,
+    ...noPhotoProps,
+    ...lowPhotoProps.filter(p => !noPhotoProps.includes(p)),
+  ];
+
   return (
     <div style={{ padding: 28, maxWidth: 1400 }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 600, color: "#3a2a1a" }}>物件管理ダッシュボード</h1>
-        <p style={{ fontSize: 12, color: "#706e68", marginTop: 3 }}>フェリアホーム 物件情報管理システム</p>
+      <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 600, color: "#3a2a1a" }}>物件管理ダッシュボード</h1>
+          <p style={{ fontSize: 12, color: "#706e68", marginTop: 3 }}>フェリアホーム 物件情報管理システム</p>
+        </div>
+        {/* Role tabs */}
+        <div style={{ display: "flex", gap: 4 }}>
+          {([["all", "全体"], ["sales", "営業向け"], ["admin", "内勤向け"]] as const).map(([t, label]) => (
+            <button key={t} onClick={() => setRoleTab(t)}
+              style={{ padding: "6px 16px", borderRadius: 8, fontSize: 12, fontWeight: roleTab === t ? 700 : 400, border: "1px solid " + (roleTab === t ? "#234f35" : "#e0deda"), background: roleTab === t ? "#234f35" : "#fff", color: roleTab === t ? "#fff" : "#706e68", cursor: "pointer", fontFamily: "inherit" }}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* License alerts */}
@@ -248,8 +278,109 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Role-specific panels */}
+      {!loadingProps && roleTab === "sales" && (
+        <div style={{ marginTop: 24 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 600, color: "#3a2a1a", marginBottom: 12 }}>営業向け — 対応が必要な物件</h2>
+          {salesAlerts.length === 0 && salesActionRequired.length === 0 ? (
+            <div style={{ background: "#e8f5e9", borderRadius: 10, padding: "16px 20px", fontSize: 13, color: "#1b5e20" }}>✅ 現在、営業対応が必要な物件はありません。</div>
+          ) : (
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", overflow: "hidden" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: "#f8f6f3" }}>
+                    {["物件", "ステータス", "未完了タスク", ""].map(h => (
+                      <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontWeight: 600, fontSize: 11, color: "#888", borderBottom: "1px solid #e8e4e0" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...salesAlerts, ...salesActionRequired.filter(p => !salesAlerts.includes(p))].slice(0, 15).map(p => {
+                    const def = getStatusDef(p.status);
+                    return (
+                      <tr key={p.id} style={{ borderBottom: "1px solid #f2f1ed" }}>
+                        <td style={{ padding: "10px 14px" }}>
+                          <div style={{ fontWeight: 500 }}>{p.city}{p.town ?? ""}</div>
+                          <div style={{ color: "#888", fontSize: 11 }}>{p.price.toLocaleString()}万円</div>
+                        </td>
+                        <td style={{ padding: "10px 14px" }}>
+                          <span style={{ background: def.bg, color: def.color, padding: "2px 8px", borderRadius: 99, fontSize: 11, fontWeight: 500, whiteSpace: "nowrap" }}>{def.icon} {def.label}</span>
+                        </td>
+                        <td style={{ padding: "10px 14px" }}>
+                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                            {(p.pending_tasks ?? []).slice(0, 2).map(t => (
+                              <span key={t} style={{ fontSize: 10, background: "#fdeaea", color: "#8c1f1f", padding: "1px 6px", borderRadius: 4 }}>❌ {t}</span>
+                            ))}
+                          </div>
+                        </td>
+                        <td style={{ padding: "10px 14px" }}>
+                          <Link href={`/admin/properties/${p.id}`} style={{ fontSize: 12, color: "#234f35", fontWeight: 600, textDecoration: "none" }}>対応する →</Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!loadingProps && roleTab === "admin" && (
+        <div style={{ marginTop: 24 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 600, color: "#3a2a1a", marginBottom: 12 }}>内勤向け — 書類・写真・掲載管理</h2>
+          {adminTasks.length === 0 ? (
+            <div style={{ background: "#e8f5e9", borderRadius: 10, padding: "16px 20px", fontSize: 13, color: "#1b5e20" }}>✅ 現在、内勤対応が必要な物件はありません。</div>
+          ) : (
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", overflow: "hidden" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: "#f8f6f3" }}>
+                    {["物件", "ステータス", "課題", ""].map(h => (
+                      <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontWeight: 600, fontSize: 11, color: "#888", borderBottom: "1px solid #e8e4e0" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {adminTasks.slice(0, 15).map(p => {
+                    const def = getStatusDef(p.status);
+                    const photoCount = p.photo_count ?? p._count?.images ?? 0;
+                    const sentDays = daysSince(p.ad_confirmation_sent_at);
+                    const issues: string[] = [];
+                    if (photoCount === 0) issues.push("写真なし");
+                    else if (photoCount < 5) issues.push(`写真${photoCount}枚（5枚必要）`);
+                    if (sentDays !== null && sentDays >= 3) issues.push(`確認書返信待ち${sentDays}日`);
+                    return (
+                      <tr key={p.id} style={{ borderBottom: "1px solid #f2f1ed" }}>
+                        <td style={{ padding: "10px 14px" }}>
+                          <div style={{ fontWeight: 500 }}>{p.city}{p.town ?? ""}</div>
+                          <div style={{ color: "#888", fontSize: 11 }}>{p.price.toLocaleString()}万円</div>
+                        </td>
+                        <td style={{ padding: "10px 14px" }}>
+                          <span style={{ background: def.bg, color: def.color, padding: "2px 8px", borderRadius: 99, fontSize: 11, fontWeight: 500, whiteSpace: "nowrap" }}>{def.icon} {def.label}</span>
+                        </td>
+                        <td style={{ padding: "10px 14px" }}>
+                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                            {issues.map(i => (
+                              <span key={i} style={{ fontSize: 10, background: "#fff8e1", color: "#8a5200", padding: "1px 6px", borderRadius: 4 }}>⚠️ {i}</span>
+                            ))}
+                          </div>
+                        </td>
+                        <td style={{ padding: "10px 14px" }}>
+                          <Link href={`/admin/properties/${p.id}`} style={{ fontSize: 12, color: "#234f35", fontWeight: 600, textDecoration: "none" }}>対応する →</Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Action required list */}
-      {!loadingProps && actionRequired.length > 0 && (
+      {!loadingProps && roleTab === "all" && actionRequired.length > 0 && (
         <div style={{ marginTop: 24 }}>
           <h2 style={{ fontSize: 14, fontWeight: 600, color: "#3a2a1a", marginBottom: 12 }}>要対応物件</h2>
           <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", overflow: "hidden" }}>
@@ -296,6 +427,8 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Workflow Kanban — only in 全体 tab */}
     </div>
   );
 }

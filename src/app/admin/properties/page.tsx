@@ -10,6 +10,9 @@ const TYPE_LABELS: Record<string, string> = {
 // Build status options from workflow definition
 const STATUS_OPTIONS = Object.entries(PROPERTY_STATUS).map(([k, v]) => ({ value: k, label: v.label }));
 
+interface Store { id: string; name: string }
+interface Staff { id: string; full_name: string }
+
 interface Property {
   id: string;
   property_type: string;
@@ -50,6 +53,21 @@ export default function PropertiesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [storeFilter, setStoreFilter] = useState("");
+  const [agentFilter, setAgentFilter] = useState("");
+  const [alertOnly, setAlertOnly] = useState(false);
+
+  const [stores, setStores] = useState<Store[]>([]);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
+
+  useEffect(() => {
+    fetch("/api/stores").then(r => r.json()).then(d => setStores(d.stores ?? [])).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!storeFilter) { setStaffList([]); setAgentFilter(""); return; }
+    fetch(`/api/staff?store_id=${storeFilter}`).then(r => r.json()).then(d => setStaffList(d.staff ?? [])).catch(() => {});
+  }, [storeFilter]);
 
   const fetchProperties = useCallback(async () => {
     setLoading(true);
@@ -57,13 +75,17 @@ export default function PropertiesPage() {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (status) params.set("status", status);
+      if (storeFilter) params.set("store_id", storeFilter);
+      if (agentFilter) params.set("agent_id", agentFilter);
       const res = await fetch(`/api/properties?${params}`);
       const data = await res.json();
-      setProperties(data.properties ?? []);
-      setTotal(data.total ?? 0);
+      let props: Property[] = data.properties ?? [];
+      if (alertOnly) props = props.filter(p => (p.pending_tasks?.length ?? 0) > 0);
+      setProperties(props);
+      setTotal(alertOnly ? props.length : (data.total ?? 0));
     } catch { /* ignore */ }
     finally { setLoading(false); }
-  }, [search, status]);
+  }, [search, status, storeFilter, agentFilter, alertOnly]);
 
   useEffect(() => { fetchProperties(); }, [fetchProperties]);
 
@@ -100,6 +122,25 @@ export default function PropertiesPage() {
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
+          {stores.length > 0 && (
+            <select value={storeFilter} onChange={e => setStoreFilter(e.target.value)}
+              style={{ padding: "6px 10px", border: "1px solid #e0deda", borderRadius: 7, fontSize: 12, fontFamily: "inherit" }}>
+              <option value="">全店舗</option>
+              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          )}
+          {storeFilter && staffList.length > 0 && (
+            <select value={agentFilter} onChange={e => setAgentFilter(e.target.value)}
+              style={{ padding: "6px 10px", border: "1px solid #e0deda", borderRadius: 7, fontSize: 12, fontFamily: "inherit" }}>
+              <option value="">全担当者</option>
+              {staffList.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+            </select>
+          )}
+          <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, cursor: "pointer", color: alertOnly ? "#8c1f1f" : "#706e68", whiteSpace: "nowrap" }}>
+            <input type="checkbox" checked={alertOnly} onChange={e => setAlertOnly(e.target.checked)}
+              style={{ cursor: "pointer" }} />
+            要対応のみ
+          </label>
           {!loading && (
             <span style={{ fontSize: 12, color: "#706e68", marginLeft: "auto" }}>{total}件</span>
           )}
