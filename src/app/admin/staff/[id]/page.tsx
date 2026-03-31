@@ -134,7 +134,8 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
   useEffect(() => {
     fetch(`/api/staff/${params.id}`)
       .then(r => r.json())
-      .then((d: { staff: StaffFull }) => {
+      .then((d: { staff?: StaffFull }) => {
+        if (!d.staff) return;
         setStaff(d.staff);
         setForm(d.staff);
       })
@@ -147,8 +148,8 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
     if (activeTab === "properties" && !propertiesLoaded) {
       fetch(`/api/staff/${params.id}?includeProperties=true`)
         .then(r => r.json())
-        .then((d: { staff: StaffFull & { properties_as_agent?: PropertyRow[] } }) => {
-          setProperties(d.staff.properties_as_agent ?? []);
+        .then((d: { staff?: StaffFull & { properties_as_agent?: PropertyRow[] } }) => {
+          setProperties(d.staff?.properties_as_agent ?? []);
           setPropertiesLoaded(true);
         })
         .catch(() => {});
@@ -158,48 +159,57 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
   const handleSave = async (fields?: Partial<StaffFull>) => {
     setSaving(true);
     setError("");
-    const payload = fields ?? form;
-    const res = await fetch(`/api/staff/${params.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (res.ok) {
-      const d = await res.json() as { staff: StaffFull };
-      setStaff(d.staff);
-      setForm(d.staff);
-      setMsg("保存しました");
-      setTimeout(() => setMsg(""), 3000);
-    } else {
-      setError("保存に失敗しました");
+    try {
+      const payload = fields ?? form;
+      const res = await fetch(`/api/staff/${params.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const d = await res.json() as { staff: StaffFull };
+        if (d.staff) { setStaff(d.staff); setForm(d.staff); }
+        setMsg("保存しました");
+        setTimeout(() => setMsg(""), 3000);
+      } else {
+        setError("保存に失敗しました");
+      }
+    } catch {
+      setError("通信エラーが発生しました");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const handleRetire = async () => {
-    if (!successorId && (staff?._count.properties_as_agent ?? 0) > 0) {
+    if (!successorId && (staff?._count?.properties_as_agent ?? 0) > 0) {
       setError("担当物件がある場合は引継ぎ先を選択してください");
       return;
     }
     if (!confirm(`${staff?.name}の退職処理を実行します。よろしいですか？`)) return;
     setRetiring(true);
     setError("");
-    const res = await fetch(`/api/staff/${params.id}/retire`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        successor_id: successorId || undefined,
-        retirement_reason: retireReason,
-        retirement_date: retireDate || undefined,
-      }),
-    });
-    if (res.ok) {
-      const d = await res.json() as { transferred: number };
-      alert(`退職処理完了。${d.transferred}件の物件が移管されました。`);
-      router.push("/admin/staff");
-    } else {
-      const d = await res.json() as { error?: string };
-      setError(d.error ?? "退職処理に失敗しました");
+    try {
+      const res = await fetch(`/api/staff/${params.id}/retire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          successor_id: successorId || undefined,
+          retirement_reason: retireReason,
+          retirement_date: retireDate || undefined,
+        }),
+      });
+      if (res.ok) {
+        const d = await res.json() as { transferred: number };
+        alert(`退職処理完了。${d.transferred}件の物件が移管されました。`);
+        router.push("/admin/staff");
+      } else {
+        const d = await res.json() as { error?: string };
+        setError(d.error ?? "退職処理に失敗しました");
+        setRetiring(false);
+      }
+    } catch {
+      setError("通信エラーが発生しました");
       setRetiring(false);
     }
   };
@@ -223,7 +233,7 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
     { key: "skills", label: "資格・スキル" },
     { key: "hp", label: "HP公開プロフィール" },
     { key: "personal", label: "個人情報" },
-    { key: "properties", label: `担当物件 (${staff._count.properties_as_agent})` },
+    { key: "properties", label: `担当物件 (${staff._count?.properties_as_agent ?? 0})` },
     { key: "retire", label: "退職処理" },
   ] as const;
 
