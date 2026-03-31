@@ -692,7 +692,7 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
       {activeTab === "properties" && (
         <div>
           <div style={{ fontSize: 13, color: "#888", marginBottom: 14 }}>
-            担当物件数: <strong style={{ color: "#1c1b18" }}>{staff._count.properties_as_agent}</strong>件
+            担当物件数: <strong style={{ color: "#1c1b18" }}>{staff._count?.properties_as_agent ?? 0}</strong>件
           </div>
           {!propertiesLoaded ? (
             <div style={{ color: "#aaa", padding: 24 }}>読み込み中...</div>
@@ -743,7 +743,7 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
           ) : (
             <>
               <div style={{ background: "#fff7f7", border: "1px solid #fcc", borderRadius: 8, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#8c1f1f" }}>
-                ⚠️ 退職処理を実行すると、担当物件 <strong>{staff._count.properties_as_agent}件</strong> が引継ぎ先スタッフに移管されます。この操作は取り消せません。
+                ⚠️ 退職処理を実行すると、担当物件 <strong>{staff._count?.properties_as_agent ?? 0}件</strong> が引継ぎ先スタッフに移管されます。この操作は取り消せません。
               </div>
 
               <div style={section}>
@@ -760,9 +760,9 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
                 </div>
               </div>
 
-              {staff._count.properties_as_agent > 0 && (
+              {(staff._count?.properties_as_agent ?? 0) > 0 && (
                 <div style={section}>
-                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 16, color: "#3a2a1a" }}>担当物件の引継ぎ（{staff._count.properties_as_agent}件）</div>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 16, color: "#3a2a1a" }}>担当物件の引継ぎ（{staff._count?.properties_as_agent ?? 0}件）</div>
                   <div style={row}>
                     <label style={lbl}>一括引継ぎ先スタッフ <span style={{ color: "#8c1f1f" }}>*</span></label>
                     <select style={inp} value={successorId} onChange={e => setSuccessorId(e.target.value)}>

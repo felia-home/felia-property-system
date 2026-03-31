@@ -54,7 +54,8 @@ const UPDATABLE_FIELDS = [
   "compliance_checked","agent_id","store_id","property_number","internal_memo","source",
   "ad_confirmation_sent_at","ad_confirmation_method","ad_confirmed_at","ad_confirmed_by","ad_confirmation_file",
   "photo_count","photo_has_exterior","photo_has_floor_plan","photo_has_interior","photo_last_updated_at",
-  "last_confirmed_at","days_on_market","inquiry_count","pending_tasks",
+  "last_confirmed_at","last_confirmed_by","last_check_result",
+  "days_on_market","inquiry_count","pending_tasks",
   "published_at",
 ];
 
