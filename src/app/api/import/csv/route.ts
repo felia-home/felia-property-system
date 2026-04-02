@@ -18,20 +18,14 @@ export interface CsvImportResult {
 // ── CSV パーサ（Shift-JIS / UTF-8 対応） ────────────────────────────────────
 
 function parseCSV(buffer: Buffer): string[][] {
-  // Detect encoding and convert to UTF-8 using encoding-japanese
+  // encoding-japanese で文字コードを自動検出・変換
+  // from: "AUTO" により Shift_JIS / EUC-JP / UTF-8 BOM 有無を問わず正しく処理される
+  // detect() が false / "BINARY" を返す場合は "SJIS" にフォールバック
   const uint8 = new Uint8Array(buffer);
   const detected = Encoding.detect(uint8);
-  let text: string;
-
-  if (detected && detected !== "UNICODE" && detected !== "UTF8") {
-    // Shift_JIS / EUC-JP → Unicode array → string
-    const unicodeArray = Encoding.convert(uint8, { to: "UNICODE", from: detected });
-    text = Encoding.codeToString(unicodeArray);
-  } else {
-    // UTF-8 (with or without BOM)
-    const bom = buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF;
-    text = buffer.slice(bom ? 3 : 0).toString("utf-8");
-  }
+  const from = (detected && detected !== "BINARY") ? detected : "SJIS";
+  const unicodeArray = Encoding.convert(uint8, { to: "UNICODE", from });
+  const text = Encoding.codeToString(unicodeArray);
 
   const rows: string[][] = [];
   let field = "";
@@ -185,7 +179,7 @@ const NUMERIC_FIELDS = new Set([
   "building_year", "building_month", "floors_total", "floors_basement",
   "floor_unit", "total_units", "bcr", "far", "road_width",
   "management_fee", "repair_reserve", "other_monthly_fee", "land_lease_fee",
-  "fixed_asset_tax", "city_planning_tax",
+  "fixed_asset_tax", "city_planning_tax", "latitude", "longitude",
 ]);
 
 // ── ハトサポシステム判定 ──────────────────────────────────────────────────────
@@ -198,26 +192,43 @@ const HATSUPO_SIGNATURE_HEADERS = [
 
 // ハトサポ形式と判定した場合に適用する固定マッピング（ヘッダーが存在する場合のみ設定）
 const HATSUPO_FIXED_MAPPINGS: Record<string, string> = {
-  legacy_id:          "自社管理番号",
-  property_type:      "物件種目",
-  city:               "行政区",
-  town:               "町丁目名",
-  address:            "番地(表示用)",
-  station_line1:      "沿線1",
-  station_name1:      "駅1",
-  station_walk1:      "駅徒歩1",
-  station_line2:      "沿線2",
-  station_name2:      "駅2",
-  station_walk2:      "駅徒歩2",
-  station_line3:      "沿線3",
-  station_name3:      "駅3",
-  station_walk3:      "駅徒歩3",
-  area_land_m2:       "敷地面積",
-  floors_total:       "地上階",
-  bcr:                "建ぺい率1",
-  far:                "容積率1",
-  seller_company:     "業者名",
-  seller_contact:     "業者電話番号",
+  legacy_id:              "自社管理番号",
+  property_type:          "物件種目",
+  postal_code:            "郵便番号",
+  city:                   "行政区",
+  town:                   "町丁目名",
+  address:                "番地(表示用)",
+  address_chiban:         "番地(非表示用)",
+  station_line1:          "沿線1",
+  station_name1:          "駅1",
+  station_walk1:          "駅徒歩1",
+  station_line2:          "沿線2",
+  station_name2:          "駅2",
+  station_walk2:          "駅徒歩2",
+  station_line3:          "沿線3",
+  station_name3:          "駅3",
+  station_walk3:          "駅徒歩3",
+  area_land_m2:           "敷地面積",
+  area_build_m2:          "建物面積(専有面積)",
+  rooms:                  "間取り",
+  building_year:          "築年月",
+  structure:              "建物構造",
+  floors_total:           "地上階",
+  bcr:                    "建ぺい率1",
+  far:                    "容積率1",
+  use_zone:               "用途地域1",
+  land_right:             "土地権利",
+  land_category:          "地目",
+  delivery_timing:        "引渡し時期",
+  delivery_condition:     "現況",
+  title:                  "物件名",
+  seller_company:         "業者名",
+  seller_contact:         "業者電話番号",
+  env_elementary_school:  "小学校名",
+  env_junior_high_school: "中学校名",
+  latitude:               "位置情報(緯度)",
+  longitude:              "位置情報(経度)",
+  internal_memo:          "物件備考",
 };
 
 // ── カラム自動検出 ────────────────────────────────────────────────────────────
