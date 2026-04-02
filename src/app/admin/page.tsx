@@ -42,6 +42,7 @@ export default function DashboardPage() {
   const [licenseAlerts, setLicenseAlerts] = useState<{ company: string; expiry: Date; daysLeft: number }[]>([]);
   const [takkenAlerts, setTakkenAlerts] = useState<{ name: string; daysLeft: number }[]>([]);
   const [newInquiries, setNewInquiries] = useState(0);
+  const [followUpCount, setFollowUpCount] = useState(0);
 
   useEffect(() => {
     fetch("/api/properties?take=300")
@@ -70,6 +71,11 @@ export default function DashboardPage() {
       .then((d: { statusCounts?: Record<string, number> }) => {
         setNewInquiries(d.statusCounts?.NEW ?? 0);
       })
+      .catch(() => {});
+
+    fetch("/api/customers/follow-up")
+      .then(r => r.json())
+      .then((d: { count?: number }) => setFollowUpCount(d.count ?? 0))
       .catch(() => {});
 
     // Takken expiry check
@@ -157,6 +163,13 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {followUpCount > 0 && (
+        <div style={{ background: "#fff3e0", border: "1px solid #ffb74d", borderRadius: 10, padding: "12px 18px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 14, color: "#e65100" }}>🤖 <strong>{followUpCount}名</strong>の顧客が7日以上未連絡です</span>
+          <a href="/admin/customers/follow-up" style={{ fontSize: 13, color: "#e65100", fontWeight: 600, textDecoration: "none" }}>AI追客を実行する →</a>
+        </div>
+      )}
 
       {newInquiries > 0 && (
         <div style={{ background: "#ffebee", border: "1px solid #ef9a9a", borderRadius: 10, padding: "12px 18px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>

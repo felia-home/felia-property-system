@@ -136,6 +136,13 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
   const [allStaff, setAllStaff] = useState<{ id: string; name: string }[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
 
+  // Follow-up message
+  const [generatingFollowUp, setGeneratingFollowUp] = useState(false);
+  const [followUpMsg, setFollowUpMsg] = useState<{ subject: string; body: string; reason: string } | null>(null);
+  const [followUpEditing, setFollowUpEditing] = useState(false);
+  const [followUpSending, setFollowUpSending] = useState(false);
+  const [followUpSent, setFollowUpSent] = useState(false);
+
   // Family
   const [editingMember, setEditingMember] = useState<Partial<FamilyMember> | null>(null);
   const [savingMember, setSavingMember] = useState(false);
@@ -199,6 +206,38 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
       setMsg("AI分析完了"); setTimeout(() => setMsg(""), 4000);
     } catch { setError("AI分析エラー"); }
     finally { setAnalyzing(false); }
+  };
+
+  const handleGenerateFollowUp = async () => {
+    setGeneratingFollowUp(true); setError(""); setFollowUpMsg(null); setFollowUpSent(false);
+    try {
+      const res = await fetch(`/api/customers/${params.id}/follow-up-message`);
+      const d = await res.json() as { subject?: string; body?: string; reason?: string; action?: string; error?: string };
+      if (d.error) { setError(d.error); return; }
+      if (d.action === "SKIP") { setError(`スキップ: ${d.reason ?? "条件に合う物件がありません"}`); return; }
+      setFollowUpMsg({ subject: d.subject ?? "", body: d.body ?? "", reason: d.reason ?? "" });
+    } catch { setError("メッセージ生成に失敗しました"); }
+    finally { setGeneratingFollowUp(false); }
+  };
+
+  const handleSendFollowUp = async () => {
+    if (!followUpMsg) return;
+    setFollowUpSending(true); setError("");
+    try {
+      const res = await fetch(`/api/customers/${params.id}/follow-up-message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(followUpMsg),
+      });
+      if (!res.ok) throw new Error("送信失敗");
+      setFollowUpSent(true);
+      setFollowUpMsg(null);
+      setFollowUpEditing(false);
+      setMsg("追客メールを記録しました。ステータスを「連絡中」に更新しました。");
+      setTimeout(() => setMsg(""), 5000);
+      await loadCustomer();
+    } catch { setError("送信の記録に失敗しました"); }
+    finally { setFollowUpSending(false); }
   };
 
   const handleAddMember = async () => {
@@ -702,10 +741,59 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
             ) : (
               <div style={{ color: "#706e68", fontSize: 13, marginBottom: 12 }}>AI分析未実施</div>
             )}
-            <button onClick={handleAnalyze} disabled={analyzing}
-              style={{ marginTop: 12, padding: "8px 16px", borderRadius: 8, background: analyzing ? "#888" : "#1565c0", color: "#fff", border: "none", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
-              {analyzing ? "分析中..." : "🤖 AI分析を実行"}
-            </button>
+            <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+              <button onClick={handleAnalyze} disabled={analyzing}
+                style={{ padding: "8px 16px", borderRadius: 8, background: analyzing ? "#888" : "#1565c0", color: "#fff", border: "none", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                {analyzing ? "分析中..." : "🤖 AI分析を実行"}
+              </button>
+              <button onClick={handleGenerateFollowUp} disabled={generatingFollowUp}
+                style={{ padding: "8px 16px", borderRadius: 8, background: generatingFollowUp ? "#888" : "#e65100", color: "#fff", border: "none", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                {generatingFollowUp ? "生成中..." : "📧 追客メールを生成"}
+              </button>
+            </div>
+
+            {/* Follow-up message panel */}
+            {followUpMsg && (
+              <div style={{ marginTop: 16, borderTop: "1px solid #f0ede8", paddingTop: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#3a2a1a", marginBottom: 10 }}>生成されたメッセージを確認・編集してください</div>
+                {followUpEditing ? (
+                  <>
+                    <div style={{ marginBottom: 10 }}>
+                      <label style={{ fontSize: 11, color: "#706e68", display: "block", marginBottom: 4 }}>件名</label>
+                      <input value={followUpMsg.subject}
+                        onChange={e => setFollowUpMsg(m => m ? { ...m, subject: e.target.value } : m)}
+                        style={{ ...inputSt }} />
+                    </div>
+                    <div style={{ marginBottom: 10 }}>
+                      <label style={{ fontSize: 11, color: "#706e68", display: "block", marginBottom: 4 }}>本文</label>
+                      <textarea value={followUpMsg.body} rows={10}
+                        onChange={e => setFollowUpMsg(m => m ? { ...m, body: e.target.value } : m)}
+                        style={{ ...inputSt, resize: "vertical" }} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>件名: {followUpMsg.subject}</div>
+                    <div style={{ fontSize: 12, lineHeight: 1.8, whiteSpace: "pre-wrap", background: "#fafaf8", padding: "12px 14px", borderRadius: 8, color: "#3a2a1a" }}>{followUpMsg.body}</div>
+                  </>
+                )}
+                <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
+                  <button onClick={() => { setFollowUpMsg(null); setFollowUpEditing(false); }}
+                    style={{ padding: "6px 14px", borderRadius: 6, fontSize: 12, border: "1px solid #e0deda", background: "#fff", cursor: "pointer", fontFamily: "inherit" }}>キャンセル</button>
+                  <button onClick={() => setFollowUpEditing(v => !v)}
+                    style={{ padding: "6px 14px", borderRadius: 6, fontSize: 12, border: "1px solid #e0deda", background: "#fff", cursor: "pointer", fontFamily: "inherit" }}>✏️ {followUpEditing ? "プレビュー" : "編集"}</button>
+                  <button onClick={handleSendFollowUp} disabled={followUpSending}
+                    style={{ padding: "6px 16px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: followUpSending ? "#888" : "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                    {followUpSending ? "記録中..." : "✅ この内容で送信記録"}
+                  </button>
+                </div>
+              </div>
+            )}
+            {followUpSent && (
+              <div style={{ marginTop: 12, background: "#e8f5e9", color: "#2e7d32", padding: "8px 12px", borderRadius: 8, fontSize: 12 }}>
+                ✅ 追客メールを対応履歴に記録しました
+              </div>
+            )}
           </div>
 
           <div style={card}>

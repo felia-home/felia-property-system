@@ -8,6 +8,7 @@ const navItems = [
   { href: "/admin/approvals", label: "広告確認待ち", icon: "✓" },
   { href: "/admin/sold", label: "成約アラート", icon: "!" },
   { href: "/admin/customers", label: "顧客管理", icon: "人" },
+  { href: "/admin/customers/follow-up", label: "AI追客", icon: "🤖" },
   { href: "/admin/contracts", label: "契約管理", icon: "📄" },
   { href: "/admin/sales", label: "売上管理", icon: "¥" },
   { href: "/admin/mansions", label: "マンションマスタ", icon: "🏢" },
