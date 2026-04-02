@@ -270,7 +270,30 @@ cat ~/.ssh/id_ed25519
 git push origin main
   → GitHub Actions 起動
   → SSH で VPS に接続
-  → git pull → npm install → prisma migrate deploy → prisma generate → npm run build → pm2 restart
+  → スワップ1GB追加（ビルド用）
+  → git pull → npm install → prisma migrate deploy → prisma generate → rm -rf .next → npm run build → pm2 restart
+  → スワップ削除
 ```
 
 デプロイ状況は GitHub リポジトリの **Actions** タブで確認できます。
+
+### VPS永続スワップの設定（初回のみ）
+
+メモリが少ないVPSでビルドが SIGKILL で落ちる場合、永続スワップを設定する。
+GitHub Actions のデプロイスクリプトがビルド時に一時スワップ（1GB）を追加するため、
+この設定がなくてもデプロイは成功するが、念のため設定しておくと安定する。
+
+```bash
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+設定確認：
+
+```bash
+free -h
+swapon --show
+```

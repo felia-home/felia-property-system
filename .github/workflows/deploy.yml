@@ -15,11 +15,28 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 30m
           script: |
+            set -e
             cd /var/www/felia-property-system
+
+            # スワップ追加（既存でなければ作成）
+            if [ ! -f /swapfile_deploy ]; then
+              sudo fallocate -l 1G /swapfile_deploy
+              sudo chmod 600 /swapfile_deploy
+              sudo mkswap /swapfile_deploy
+            fi
+            sudo swapon /swapfile_deploy 2>/dev/null || true
+
+            # デプロイ
             git pull origin main
             npm install
             npx prisma migrate deploy
             npx prisma generate
+            rm -rf .next
             npm run build
             pm2 restart felia-property
+
+            # スワップ削除（一時スワップなので後片付け）
+            sudo swapoff /swapfile_deploy 2>/dev/null || true
+            sudo rm -f /swapfile_deploy
