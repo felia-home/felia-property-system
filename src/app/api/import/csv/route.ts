@@ -24,9 +24,15 @@ async function convertToUtf8(buffer: ArrayBuffer): Promise<string> {
   const detected = Encoding.detect(uint8Array);
   console.log("[CSV Import] 検出文字コード:", detected);
 
+  // UNICODE / UTF8 と誤検出された場合は SJIS として強制変換
+  const fromEncoding = (!detected || detected === "UNICODE" || detected === "UTF8")
+    ? "SJIS"
+    : detected;
+  console.log("[CSV Import] 使用する文字コード:", fromEncoding);
+
   const utf8Array = Encoding.convert(uint8Array, {
     to: "UTF8",
-    from: detected === false ? "SJIS" : detected,
+    from: fromEncoding,
   });
 
   const result = new TextDecoder("utf-8").decode(new Uint8Array(utf8Array));
