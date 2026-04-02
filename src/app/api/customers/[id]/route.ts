@@ -5,19 +5,49 @@ const UPDATABLE_FIELDS = [
   "name", "name_kana", "email", "phone",
   "budget_min", "budget_max",
   "area_preferences", "property_type_pref", "rooms_pref", "area_m2_pref",
-  "status", "notes", "source", "assigned_agent_id",
+  "status", "priority", "notes", "source", "assigned_agent_id",
   "last_contacted_at", "next_action_date", "next_action_note",
 ];
 
 // GET /api/customers/[id]
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const { searchParams } = new URL(req.url);
+    const includeRelations = searchParams.get("includeRelations") === "true";
+
     const customer = await prisma.customer.findUnique({
       where: { id: params.id },
-      include: { contracts: true },
+      include: includeRelations
+        ? {
+            contracts: true,
+            inquiries: {
+              orderBy: { received_at: "desc" },
+              select: {
+                id: true,
+                source: true,
+                received_at: true,
+                ai_score: true,
+                property_name: true,
+                message: true,
+                status: true,
+                assigned_agent_id: true,
+              },
+            },
+            activities: {
+              orderBy: { created_at: "desc" },
+              select: {
+                id: true,
+                type: true,
+                content: true,
+                staff_id: true,
+                created_at: true,
+              },
+            },
+          }
+        : { contracts: true },
     });
     if (!customer || customer.is_deleted) {
       return NextResponse.json({ error: "顧客が見つかりません" }, { status: 404 });

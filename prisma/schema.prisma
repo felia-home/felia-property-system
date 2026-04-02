@@ -579,17 +579,32 @@ model Customer {
   status             String    @default("lead")
   notes              String?
   source             String?
+  ai_score           Int?
+  priority           String    @default("NORMAL")
   assigned_agent_id  String?
+  first_contact_at   DateTime?
   last_contacted_at  DateTime?
   next_action_date   DateTime?
   next_action_note   String?
   is_deleted         Boolean   @default(false)
   deleted_at         DateTime?
   contracts          Contract[]
-  inquiries           Inquiry[]
+  inquiries          Inquiry[]
+  activities         CustomerActivity[]
   created_at         DateTime  @default(now())
   updated_at         DateTime  @updatedAt
   @@map("customers")
+}
+
+model CustomerActivity {
+  id          String   @id @default(cuid())
+  customer_id String
+  customer    Customer @relation(fields: [customer_id], references: [id])
+  staff_id    String?
+  type        String   // CALL | EMAIL | VISIT | MEETING | NOTE
+  content     String
+  created_at  DateTime @default(now())
+  @@map("customer_activities")
 }
 
 model Company {

@@ -7,9 +7,14 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
+    const priority = searchParams.get("priority");
+    const source = searchParams.get("source");
+    const includeInquiries = searchParams.get("includeInquiries") === "true";
 
     const where: Record<string, unknown> = { is_deleted: false };
     if (status) where.status = status;
+    if (priority) where.priority = priority;
+    if (source) where.source = source;
     if (search) {
       where.OR = [
         { name: { contains: search } },
@@ -21,8 +26,23 @@ export async function GET(request: NextRequest) {
 
     const customers = await prisma.customer.findMany({
       where,
-      orderBy: { created_at: "desc" },
+      orderBy: [{ priority: "asc" }, { created_at: "desc" }],
       take: 200,
+      include: includeInquiries
+        ? {
+            inquiries: {
+              orderBy: { received_at: "desc" },
+              take: 1,
+              select: {
+                id: true,
+                source: true,
+                received_at: true,
+                ai_score: true,
+                property_name: true,
+              },
+            },
+          }
+        : undefined,
     });
 
     return NextResponse.json({ customers, total: customers.length });
