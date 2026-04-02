@@ -9,40 +9,54 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
     const priority = searchParams.get("priority");
     const source = searchParams.get("source");
+    const assignedTo = searchParams.get("assigned_to");
     const includeInquiries = searchParams.get("includeInquiries") === "true";
+    const includeFamily = searchParams.get("includeFamily") === "true";
 
     const where: Record<string, unknown> = { is_deleted: false };
     if (status) where.status = status;
     if (priority) where.priority = priority;
     if (source) where.source = source;
+    if (assignedTo) where.assigned_to = assignedTo;
     if (search) {
       where.OR = [
-        { name: { contains: search } },
-        { name_kana: { contains: search } },
-        { email: { contains: search } },
-        { phone: { contains: search } },
+        { name: { contains: search, mode: "insensitive" } },
+        { name_kana: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { tel: { contains: search } },
+        { tel_mobile: { contains: search } },
       ];
     }
 
     const customers = await prisma.customer.findMany({
       where,
-      orderBy: [{ priority: "asc" }, { created_at: "desc" }],
+      orderBy: [
+        { ai_score: "desc" },
+        { created_at: "desc" },
+      ],
       take: 200,
-      include: includeInquiries
-        ? {
-            inquiries: {
-              orderBy: { received_at: "desc" },
-              take: 1,
-              select: {
-                id: true,
-                source: true,
-                received_at: true,
-                ai_score: true,
-                property_name: true,
-              },
+      include: {
+        ...(includeInquiries ? {
+          inquiries: {
+            orderBy: { received_at: "desc" },
+            take: 1,
+            select: {
+              id: true,
+              source: true,
+              received_at: true,
+              ai_score: true,
+              property_name: true,
             },
-          }
-        : undefined,
+          },
+        } : {}),
+        ...(includeFamily ? {
+          family_members: {
+            orderBy: { created_at: "asc" },
+            select: { id: true, relation: true, name: true, age: true },
+          },
+        } : {}),
+        assigned_staff: { select: { id: true, name: true } },
+      },
     });
 
     return NextResponse.json({ customers, total: customers.length });
@@ -66,17 +80,35 @@ export async function POST(request: NextRequest) {
         name: body.name,
         name_kana: body.name_kana ?? null,
         email: body.email ?? null,
-        phone: body.phone ?? null,
-        budget_min: body.budget_min ? Number(body.budget_min) : null,
-        budget_max: body.budget_max ? Number(body.budget_max) : null,
-        area_preferences: body.area_preferences ?? null,
-        property_type_pref: body.property_type_pref ?? null,
-        rooms_pref: body.rooms_pref ?? null,
-        area_m2_pref: body.area_m2_pref ? Number(body.area_m2_pref) : null,
-        status: body.status ?? "lead",
-        notes: body.notes ?? null,
+        tel: body.tel ?? body.phone ?? null,
+        tel_mobile: body.tel_mobile ?? null,
+        line_id: body.line_id ?? null,
+        postal_code: body.postal_code ?? null,
+        prefecture: body.prefecture ?? null,
+        city: body.city ?? null,
+        address: body.address ?? null,
+        current_housing_type: body.current_housing_type ?? null,
+        current_rent: body.current_rent ? Number(body.current_rent) : null,
+        desired_budget_min: body.desired_budget_min ? Number(body.desired_budget_min) : null,
+        desired_budget_max: body.desired_budget_max ? Number(body.desired_budget_max) : null,
+        desired_property_type: body.desired_property_type ?? [],
+        desired_areas: body.desired_areas ?? [],
+        desired_stations: body.desired_stations ?? [],
+        desired_rooms: body.desired_rooms ?? [],
+        desired_features: body.desired_features ?? [],
+        desired_move_timing: body.desired_move_timing ?? null,
+        desired_note: body.desired_note ?? null,
+        finance_type: body.finance_type ?? null,
+        down_payment: body.down_payment ? Number(body.down_payment) : null,
+        annual_income: body.annual_income ? Number(body.annual_income) : null,
+        loan_preapproval: body.loan_preapproval ?? null,
+        status: body.status ?? "NEW",
+        priority: body.priority ?? "NORMAL",
         source: body.source ?? null,
-        assigned_agent_id: body.assigned_agent_id ?? null,
+        source_detail: body.source_detail ?? null,
+        assigned_to: body.assigned_to ?? null,
+        internal_memo: body.internal_memo ?? body.notes ?? null,
+        tags: body.tags ?? [],
       },
     });
 

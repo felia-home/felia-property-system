@@ -1,25 +1,35 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 const STATUS_LABELS: Record<string, string> = {
-  lead: "見込み客", active: "商談中", contract: "契約済み", closed: "クローズ",
+  NEW: "新規", CONTACTING: "連絡中", VISITING: "内見調整中",
+  NEGOTIATING: "商談中", CONTRACT: "契約済", CLOSED: "成約",
+  LOST: "失注", PENDING: "保留",
 };
 const STATUS_BADGE: Record<string, React.CSSProperties> = {
-  lead:     { background: "#f3f2ef", color: "#706e68" },
-  active:   { background: "#e3f0ff", color: "#1a56a0" },
-  contract: { background: "#234f35", color: "#fff" },
-  closed:   { background: "#fdeaea", color: "#8c1f1f" },
-};
-const TYPE_LABELS: Record<string, string> = {
-  NEW_HOUSE: "新築戸建", USED_HOUSE: "中古戸建", MANSION: "マンション",
-  NEW_MANSION: "新築マンション", LAND: "土地",
+  NEW:         { background: "#e3f2fd", color: "#1565c0" },
+  CONTACTING:  { background: "#fff8e1", color: "#e65100" },
+  VISITING:    { background: "#e8f5e9", color: "#2e7d32" },
+  NEGOTIATING: { background: "#234f35", color: "#fff" },
+  CONTRACT:    { background: "#1a237e", color: "#fff" },
+  CLOSED:      { background: "#880e4f", color: "#fff" },
+  LOST:        { background: "#fdeaea", color: "#8c1f1f" },
+  PENDING:     { background: "#f3f2ef", color: "#706e68" },
 };
 const SOURCE_LABELS: Record<string, string> = {
   SUUMO: "SUUMO", ATHOME: "athome", YAHOO: "Yahoo不動産",
-  HOMES: "HOME'S", HP: "自社HP", TEL: "電話", WALK_IN: "来店", OTHER: "その他",
+  HOMES: "HOME'S", HP: "自社HP", TEL: "電話", WALK_IN: "来店",
+  REFERRAL: "紹介", OTHER: "その他",
 };
-const INQUIRY_STATUS_LABELS: Record<string, { label: string; bg: string; color: string }> = {
+const TYPE_LABELS: Record<string, string> = {
+  NEW_HOUSE: "新築戸建", USED_HOUSE: "中古戸建", MANSION: "マンション", LAND: "土地",
+};
+const ACTIVITY_ICONS: Record<string, string> = {
+  CALL: "📞", EMAIL: "✉", LINE: "💬", VISIT: "🏠",
+  MEETING: "🤝", VIEWING: "👁", NOTE: "📝", AI_AUTO: "🤖",
+};
+const INQUIRY_STATUS: Record<string, { label: string; bg: string; color: string }> = {
   NEW: { label: "未対応", bg: "#ffebee", color: "#c62828" },
   CONTACTED: { label: "連絡済", bg: "#fff8e1", color: "#e65100" },
   VISITING: { label: "内見調整", bg: "#e3f2fd", color: "#1565c0" },
@@ -27,106 +37,140 @@ const INQUIRY_STATUS_LABELS: Record<string, { label: string; bg: string; color: 
   CLOSED: { label: "完了", bg: "#f5f5f5", color: "#616161" },
   LOST: { label: "失注", bg: "#fdeaea", color: "#8c1f1f" },
 };
-const ACTIVITY_TYPE_LABELS: Record<string, string> = {
-  CALL: "📞 電話", EMAIL: "✉ メール", VISIT: "🏠 内見",
-  MEETING: "🤝 来店", NOTE: "📝 メモ",
-};
 
-interface Customer {
-  id: string; name: string; name_kana: string | null;
-  email: string | null; phone: string | null;
-  budget_min: number | null; budget_max: number | null;
-  area_preferences: unknown; property_type_pref: string | null;
-  rooms_pref: string | null; area_m2_pref: number | null;
-  status: string; notes: string | null; source: string | null;
-  ai_score: number | null; priority: string;
-  assigned_agent_id: string | null;
-  first_contact_at: string | null;
-  last_contacted_at: string | null; next_action_date: string | null; next_action_note: string | null;
-  created_at: string;
-  inquiries: InquiryItem[];
-  activities: ActivityItem[];
+interface FamilyMember {
+  id: string; customer_id?: string; relation: string; name: string | null;
+  name_kana: string | null; age: number | null; birth_year: number | null;
+  occupation: string | null; annual_income: number | null; note: string | null;
+  created_at?: string;
 }
-
+interface ActivityItem {
+  id: string; type: string; direction: string; content: string;
+  result: string | null; next_action: string | null; next_action_at: string | null;
+  staff_id: string | null; created_at: string;
+}
 interface InquiryItem {
-  id: string; source: string; received_at: string;
-  inquiry_type: string; message: string | null;
+  id: string; source: string; received_at: string; ai_score: number | null;
+  ai_notes: string | null; property_name: string | null; property_number: string | null;
+  message: string | null; status: string; priority: string;
   visit_hope: boolean; document_hope: boolean;
-  property_name: string | null; property_number: string | null;
-  status: string; ai_score: number | null; ai_notes: string | null;
-  priority: string;
   assigned_staff: { name: string } | null;
 }
-
-interface ActivityItem {
-  id: string; type: string; content: string; created_at: string; staff_id: string | null;
+interface Customer {
+  id: string; name: string; name_kana: string | null;
+  email: string | null; tel: string | null; tel_mobile: string | null; line_id: string | null;
+  postal_code: string | null; prefecture: string | null; city: string | null; address: string | null;
+  current_housing_type: string | null; current_rent: number | null; current_housing_note: string | null;
+  desired_property_type: string[]; desired_areas: string[]; desired_stations: string[];
+  desired_budget_min: number | null; desired_budget_max: number | null;
+  desired_area_min: number | null; desired_area_max: number | null;
+  desired_rooms: string[]; desired_floor_min: number | null; desired_building_year: number | null;
+  desired_walk_max: number | null; desired_move_timing: string | null;
+  desired_features: string[]; desired_note: string | null;
+  finance_type: string | null; down_payment: number | null; annual_income: number | null;
+  loan_preapproval: string | null; loan_amount: number | null; loan_bank: string | null;
+  has_property_to_sell: boolean; sell_property_note: string | null;
+  source: string | null; source_detail: string | null;
+  first_inquiry_at: string | null; first_inquiry_property: string | null;
+  status: string; priority: string;
+  ai_score: number | null; ai_analysis: string | null;
+  ai_next_action: string | null; ai_analyzed_at: string | null;
+  assigned_to: string | null; assigned_at: string | null; store_id: string | null;
+  last_contact_at: string | null; next_contact_at: string | null; next_contact_note: string | null;
+  contact_frequency: string | null; do_not_contact: boolean; unsubscribed: boolean;
+  internal_memo: string | null; tags: string[];
+  is_member: boolean; member_registered_at: string | null;
+  created_at: string;
+  family_members: FamilyMember[];
+  activities: ActivityItem[];
+  inquiries: InquiryItem[];
+  assigned_staff: { id: string; name: string } | null;
 }
 
-interface MatchingProperty {
-  id: string; property_type: string; status: string;
-  city: string; address: string; station_name1: string | null; station_walk1: number | null;
-  price: number; rooms: string | null; area_build_m2: number | null;
-}
+type TabKey = "basic" | "family" | "desired" | "finance" | "followup" | "history";
 
 const inputSt: React.CSSProperties = {
   padding: "6px 10px", border: "1px solid #e0deda", borderRadius: 6,
   fontSize: 12, fontFamily: "inherit", width: "100%", boxSizing: "border-box",
 };
-const section: React.CSSProperties = {
+const card: React.CSSProperties = {
   background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 20, marginBottom: 14,
 };
+const label11: React.CSSProperties = { fontSize: 11, color: "#706e68", display: "block", marginBottom: 4 };
+const row: React.CSSProperties = { display: "flex", gap: 10, alignItems: "center", marginBottom: 12 };
+const labelW: React.CSSProperties = { fontSize: 11, color: "#706e68", width: 90, flexShrink: 0 };
+
+const PROP_TYPES = ["NEW_HOUSE", "USED_HOUSE", "MANSION", "LAND"];
+const FEATURES = ["駐車場", "角部屋", "南向き", "ペット可", "庭付き", "オートロック", "床暖房", "学区"];
+
+function TagList({ items, onRemove, onAdd, placeholder }: {
+  items: string[]; onRemove: (i: number) => void;
+  onAdd: (v: string) => void; placeholder?: string;
+}) {
+  const [val, setVal] = useState("");
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+      {items.map((item, i) => (
+        <span key={i} style={{ background: "#e8f5e9", color: "#234f35", borderRadius: 12, padding: "2px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+          {item}
+          <button onClick={() => onRemove(i)} style={{ background: "none", border: "none", cursor: "pointer", color: "#888", fontSize: 12, padding: 0, lineHeight: 1 }}>✕</button>
+        </span>
+      ))}
+      <input value={val} onChange={e => setVal(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter" && val.trim()) { onAdd(val.trim()); setVal(""); } }}
+        placeholder={placeholder ?? "入力してEnter"}
+        style={{ padding: "2px 8px", border: "1px solid #e0deda", borderRadius: 12, fontSize: 11, fontFamily: "inherit", width: 120 }} />
+    </div>
+  );
+}
 
 export default function CustomerDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"basic" | "inquiries" | "activities" | "matching">("basic");
-  const [form, setForm] = useState<Record<string, unknown>>({});
+  const [activeTab, setActiveTab] = useState<TabKey>("basic");
+  const [form, setForm] = useState<Partial<Customer>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
-  const [matchingProps, setMatchingProps] = useState<MatchingProperty[]>([]);
   const [allStaff, setAllStaff] = useState<{ id: string; name: string }[]>([]);
+  const [analyzing, setAnalyzing] = useState(false);
+
+  // Family
+  const [editingMember, setEditingMember] = useState<Partial<FamilyMember> | null>(null);
+  const [savingMember, setSavingMember] = useState(false);
 
   // Activity form
   const [actType, setActType] = useState("CALL");
+  const [actDir, setActDir] = useState("OUTBOUND");
   const [actContent, setActContent] = useState("");
+  const [actResult, setActResult] = useState("");
+  const [actNext, setActNext] = useState("");
   const [addingAct, setAddingAct] = useState(false);
 
-  useEffect(() => {
-    fetch(`/api/customers/${params.id}?includeRelations=true`)
+  const loadCustomer = useCallback(() => {
+    return fetch(`/api/customers/${params.id}?includeRelations=true`)
       .then(r => r.json())
       .then(d => {
         if (!d.customer) return;
-        setCustomer(d.customer);
-        setForm(d.customer as Record<string, unknown>);
+        setCustomer(d.customer as Customer);
+        setForm(d.customer as Customer);
       })
-      .catch(() => setError("顧客情報の取得に失敗しました"))
-      .finally(() => setLoading(false));
-
-    fetch("/api/staff?active=true")
-      .then(r => r.json())
-      .then((d: { staff?: { id: string; name: string }[] }) => setAllStaff(d.staff ?? []))
-      .catch(() => {});
+      .catch(() => setError("顧客情報の取得に失敗しました"));
   }, [params.id]);
 
   useEffect(() => {
-    if (activeTab !== "matching" || !customer) return;
-    fetch("/api/properties?status=APPROVED")
-      .then(r => r.json())
-      .then(d => {
-        const props: MatchingProperty[] = d.properties ?? [];
-        setMatchingProps(props.filter(p => {
-          if (customer.budget_max && p.price > customer.budget_max) return false;
-          if (customer.budget_min && p.price < customer.budget_min * 0.9) return false;
-          if (customer.property_type_pref && p.property_type !== customer.property_type_pref) return false;
-          return true;
-        }).slice(0, 10));
-      })
-      .catch(() => {});
-  }, [activeTab, customer]);
+    setLoading(true);
+    Promise.all([
+      loadCustomer(),
+      fetch("/api/staff?active=true").then(r => r.json())
+        .then((d: { staff?: { id: string; name: string }[] }) => setAllStaff(d.staff ?? []))
+        .catch(() => {}),
+    ]).finally(() => setLoading(false));
+  }, [loadCustomer]);
 
-  const setF = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }));
+  const setF = <K extends keyof Customer>(k: K, v: Customer[K]) =>
+    setForm(f => ({ ...f, [k]: v }));
 
   const handleSave = async () => {
     setSaving(true); setError("");
@@ -138,11 +182,48 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "更新に失敗しました"); return; }
-      setCustomer(data.customer);
-      setForm(data.customer as Record<string, unknown>);
+      setCustomer(prev => prev ? { ...prev, ...data.customer } : data.customer);
       setMsg("保存しました"); setTimeout(() => setMsg(""), 3000);
     } catch { setError("通信エラーが発生しました"); }
     finally { setSaving(false); }
+  };
+
+  const handleAnalyze = async () => {
+    setAnalyzing(true); setError("");
+    try {
+      const res = await fetch(`/api/customers/${params.id}/analyze`, { method: "POST" });
+      const d = await res.json() as { score?: number; priority?: string; analysis?: string; next_action?: string; error?: string };
+      if (d.error) { setError(d.error); return; }
+      setForm(f => ({ ...f, ai_score: d.score, priority: d.priority as Customer["priority"], ai_analysis: d.analysis ?? null, ai_next_action: d.next_action ?? null, ai_analyzed_at: new Date().toISOString() }));
+      setCustomer(prev => prev ? { ...prev, ai_score: d.score ?? null, ai_analysis: d.analysis ?? null, ai_next_action: d.next_action ?? null } : prev);
+      setMsg("AI分析完了"); setTimeout(() => setMsg(""), 4000);
+    } catch { setError("AI分析エラー"); }
+    finally { setAnalyzing(false); }
+  };
+
+  const handleAddMember = async () => {
+    if (!editingMember?.relation) return;
+    setSavingMember(true);
+    try {
+      const method = editingMember.id ? "PATCH" : "POST";
+      const url = editingMember.id
+        ? `/api/customers/${params.id}/family/${editingMember.id}`
+        : `/api/customers/${params.id}/family`;
+      const res = await fetch(url, {
+        method, headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingMember),
+      });
+      if (!res.ok) { setError("家族の保存に失敗しました"); return; }
+      setEditingMember(null);
+      await loadCustomer();
+    } catch { setError("通信エラー"); }
+    finally { setSavingMember(false); }
+  };
+
+  const handleDeleteMember = async (memberId: string) => {
+    if (!confirm("この家族情報を削除しますか？")) return;
+    await fetch(`/api/customers/${params.id}/family/${memberId}`, { method: "DELETE" });
+    await loadCustomer();
   };
 
   const handleAddActivity = async () => {
@@ -152,48 +233,56 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
       await fetch(`/api/customers/${params.id}/activities`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: actType, content: actContent }),
+        body: JSON.stringify({ type: actType, direction: actDir, content: actContent, result: actResult || null, next_action: actNext || null }),
       });
-      setActContent("");
-      // リロード
-      const res = await fetch(`/api/customers/${params.id}?includeRelations=true`);
-      const d = await res.json();
-      if (d.customer) { setCustomer(d.customer); setForm(d.customer as Record<string, unknown>); }
+      setActContent(""); setActResult(""); setActNext("");
+      await loadCustomer();
     } catch { setError("対応記録の保存に失敗しました"); }
     finally { setAddingAct(false); }
   };
 
-  if (loading) return <div style={{ padding: 28, color: "#706e68", fontSize: 13 }}>読み込み中...</div>;
-  if (!customer) return <div style={{ padding: 28, color: "#8c1f1f", fontSize: 13 }}>顧客が見つかりません</div>;
+  if (loading) return <div style={{ padding: 28, color: "#706e68" }}>読み込み中...</div>;
+  if (!customer) return <div style={{ padding: 28, color: "#8c1f1f" }}>顧客が見つかりません</div>;
 
   const badge = STATUS_BADGE[customer.status] ?? { background: "#f3f2ef", color: "#706e68" };
-  const tabs = [
+  const tabs: { key: TabKey; label: string }[] = [
     { key: "basic", label: "基本情報" },
-    { key: "inquiries", label: `反響・問い合わせ (${customer.inquiries?.length ?? 0})` },
-    { key: "activities", label: `対応履歴 (${customer.activities?.length ?? 0})` },
-    { key: "matching", label: "物件マッチング" },
-  ] as const;
+    { key: "family", label: `家族構成 (${customer.family_members?.length ?? 0})` },
+    { key: "desired", label: "希望条件" },
+    { key: "finance", label: "資金計画" },
+    { key: "followup", label: "追客管理" },
+    { key: "history", label: `対応履歴 (${customer.activities?.length ?? 0})` },
+  ];
+
+  const SaveBtn = () => (
+    <button onClick={handleSave} disabled={saving}
+      style={{ padding: "9px 24px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: saving ? "#888" : "#234f35", color: "#fff", border: "none", cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+      {saving ? "保存中..." : "変更を保存"}
+    </button>
+  );
 
   return (
-    <div style={{ padding: 28, maxWidth: 920 }}>
+    <div style={{ padding: 28, maxWidth: 960 }}>
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <button onClick={() => router.back()} style={{ fontSize: 12, color: "#706e68", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 8, fontFamily: "inherit" }}>← 顧客一覧</button>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <h1 style={{ fontSize: 20, fontWeight: 500 }}>{customer.name}</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <h1 style={{ fontSize: 20, fontWeight: 500 }}>{customer.name}様</h1>
           {customer.name_kana && <span style={{ fontSize: 12, color: "#706e68" }}>{customer.name_kana}</span>}
           <span style={{ ...badge, padding: "3px 12px", borderRadius: 99, fontSize: 11, fontWeight: 500 }}>
             {STATUS_LABELS[customer.status] ?? customer.status}
           </span>
           {customer.ai_score != null && (
-            <span style={{ background: customer.ai_score >= 70 ? "#ffebee" : "#f7f6f2", color: customer.ai_score >= 70 ? "#c62828" : "#706e68", padding: "3px 12px", borderRadius: 99, fontSize: 12, fontWeight: 600 }}>
-              AIスコア {customer.ai_score}
+            <span style={{ background: customer.ai_score >= 70 ? "#ffebee" : "#f7f6f2", color: customer.ai_score >= 70 ? "#c62828" : "#706e68", padding: "3px 12px", borderRadius: 99, fontSize: 12, fontWeight: 700 }}>
+              AIスコア {customer.ai_score}点
             </span>
           )}
+          {customer.do_not_contact && <span style={{ background: "#fdeaea", color: "#8c1f1f", padding: "3px 10px", borderRadius: 99, fontSize: 11 }}>連絡不要</span>}
         </div>
         <p style={{ fontSize: 12, color: "#706e68", marginTop: 4 }}>
-          登録日: {new Date(customer.created_at).toLocaleDateString("ja-JP")}
-          {customer.source && `　初回反響: ${SOURCE_LABELS[customer.source] ?? customer.source}`}
+          登録: {new Date(customer.created_at).toLocaleDateString("ja-JP")}
+          {customer.source && `　反響元: ${SOURCE_LABELS[customer.source] ?? customer.source}`}
+          {customer.first_inquiry_at && `　初回問い合わせ: ${new Date(customer.first_inquiry_at).toLocaleDateString("ja-JP")}`}
         </p>
       </div>
 
@@ -201,222 +290,591 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
       {msg && <div style={{ background: "#e8f5e9", color: "#2e7d32", padding: "10px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>{msg}</div>}
 
       {/* Tabs */}
-      <div style={{ display: "flex", borderBottom: "2px solid #e0deda", marginBottom: 20 }}>
+      <div style={{ display: "flex", borderBottom: "2px solid #e0deda", marginBottom: 20, gap: 0 }}>
         {tabs.map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)}
-            style={{ padding: "9px 18px", fontSize: 13, fontWeight: activeTab === t.key ? 600 : 400, color: activeTab === t.key ? "#234f35" : "#706e68", background: "none", border: "none", borderBottom: activeTab === t.key ? "2px solid #234f35" : "2px solid transparent", marginBottom: -2, cursor: "pointer", fontFamily: "inherit" }}>
+            style={{ padding: "9px 16px", fontSize: 12, fontWeight: activeTab === t.key ? 600 : 400, color: activeTab === t.key ? "#234f35" : "#706e68", background: "none", border: "none", borderBottom: activeTab === t.key ? "2px solid #234f35" : "2px solid transparent", marginBottom: -2, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
             {t.label}
           </button>
         ))}
       </div>
 
-      {/* ─── Tab: 基本情報 ─── */}
+      {/* ─── Tab1: 基本情報 ─── */}
       {activeTab === "basic" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={section}>
-              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14, color: "#3a2a1a" }}>基本情報</div>
-              {[
-                { label: "氏名", k: "name" },
-                { label: "フリガナ", k: "name_kana" },
-                { label: "メール", k: "email" },
-                { label: "電話", k: "phone" },
-              ].map(({ label, k }) => (
-                <div key={k} style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-                  <span style={{ fontSize: 11, color: "#706e68", width: 80, flexShrink: 0 }}>{label}</span>
-                  <input value={String(form[k] ?? "")} onChange={e => setF(k, e.target.value)} style={{ ...inputSt, flex: 1 }} />
-                </div>
-              ))}
-              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-                <span style={{ fontSize: 11, color: "#706e68", width: 80, flexShrink: 0 }}>ステータス</span>
-                <select value={String(form.status ?? "lead")} onChange={e => setF("status", e.target.value)} style={{ ...inputSt, flex: 1 }}>
-                  {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div style={card}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 16 }}>基本情報</div>
+            {[
+              { label: "氏名", k: "name" as const }, { label: "フリガナ", k: "name_kana" as const },
+              { label: "メール", k: "email" as const }, { label: "電話", k: "tel" as const },
+              { label: "携帯", k: "tel_mobile" as const }, { label: "LINE ID", k: "line_id" as const },
+            ].map(({ label, k }) => (
+              <div key={k} style={row}>
+                <span style={labelW}>{label}</span>
+                <input value={String(form[k] ?? "")} onChange={e => setF(k, e.target.value as never)}
+                  style={{ ...inputSt, flex: 1 }} />
               </div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-                <span style={{ fontSize: 11, color: "#706e68", width: 80, flexShrink: 0 }}>優先度</span>
-                <select value={String(form.priority ?? "NORMAL")} onChange={e => setF("priority", e.target.value)} style={{ ...inputSt, flex: 1 }}>
-                  <option value="HIGH">🔴 高</option>
-                  <option value="NORMAL">🟡 普通</option>
-                  <option value="LOW">⚪ 低</option>
-                </select>
-              </div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <span style={{ fontSize: 11, color: "#706e68", width: 80, flexShrink: 0 }}>担当者</span>
-                <select value={String(form.assigned_agent_id ?? "")} onChange={e => setF("assigned_agent_id", e.target.value || null)} style={{ ...inputSt, flex: 1 }}>
-                  <option value="">未設定</option>
-                  {allStaff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-            </div>
+            ))}
+          </div>
 
-            <div style={section}>
-              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14, color: "#3a2a1a" }}>備考</div>
-              <textarea value={String(form.notes ?? "")} onChange={e => setF("notes", e.target.value)} rows={4}
-                style={{ ...inputSt, resize: "vertical" }} placeholder="メモ・特記事項など" />
+          <div style={card}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 16 }}>現住所・住まい</div>
+            {[
+              { label: "郵便番号", k: "postal_code" as const, ph: "123-4567" },
+              { label: "都道府県", k: "prefecture" as const, ph: "東京都" },
+              { label: "市区町村", k: "city" as const, ph: "目黒区" },
+              { label: "番地以降", k: "address" as const, ph: "平町1-2-3" },
+            ].map(({ label, k, ph }) => (
+              <div key={k} style={row}>
+                <span style={labelW}>{label}</span>
+                <input value={String(form[k] ?? "")} onChange={e => setF(k, e.target.value as never)}
+                  placeholder={ph} style={{ ...inputSt, flex: 1 }} />
+              </div>
+            ))}
+            <div style={row}>
+              <span style={labelW}>現在の住まい</span>
+              <select value={String(form.current_housing_type ?? "")} onChange={e => setF("current_housing_type", e.target.value)}
+                style={{ ...inputSt, flex: 1 }}>
+                <option value="">選択</option>
+                {["賃貸", "持家", "社宅", "実家", "その他"].map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+            <div style={row}>
+              <span style={labelW}>現在の家賃</span>
+              <input type="number" value={String(form.current_rent ?? "")} onChange={e => setF("current_rent", Number(e.target.value) as never)}
+                placeholder="80000" style={{ ...inputSt, flex: 1 }} />
+              <span style={{ fontSize: 11, color: "#706e68", flexShrink: 0 }}>円/月</span>
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={section}>
-              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14, color: "#3a2a1a" }}>希望条件</div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-                <span style={{ fontSize: 11, color: "#706e68", width: 80, flexShrink: 0 }}>予算</span>
-                <input type="number" value={String(form.budget_min ?? "")} onChange={e => setF("budget_min", Number(e.target.value))} placeholder="下限" style={{ ...inputSt, flex: 1 }} />
-                <span style={{ fontSize: 12, color: "#706e68" }}>〜</span>
-                <input type="number" value={String(form.budget_max ?? "")} onChange={e => setF("budget_max", Number(e.target.value))} placeholder="上限" style={{ ...inputSt, flex: 1 }} />
-                <span style={{ fontSize: 11, color: "#706e68" }}>万円</span>
-              </div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-                <span style={{ fontSize: 11, color: "#706e68", width: 80, flexShrink: 0 }}>物件種別</span>
-                <select value={String(form.property_type_pref ?? "")} onChange={e => setF("property_type_pref", e.target.value)} style={{ ...inputSt, flex: 1 }}>
-                  <option value="">指定なし</option>
-                  <option value="USED_HOUSE">中古戸建</option>
-                  <option value="NEW_HOUSE">新築戸建</option>
-                  <option value="MANSION">マンション</option>
-                  <option value="LAND">土地</option>
-                </select>
-              </div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <span style={{ fontSize: 11, color: "#706e68", width: 80, flexShrink: 0 }}>希望間取り</span>
-                <input value={String(form.rooms_pref ?? "")} onChange={e => setF("rooms_pref", e.target.value)} placeholder="3LDK以上" style={{ ...inputSt, flex: 1 }} />
-              </div>
+          <div style={card}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 16 }}>対応状況</div>
+            <div style={row}>
+              <span style={labelW}>ステータス</span>
+              <select value={String(form.status ?? "NEW")} onChange={e => setF("status", e.target.value as never)}
+                style={{ ...inputSt, flex: 1 }}>
+                {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
             </div>
-
-            <div style={section}>
-              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14, color: "#3a2a1a" }}>追客状況</div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-                <span style={{ fontSize: 11, color: "#706e68", width: 80, flexShrink: 0 }}>最終連絡日</span>
-                <span style={{ fontSize: 13 }}>{customer.last_contacted_at ? new Date(customer.last_contacted_at).toLocaleDateString("ja-JP") : "—"}</span>
-              </div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-                <span style={{ fontSize: 11, color: "#706e68", width: 80, flexShrink: 0 }}>次回アクション</span>
-                <input type="date" value={String(form.next_action_date ? new Date(String(form.next_action_date)).toISOString().split("T")[0] : "")}
-                  onChange={e => setF("next_action_date", e.target.value)} style={{ ...inputSt, flex: 1 }} />
-              </div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <span style={{ fontSize: 11, color: "#706e68", width: 80, flexShrink: 0 }}>内容</span>
-                <input value={String(form.next_action_note ?? "")} onChange={e => setF("next_action_note", e.target.value)} placeholder="電話フォロー・物件紹介など" style={{ ...inputSt, flex: 1 }} />
-              </div>
+            <div style={row}>
+              <span style={labelW}>優先度</span>
+              <select value={String(form.priority ?? "NORMAL")} onChange={e => setF("priority", e.target.value as never)}
+                style={{ ...inputSt, flex: 1 }}>
+                <option value="HIGH">高（HIGH）</option>
+                <option value="NORMAL">普通（NORMAL）</option>
+                <option value="LOW">低（LOW）</option>
+              </select>
+            </div>
+            <div style={row}>
+              <span style={labelW}>担当者</span>
+              <select value={String(form.assigned_to ?? "")} onChange={e => setF("assigned_to", (e.target.value || null) as never)}
+                style={{ ...inputSt, flex: 1 }}>
+                <option value="">未設定</option>
+                {allStaff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div style={row}>
+              <span style={labelW}>流入元</span>
+              <select value={String(form.source ?? "")} onChange={e => setF("source", e.target.value as never)}
+                style={{ ...inputSt, flex: 1 }}>
+                <option value="">選択</option>
+                {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+            <div style={row}>
+              <span style={labelW}>流入詳細</span>
+              <input value={String(form.source_detail ?? "")} onChange={e => setF("source_detail", e.target.value as never)}
+                placeholder="紹介者名・媒体詳細など" style={{ ...inputSt, flex: 1 }} />
             </div>
           </div>
 
-          <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end" }}>
-            <button onClick={handleSave} disabled={saving}
-              style={{ padding: "9px 24px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: saving ? "#888" : "#234f35", color: "#fff", border: "none", cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-              {saving ? "保存中..." : "変更を保存"}
+          <div style={card}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 16 }}>内部メモ・タグ</div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={label11}>内部メモ（非公開）</label>
+              <textarea value={String(form.internal_memo ?? "")} onChange={e => setF("internal_memo", e.target.value as never)}
+                rows={4} style={{ ...inputSt, resize: "vertical" }} placeholder="スタッフ向け備考・注意事項など" />
+            </div>
+            <div>
+              <label style={label11}>タグ</label>
+              <TagList
+                items={form.tags ?? []}
+                onRemove={i => setF("tags", (form.tags ?? []).filter((_, idx) => idx !== i) as never)}
+                onAdd={v => setF("tags", [...(form.tags ?? []), v] as never)}
+                placeholder="VIP・要注意など"
+              />
+            </div>
+          </div>
+
+          <div style={{ gridColumn: "1/-1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <SaveBtn />
+          </div>
+        </div>
+      )}
+
+      {/* ─── Tab2: 家族構成 ─── */}
+      {activeTab === "family" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+            <button onClick={() => setEditingMember({ relation: "配偶者" })}
+              style={{ padding: "8px 16px", borderRadius: 8, background: "#234f35", color: "#fff", border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+              + 家族を追加
             </button>
           </div>
-        </div>
-      )}
 
-      {/* ─── Tab: 反響・問い合わせ履歴 ─── */}
-      {activeTab === "inquiries" && (
-        <div>
-          {(!customer.inquiries || customer.inquiries.length === 0) ? (
-            <div style={{ ...section, textAlign: "center", color: "#706e68", fontSize: 13, padding: 40 }}>
-              問い合わせ履歴がありません
-            </div>
-          ) : customer.inquiries.map(inq => {
-            const st = INQUIRY_STATUS_LABELS[inq.status] ?? { label: inq.status, bg: "#f5f5f5", color: "#616161" };
-            return (
-              <div key={inq.id} style={{ ...section, borderLeft: inq.priority === "HIGH" ? "4px solid #f44336" : "4px solid #e0deda" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>{SOURCE_LABELS[inq.source] ?? inq.source}</span>
-                    <span style={{ ...st, padding: "2px 10px", borderRadius: 12, fontSize: 11, fontWeight: 500 }}>{st.label}</span>
-                    {inq.visit_hope && <span style={{ background: "#e3f2fd", color: "#1565c0", padding: "1px 8px", borderRadius: 8, fontSize: 11 }}>内見希望</span>}
-                    {inq.document_hope && <span style={{ background: "#f3e5f5", color: "#6a1b9a", padding: "1px 8px", borderRadius: 8, fontSize: 11 }}>資料希望</span>}
-                    <span style={{ fontSize: 12, color: "#888" }}>{new Date(inq.received_at).toLocaleString("ja-JP")}</span>
-                  </div>
-                  <a href={`/admin/inquiries/${inq.id}`} style={{ fontSize: 12, color: "#234f35", textDecoration: "none" }}>詳細 →</a>
+          {editingMember && (
+            <div style={{ ...card, borderLeft: "3px solid #234f35" }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14 }}>{editingMember.id ? "家族情報を編集" : "家族を追加"}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
+                <div>
+                  <label style={label11}>続柄 *</label>
+                  <select value={editingMember.relation ?? ""} onChange={e => setEditingMember(m => ({ ...m!, relation: e.target.value }))} style={inputSt}>
+                    {["本人", "配偶者", "子供", "親", "その他"].map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
                 </div>
-                {inq.property_name && <div style={{ fontSize: 13, color: "#3a2a1a", marginBottom: 6 }}>📍 {inq.property_name}{inq.property_number ? ` (${inq.property_number})` : ""}</div>}
-                {inq.message && <div style={{ fontSize: 13, fontStyle: "italic", color: "#3a2a1a", marginBottom: 8 }}>「{inq.message.slice(0, 150)}{inq.message.length > 150 ? "…" : ""}」</div>}
-                {inq.ai_score != null && (
-                  <div style={{ fontSize: 12, color: "#888" }}>
-                    AIスコア: <strong style={{ color: inq.ai_score >= 70 ? "#c62828" : "#3a2a1a" }}>{inq.ai_score}</strong>
-                    {inq.assigned_staff && <span style={{ marginLeft: 12 }}>担当: {inq.assigned_staff.name}</span>}
-                  </div>
-                )}
-                {inq.ai_notes && <div style={{ fontSize: 12, color: "#706e68", marginTop: 6, background: "#fffde7", padding: "8px 12px", borderRadius: 8 }}>{inq.ai_notes}</div>}
+                <div>
+                  <label style={label11}>氏名</label>
+                  <input value={editingMember.name ?? ""} onChange={e => setEditingMember(m => ({ ...m!, name: e.target.value }))} style={inputSt} placeholder="田中 花子" />
+                </div>
+                <div>
+                  <label style={label11}>フリガナ</label>
+                  <input value={editingMember.name_kana ?? ""} onChange={e => setEditingMember(m => ({ ...m!, name_kana: e.target.value }))} style={inputSt} placeholder="タナカ ハナコ" />
+                </div>
+                <div>
+                  <label style={label11}>年齢</label>
+                  <input type="number" value={editingMember.age ?? ""} onChange={e => setEditingMember(m => ({ ...m!, age: Number(e.target.value) || null }))} style={inputSt} placeholder="35" />
+                </div>
+                <div>
+                  <label style={label11}>職業</label>
+                  <select value={editingMember.occupation ?? ""} onChange={e => setEditingMember(m => ({ ...m!, occupation: e.target.value || null }))} style={inputSt}>
+                    <option value="">選択</option>
+                    {["会社員", "自営業", "公務員", "専業主婦/夫", "学生", "無職", "その他"].map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={label11}>年収（万円）</label>
+                  <input type="number" value={editingMember.annual_income ?? ""} onChange={e => setEditingMember(m => ({ ...m!, annual_income: Number(e.target.value) || null }))} style={inputSt} placeholder="400" />
+                </div>
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ─── Tab: 対応履歴 ─── */}
-      {activeTab === "activities" && (
-        <div>
-          {/* Add activity form */}
-          <div style={section}>
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14, color: "#3a2a1a" }}>対応を記録する</div>
-            <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-              <select value={actType} onChange={e => setActType(e.target.value)}
-                style={{ ...inputSt, width: 130, flexShrink: 0 }}>
-                {Object.entries(ACTIVITY_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-              <textarea value={actContent} onChange={e => setActContent(e.target.value)}
-                placeholder="対応内容を入力..." rows={2}
-                style={{ ...inputSt, flex: 1, resize: "vertical" }} />
-              <button onClick={handleAddActivity} disabled={addingAct || !actContent}
-                style={{ padding: "9px 18px", borderRadius: 8, background: addingAct ? "#888" : "#234f35", color: "#fff", border: "none", fontSize: 13, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
-                記録
-              </button>
-            </div>
-          </div>
-
-          {/* Activity list */}
-          {(!customer.activities || customer.activities.length === 0) ? (
-            <div style={{ ...section, textAlign: "center", color: "#706e68", fontSize: 13, padding: 32 }}>対応履歴がありません</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {customer.activities.map(act => (
-                <div key={act.id} style={{ ...section, display: "flex", gap: 14, alignItems: "flex-start", padding: 16 }}>
-                  <div style={{ fontSize: 20, flexShrink: 0 }}>{ACTIVITY_TYPE_LABELS[act.type]?.split(" ")[0] ?? "📝"}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600 }}>{ACTIVITY_TYPE_LABELS[act.type]?.split(" ").slice(1).join(" ") ?? act.type}</span>
-                      <span style={{ fontSize: 11, color: "#888" }}>{new Date(act.created_at).toLocaleString("ja-JP")}</span>
-                    </div>
-                    <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{act.content}</div>
-                  </div>
-                </div>
-              ))}
+              <div style={{ marginBottom: 14 }}>
+                <label style={label11}>メモ</label>
+                <input value={editingMember.note ?? ""} onChange={e => setEditingMember(m => ({ ...m!, note: e.target.value }))} style={inputSt} placeholder="共同名義希望・学区重視など" />
+              </div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button onClick={() => setEditingMember(null)}
+                  style={{ padding: "7px 14px", borderRadius: 8, fontSize: 12, border: "1px solid #e0deda", background: "#fff", cursor: "pointer", fontFamily: "inherit" }}>キャンセル</button>
+                <button onClick={handleAddMember} disabled={savingMember || !editingMember.relation}
+                  style={{ padding: "7px 16px", borderRadius: 8, fontSize: 12, fontWeight: 500, background: savingMember ? "#888" : "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                  {savingMember ? "保存中..." : "保存"}
+                </button>
+              </div>
             </div>
           )}
+
+          {(!customer.family_members || customer.family_members.length === 0) ? (
+            <div style={{ ...card, textAlign: "center", color: "#706e68", fontSize: 13, padding: 48 }}>
+              家族情報が登録されていません。「+ 家族を追加」ボタンから追加してください。
+            </div>
+          ) : customer.family_members.map(member => (
+            <div key={member.id} style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ background: "#234f35", color: "#fff", borderRadius: 8, padding: "2px 10px", fontSize: 11, fontWeight: 600 }}>{member.relation}</span>
+                  {member.name && <span style={{ fontSize: 14, fontWeight: 500 }}>{member.name}</span>}
+                  {member.name_kana && <span style={{ fontSize: 11, color: "#706e68" }}>{member.name_kana}</span>}
+                  {member.age && <span style={{ fontSize: 12, color: "#706e68" }}>{member.age}歳</span>}
+                </div>
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                  {member.occupation && <span style={{ fontSize: 12, color: "#706e68" }}>職業: {member.occupation}</span>}
+                  {member.annual_income && <span style={{ fontSize: 12, color: "#706e68" }}>年収: {member.annual_income.toLocaleString()}万円</span>}
+                </div>
+                {member.note && <div style={{ fontSize: 12, color: "#3a2a1a", marginTop: 6, background: "#fffde7", padding: "4px 10px", borderRadius: 6 }}>{member.note}</div>}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexShrink: 0, marginLeft: 16 }}>
+                <button onClick={() => setEditingMember({ ...member })}
+                  style={{ padding: "5px 12px", borderRadius: 6, fontSize: 11, border: "1px solid #e0deda", background: "#fff", cursor: "pointer", fontFamily: "inherit" }}>編集</button>
+                <button onClick={() => handleDeleteMember(member.id)}
+                  style={{ padding: "5px 12px", borderRadius: 6, fontSize: 11, border: "1px solid #fdeaea", background: "#fdeaea", color: "#8c1f1f", cursor: "pointer", fontFamily: "inherit" }}>削除</button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* ─── Tab: 物件マッチング ─── */}
-      {activeTab === "matching" && (
+      {/* ─── Tab3: 希望条件 ─── */}
+      {activeTab === "desired" && (
         <div>
-          <div style={{ fontSize: 13, color: "#706e68", marginBottom: 16 }}>
-            希望条件（{customer.budget_min?.toLocaleString() ?? "?"}〜{customer.budget_max?.toLocaleString() ?? "?"}万円
-            {customer.property_type_pref ? `・${TYPE_LABELS[customer.property_type_pref] ?? customer.property_type_pref}` : ""}）に合う掲載中物件
+          <div style={card}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 16 }}>物件種別（複数選択可）</div>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              {PROP_TYPES.map(t => (
+                <label key={t} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}>
+                  <input type="checkbox"
+                    checked={(form.desired_property_type ?? []).includes(t)}
+                    onChange={e => {
+                      const curr = form.desired_property_type ?? [];
+                      setF("desired_property_type", (e.target.checked ? [...curr, t] : curr.filter(x => x !== t)) as never);
+                    }} />
+                  {TYPE_LABELS[t]}
+                </label>
+              ))}
+            </div>
           </div>
-          {matchingProps.length === 0 ? (
-            <div style={{ ...section, textAlign: "center", color: "#706e68", fontSize: 13, padding: 40 }}>
-              {customer.budget_min || customer.budget_max ? "条件に合う掲載中物件はありません" : "予算を設定するとマッチング物件が表示されます"}
+
+          <div style={card}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 16 }}>エリア・立地</div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={label11}>希望エリア（区・市など）</label>
+              <TagList
+                items={form.desired_areas ?? []}
+                onRemove={i => setF("desired_areas", (form.desired_areas ?? []).filter((_, idx) => idx !== i) as never)}
+                onAdd={v => setF("desired_areas", [...(form.desired_areas ?? []), v] as never)}
+                placeholder="目黒区、世田谷区など"
+              />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={label11}>希望沿線・駅</label>
+              <TagList
+                items={form.desired_stations ?? []}
+                onRemove={i => setF("desired_stations", (form.desired_stations ?? []).filter((_, idx) => idx !== i) as never)}
+                onAdd={v => setF("desired_stations", [...(form.desired_stations ?? []), v] as never)}
+                placeholder="東急東横線/都立大学など"
+              />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={label11}>駅徒歩（分以内）</label>
+                <input type="number" value={String(form.desired_walk_max ?? "")} onChange={e => setF("desired_walk_max", Number(e.target.value) as never)} style={inputSt} placeholder="10" />
+              </div>
+            </div>
+          </div>
+
+          <div style={card}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 16 }}>予算・規模</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+              <div>
+                <label style={label11}>予算下限（万円）</label>
+                <input type="number" value={String(form.desired_budget_min ?? "")} onChange={e => setF("desired_budget_min", Number(e.target.value) as never)} style={inputSt} placeholder="5000" />
+              </div>
+              <div>
+                <label style={label11}>予算上限（万円）</label>
+                <input type="number" value={String(form.desired_budget_max ?? "")} onChange={e => setF("desired_budget_max", Number(e.target.value) as never)} style={inputSt} placeholder="8000" />
+              </div>
+              <div>
+                <label style={label11}>面積下限（㎡）</label>
+                <input type="number" value={String(form.desired_area_min ?? "")} onChange={e => setF("desired_area_min", Number(e.target.value) as never)} style={inputSt} placeholder="80" />
+              </div>
+              <div>
+                <label style={label11}>築年数以内</label>
+                <input type="number" value={String(form.desired_building_year ?? "")} onChange={e => setF("desired_building_year", Number(e.target.value) as never)} style={inputSt} placeholder="20" />
+              </div>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={label11}>希望間取り（複数可）</label>
+              <TagList
+                items={form.desired_rooms ?? []}
+                onRemove={i => setF("desired_rooms", (form.desired_rooms ?? []).filter((_, idx) => idx !== i) as never)}
+                onAdd={v => setF("desired_rooms", [...(form.desired_rooms ?? []), v] as never)}
+                placeholder="3LDK、4LDKなど"
+              />
+            </div>
+            <div>
+              <label style={label11}>入居希望時期</label>
+              <input value={String(form.desired_move_timing ?? "")} onChange={e => setF("desired_move_timing", e.target.value as never)}
+                style={{ ...inputSt, maxWidth: 300 }} placeholder="2026年夏頃" />
+            </div>
+          </div>
+
+          <div style={card}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 16 }}>こだわり条件</div>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 12 }}>
+              {FEATURES.map(f => (
+                <label key={f} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}>
+                  <input type="checkbox"
+                    checked={(form.desired_features ?? []).includes(f)}
+                    onChange={e => {
+                      const curr = form.desired_features ?? [];
+                      setF("desired_features", (e.target.checked ? [...curr, f] : curr.filter(x => x !== f)) as never);
+                    }} />
+                  {f}
+                </label>
+              ))}
+            </div>
+            <div>
+              <label style={label11}>希望条件備考</label>
+              <textarea value={String(form.desired_note ?? "")} onChange={e => setF("desired_note", e.target.value as never)}
+                rows={3} style={{ ...inputSt, resize: "vertical" }} placeholder="その他こだわり条件など" />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end" }}><SaveBtn /></div>
+        </div>
+      )}
+
+      {/* ─── Tab4: 資金計画 ─── */}
+      {activeTab === "finance" && (
+        <div>
+          <div style={card}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 16 }}>資金タイプ</div>
+            <div style={{ display: "flex", gap: 24, marginBottom: 16 }}>
+              {["現金", "ローン", "現金+ローン"].map(v => (
+                <label key={v} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}>
+                  <input type="radio" name="finance_type" value={v}
+                    checked={form.finance_type === v}
+                    onChange={() => setF("finance_type", v as never)} />
+                  {v}
+                </label>
+              ))}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {[
+                { label: "頭金（万円）", k: "down_payment" as const, ph: "2000" },
+                { label: "世帯年収（万円）", k: "annual_income" as const, ph: "900" },
+                { label: "借入希望額（万円）", k: "loan_amount" as const, ph: "6000" },
+              ].map(({ label, k, ph }) => (
+                <div key={k}>
+                  <label style={label11}>{label}</label>
+                  <input type="number" value={String(form[k] ?? "")} onChange={e => setF(k, Number(e.target.value) as never)}
+                    style={inputSt} placeholder={ph} />
+                </div>
+              ))}
+              <div>
+                <label style={label11}>事前審査状況</label>
+                <select value={String(form.loan_preapproval ?? "")} onChange={e => setF("loan_preapproval", e.target.value as never)} style={inputSt}>
+                  <option value="">未選択</option>
+                  {["未実施", "審査中", "承認済", "否決"].map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={label11}>希望金融機関</label>
+                <input value={String(form.loan_bank ?? "")} onChange={e => setF("loan_bank", e.target.value as never)}
+                  style={inputSt} placeholder="住信SBIネット銀行など" />
+              </div>
+            </div>
+          </div>
+
+          <div style={card}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 16 }}>売却物件</div>
+            <div style={{ ...row, marginBottom: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+                <input type="checkbox" checked={form.has_property_to_sell ?? false}
+                  onChange={e => setF("has_property_to_sell", e.target.checked as never)} />
+                売却物件あり（購入と同時売却）
+              </label>
+            </div>
+            {form.has_property_to_sell && (
+              <div>
+                <label style={label11}>売却物件の概要</label>
+                <textarea value={String(form.sell_property_note ?? "")} onChange={e => setF("sell_property_note", e.target.value as never)}
+                  rows={3} style={{ ...inputSt, resize: "vertical" }} placeholder="世田谷区 マンション 2LDK 築10年など" />
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end" }}><SaveBtn /></div>
+        </div>
+      )}
+
+      {/* ─── Tab5: 追客管理 ─── */}
+      {activeTab === "followup" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div style={card}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 16 }}>AIスコアリング</div>
+            {customer.ai_score != null ? (
+              <div>
+                <div style={{ fontSize: 36, fontWeight: 700, color: customer.ai_score >= 70 ? "#c62828" : "#234f35", marginBottom: 8 }}>
+                  {customer.ai_score}<span style={{ fontSize: 16 }}>点</span>
+                </div>
+                {customer.ai_analysis && (
+                  <div style={{ fontSize: 12, color: "#3a2a1a", background: "#fffde7", padding: "10px 14px", borderRadius: 8, marginBottom: 10, lineHeight: 1.7 }}>
+                    {customer.ai_analysis}
+                  </div>
+                )}
+                {customer.ai_next_action && (
+                  <div style={{ fontSize: 12, color: "#1565c0", background: "#e3f2fd", padding: "10px 14px", borderRadius: 8, marginBottom: 10 }}>
+                    <strong>推奨アクション:</strong> {customer.ai_next_action}
+                  </div>
+                )}
+                {customer.ai_analyzed_at && (
+                  <div style={{ fontSize: 11, color: "#888" }}>分析日時: {new Date(customer.ai_analyzed_at).toLocaleString("ja-JP")}</div>
+                )}
+              </div>
+            ) : (
+              <div style={{ color: "#706e68", fontSize: 13, marginBottom: 12 }}>AI分析未実施</div>
+            )}
+            <button onClick={handleAnalyze} disabled={analyzing}
+              style={{ marginTop: 12, padding: "8px 16px", borderRadius: 8, background: analyzing ? "#888" : "#1565c0", color: "#fff", border: "none", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+              {analyzing ? "分析中..." : "🤖 AI分析を実行"}
+            </button>
+          </div>
+
+          <div style={card}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 16 }}>追客設定</div>
+            <div style={row}>
+              <span style={labelW}>担当者</span>
+              <select value={String(form.assigned_to ?? "")} onChange={e => setF("assigned_to", (e.target.value || null) as never)}
+                style={{ ...inputSt, flex: 1 }}>
+                <option value="">未設定</option>
+                {allStaff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div style={row}>
+              <span style={labelW}>次回連絡予定</span>
+              <input type="date" value={String(form.next_contact_at ? new Date(String(form.next_contact_at)).toISOString().split("T")[0] : "")}
+                onChange={e => setF("next_contact_at", (e.target.value || null) as never)} style={{ ...inputSt, flex: 1 }} />
+            </div>
+            <div style={row}>
+              <span style={labelW}>連絡内容メモ</span>
+              <input value={String(form.next_contact_note ?? "")} onChange={e => setF("next_contact_note", e.target.value as never)}
+                placeholder="内見日程の確認・物件紹介など" style={{ ...inputSt, flex: 1 }} />
+            </div>
+            <div style={row}>
+              <span style={labelW}>連絡頻度</span>
+              <select value={String(form.contact_frequency ?? "")} onChange={e => setF("contact_frequency", e.target.value as never)} style={{ ...inputSt, flex: 1 }}>
+                <option value="">選択</option>
+                {["毎日", "週1", "週2", "月1", "必要時のみ"].map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer", marginBottom: 8 }}>
+                <input type="checkbox" checked={form.do_not_contact ?? false}
+                  onChange={e => setF("do_not_contact", e.target.checked as never)} />
+                連絡不要フラグ（DNC）
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+                <input type="checkbox" checked={form.unsubscribed ?? false}
+                  onChange={e => setF("unsubscribed", e.target.checked as never)} />
+                メール配信停止
+              </label>
+            </div>
+          </div>
+
+          <div style={{ gridColumn: "1/-1" }}>
+            <div style={card}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14 }}>対応を記録する</div>
+              <div style={{ display: "grid", gridTemplateColumns: "120px 100px 1fr", gap: 10, marginBottom: 10 }}>
+                <div>
+                  <label style={label11}>種別</label>
+                  <select value={actType} onChange={e => setActType(e.target.value)} style={inputSt}>
+                    {Object.entries(ACTIVITY_ICONS).map(([k, icon]) => (
+                      <option key={k} value={k}>{icon} {k}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={label11}>方向</label>
+                  <select value={actDir} onChange={e => setActDir(e.target.value)} style={inputSt}>
+                    <option value="OUTBOUND">発信</option>
+                    <option value="INBOUND">着信</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={label11}>対応内容 *</label>
+                  <input value={actContent} onChange={e => setActContent(e.target.value)}
+                    placeholder="対応内容を入力..." style={inputSt} />
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                <div>
+                  <label style={label11}>結果</label>
+                  <select value={actResult} onChange={e => setActResult(e.target.value)} style={inputSt}>
+                    <option value="">選択</option>
+                    <option value="INTERESTED">興味あり</option>
+                    <option value="NOT_INTERESTED">興味なし</option>
+                    <option value="CALLBACK">折り返し待ち</option>
+                    <option value="VISIT_SCHEDULED">内見予約済</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={label11}>次のアクション</label>
+                  <input value={actNext} onChange={e => setActNext(e.target.value)}
+                    placeholder="来週内見の確認など" style={inputSt} />
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button onClick={handleAddActivity} disabled={addingAct || !actContent}
+                  style={{ padding: "8px 20px", borderRadius: 8, background: addingAct || !actContent ? "#888" : "#234f35", color: "#fff", border: "none", fontSize: 13, cursor: addingAct || !actContent ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                  {addingAct ? "記録中..." : "記録する"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ gridColumn: "1/-1", display: "flex", justifyContent: "flex-end" }}><SaveBtn /></div>
+        </div>
+      )}
+
+      {/* ─── Tab6: 対応履歴 ─── */}
+      {activeTab === "history" && (
+        <div>
+          {/* Inquiries section */}
+          {customer.inquiries?.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#706e68", marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>反響・問い合わせ</div>
+              {customer.inquiries.map(inq => {
+                const st = INQUIRY_STATUS[inq.status] ?? { label: inq.status, bg: "#f5f5f5", color: "#616161" };
+                return (
+                  <div key={inq.id} style={{ ...card, borderLeft: inq.priority === "HIGH" ? "3px solid #f44336" : "3px solid #e0deda", padding: 16 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 12, fontWeight: 600 }}>{SOURCE_LABELS[inq.source] ?? inq.source}</span>
+                        <span style={{ ...st, padding: "1px 8px", borderRadius: 10, fontSize: 11 }}>{st.label}</span>
+                        {inq.visit_hope && <span style={{ background: "#e3f2fd", color: "#1565c0", padding: "1px 8px", borderRadius: 8, fontSize: 11 }}>内見希望</span>}
+                        <span style={{ fontSize: 11, color: "#888" }}>{new Date(inq.received_at).toLocaleString("ja-JP")}</span>
+                      </div>
+                      <a href={`/admin/inquiries/${inq.id}`} style={{ fontSize: 11, color: "#234f35", textDecoration: "none" }}>詳細 →</a>
+                    </div>
+                    {inq.property_name && <div style={{ fontSize: 12, color: "#3a2a1a", marginBottom: 4 }}>📍 {inq.property_name}</div>}
+                    {inq.message && <div style={{ fontSize: 12, color: "#706e68", fontStyle: "italic" }}>「{inq.message.slice(0, 120)}{inq.message.length > 120 ? "…" : ""}」</div>}
+                    {inq.ai_score != null && (
+                      <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>
+                        AIスコア: <strong style={{ color: inq.ai_score >= 70 ? "#c62828" : "#3a2a1a" }}>{inq.ai_score}</strong>
+                        {inq.assigned_staff && <span style={{ marginLeft: 10 }}>担当: {inq.assigned_staff.name}</span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Activities timeline */}
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#706e68", marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>対応履歴タイムライン</div>
+          {(!customer.activities || customer.activities.length === 0) ? (
+            <div style={{ ...card, textAlign: "center", color: "#706e68", fontSize: 13, padding: 40 }}>
+              対応履歴がありません。「追客管理」タブから記録できます。
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {matchingProps.map(p => (
-                <div key={p.id} style={{ ...section, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
-                      {TYPE_LABELS[p.property_type] ?? p.property_type}｜{p.city}{p.address}
+            <div style={{ position: "relative" }}>
+              {customer.activities.map((act, i) => (
+                <div key={act.id} style={{ display: "flex", gap: 14, marginBottom: 12 }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#f7f6f2", border: "2px solid #e0deda", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>
+                      {ACTIVITY_ICONS[act.type] ?? "📝"}
                     </div>
-                    <div style={{ fontSize: 12, color: "#706e68" }}>
-                      {p.station_name1 ? `${p.station_name1} 徒歩${p.station_walk1}分` : ""}
-                      {p.rooms ? `　${p.rooms}` : ""}
-                      {p.area_build_m2 ? `　${p.area_build_m2}㎡` : ""}
-                    </div>
+                    {i < customer.activities.length - 1 && (
+                      <div style={{ width: 2, flex: 1, background: "#e0deda", marginTop: 4 }} />
+                    )}
                   </div>
-                  <div style={{ textAlign: "right", display: "flex", gap: 12, alignItems: "center" }}>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: "#234f35" }}>{p.price.toLocaleString()}万円</span>
-                    <a href={`/admin/properties/${p.id}`} style={{ fontSize: 12, padding: "6px 14px", borderRadius: 8, border: "1px solid #234f35", color: "#234f35", textDecoration: "none" }}>詳細</a>
+                  <div style={{ ...card, flex: 1, padding: "12px 16px", marginBottom: 0 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 12, fontWeight: 600 }}>{act.type}</span>
+                      <span style={{ background: act.direction === "INBOUND" ? "#e3f2fd" : "#f3f2ef", color: act.direction === "INBOUND" ? "#1565c0" : "#706e68", padding: "1px 8px", borderRadius: 8, fontSize: 10 }}>
+                        {act.direction === "INBOUND" ? "着信/来訪" : "発信/訪問"}
+                      </span>
+                      <span style={{ fontSize: 11, color: "#888" }}>{new Date(act.created_at).toLocaleString("ja-JP")}</span>
+                    </div>
+                    <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", marginBottom: act.result || act.next_action ? 8 : 0 }}>
+                      {act.content}
+                    </div>
+                    {act.result && (
+                      <div style={{ fontSize: 11, color: "#2e7d32", marginBottom: 4 }}>
+                        結果: {act.result === "INTERESTED" ? "興味あり" : act.result === "NOT_INTERESTED" ? "興味なし" : act.result === "CALLBACK" ? "折り返し待ち" : act.result === "VISIT_SCHEDULED" ? "内見予約済" : act.result}
+                      </div>
+                    )}
+                    {act.next_action && (
+                      <div style={{ fontSize: 11, color: "#1565c0" }}>→ {act.next_action}</div>
+                    )}
                   </div>
                 </div>
               ))}

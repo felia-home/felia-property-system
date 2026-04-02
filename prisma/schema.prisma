@@ -564,46 +564,133 @@ model InquiryActivity {
 }
 
 model Customer {
-  id                 String    @id @default(cuid())
-  crm_id             String?   @unique
-  name               String
-  name_kana          String?
-  email              String?
-  phone              String?
-  budget_min         Int?
-  budget_max         Int?
-  area_preferences   Json?
-  property_type_pref String?
-  rooms_pref         String?
-  area_m2_pref       Float?
-  status             String    @default("lead")
-  notes              String?
-  source             String?
-  ai_score           Int?
-  priority           String    @default("NORMAL")
-  assigned_agent_id  String?
-  first_contact_at   DateTime?
-  last_contacted_at  DateTime?
-  next_action_date   DateTime?
-  next_action_note   String?
-  is_deleted         Boolean   @default(false)
-  deleted_at         DateTime?
-  contracts          Contract[]
-  inquiries          Inquiry[]
-  activities         CustomerActivity[]
-  created_at         DateTime  @default(now())
-  updated_at         DateTime  @updatedAt
+  id                     String    @id @default(cuid())
+  legacy_id              String?   @unique
+
+  // ===== 基本情報 =====
+  name                   String
+  name_kana              String?
+  email                  String?   @unique
+  tel                    String?
+  tel_mobile             String?
+  line_id                String?
+
+  // ===== 現住所 =====
+  postal_code            String?
+  prefecture             String?
+  city                   String?
+  address                String?
+  current_housing_type   String?   // 賃貸 | 持家 | 社宅 | 実家 | その他
+  current_rent           Int?
+  current_housing_note   String?
+
+  // ===== 購入希望条件 =====
+  desired_property_type  String[]
+  desired_areas          String[]
+  desired_stations       String[]
+  desired_budget_min     Int?
+  desired_budget_max     Int?
+  desired_area_min       Float?
+  desired_area_max       Float?
+  desired_rooms          String[]
+  desired_floor_min      Int?
+  desired_building_year  Int?
+  desired_walk_max       Int?
+  desired_move_timing    String?
+  desired_features       String[]
+  desired_note           String?
+
+  // ===== 資金計画 =====
+  finance_type           String?   // 現金 | ローン | 併用
+  down_payment           Int?
+  annual_income          Int?
+  loan_preapproval       String?   // 未実施 | 審査中 | 承認済 | 否決
+  loan_amount            Int?
+  loan_bank              String?
+  has_property_to_sell   Boolean   @default(false)
+  sell_property_note     String?
+
+  // ===== 反響・流入情報 =====
+  source                 String?
+  source_detail          String?
+  first_inquiry_at       DateTime?
+  first_inquiry_property String?
+
+  // ===== 対応状況 =====
+  status                 String    @default("NEW")
+  // NEW | CONTACTING | VISITING | NEGOTIATING | CONTRACT | CLOSED | LOST | PENDING
+  priority               String    @default("NORMAL")
+  ai_score               Int?
+  ai_analysis            String?
+  ai_next_action         String?
+  ai_analyzed_at         DateTime?
+
+  // ===== 担当者 =====
+  assigned_to            String?
+  assigned_at            DateTime?
+  store_id               String?
+
+  // ===== 追客管理 =====
+  last_contact_at        DateTime?
+  next_contact_at        DateTime?
+  next_contact_note      String?
+  contact_frequency      String?
+  do_not_contact         Boolean   @default(false)
+  unsubscribed           Boolean   @default(false)
+
+  // ===== 内部メモ =====
+  internal_memo          String?
+  tags                   String[]
+
+  // ===== HP会員 =====
+  is_member              Boolean   @default(false)
+  member_registered_at   DateTime?
+
+  // ===== システム =====
+  is_deleted             Boolean   @default(false)
+  deleted_at             DateTime?
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
+
+  // リレーション
+  family_members         FamilyMember[]
+  inquiries              Inquiry[]
+  activities             CustomerActivity[]
+  contracts              Contract[]
+  assigned_staff         Staff?    @relation("CustomerAgent", fields: [assigned_to], references: [id])
+
   @@map("customers")
 }
 
+model FamilyMember {
+  id            String   @id @default(cuid())
+  customer_id   String
+  customer      Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  relation      String   // 本人 | 配偶者 | 子供 | 親 | その他
+  name          String?
+  name_kana     String?
+  age           Int?
+  birth_year    Int?
+  occupation    String?  // 会社員 | 自営業 | 公務員 | 専業主婦 | 学生 | 無職
+  annual_income Int?
+  note          String?
+  created_at    DateTime @default(now())
+  @@map("family_members")
+}
+
 model CustomerActivity {
-  id          String   @id @default(cuid())
-  customer_id String
-  customer    Customer @relation(fields: [customer_id], references: [id])
-  staff_id    String?
-  type        String   // CALL | EMAIL | VISIT | MEETING | NOTE
-  content     String
-  created_at  DateTime @default(now())
+  id             String    @id @default(cuid())
+  customer_id    String
+  customer       Customer  @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  staff_id       String?
+  type           String    // CALL | EMAIL | LINE | VISIT | MEETING | VIEWING | NOTE | AI_AUTO
+  direction      String    @default("OUTBOUND") // INBOUND | OUTBOUND
+  content        String
+  property_id    String?
+  result         String?
+  next_action    String?
+  next_action_at DateTime?
+  created_at     DateTime  @default(now())
   @@map("customer_activities")
 }
 
@@ -723,6 +810,7 @@ model Staff {
   transfers_from PropertyTransfer[] @relation("TransferFrom")
   transfers_to   PropertyTransfer[] @relation("TransferTo")
   inquiries_assigned  Inquiry[] @relation("InquiryAgent")
+  customers_assigned  Customer[] @relation("CustomerAgent")
 
   @@map("staffs")
 }

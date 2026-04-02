@@ -2,11 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
 const UPDATABLE_FIELDS = [
-  "name", "name_kana", "email", "phone",
-  "budget_min", "budget_max",
-  "area_preferences", "property_type_pref", "rooms_pref", "area_m2_pref",
-  "status", "priority", "notes", "source", "assigned_agent_id",
-  "last_contacted_at", "next_action_date", "next_action_note",
+  "name", "name_kana", "email", "tel", "tel_mobile", "line_id",
+  "postal_code", "prefecture", "city", "address",
+  "current_housing_type", "current_rent", "current_housing_note",
+  "desired_property_type", "desired_areas", "desired_stations",
+  "desired_budget_min", "desired_budget_max",
+  "desired_area_min", "desired_area_max",
+  "desired_rooms", "desired_floor_min", "desired_building_year",
+  "desired_walk_max", "desired_move_timing", "desired_features", "desired_note",
+  "finance_type", "down_payment", "annual_income",
+  "loan_preapproval", "loan_amount", "loan_bank",
+  "has_property_to_sell", "sell_property_note",
+  "source", "source_detail", "first_inquiry_at", "first_inquiry_property",
+  "status", "priority",
+  "assigned_to", "assigned_at", "store_id",
+  "last_contact_at", "next_contact_at", "next_contact_note",
+  "contact_frequency", "do_not_contact", "unsubscribed",
+  "internal_memo", "tags",
+  "is_member", "member_registered_at",
 ];
 
 // GET /api/customers/[id]
@@ -23,6 +36,7 @@ export async function GET(
       include: includeRelations
         ? {
             contracts: true,
+            family_members: { orderBy: { created_at: "asc" } },
             inquiries: {
               orderBy: { received_at: "desc" },
               select: {
@@ -30,10 +44,16 @@ export async function GET(
                 source: true,
                 received_at: true,
                 ai_score: true,
+                ai_notes: true,
                 property_name: true,
+                property_number: true,
                 message: true,
                 status: true,
-                assigned_agent_id: true,
+                priority: true,
+                visit_hope: true,
+                document_hope: true,
+                assigned_to: true,
+                assigned_staff: { select: { name: true } },
               },
             },
             activities: {
@@ -41,14 +61,23 @@ export async function GET(
               select: {
                 id: true,
                 type: true,
+                direction: true,
                 content: true,
+                result: true,
+                next_action: true,
+                next_action_at: true,
                 staff_id: true,
                 created_at: true,
               },
             },
+            assigned_staff: { select: { id: true, name: true } },
           }
-        : { contracts: true },
+        : {
+            contracts: true,
+            assigned_staff: { select: { id: true, name: true } },
+          },
     });
+
     if (!customer || customer.is_deleted) {
       return NextResponse.json({ error: "顧客が見つかりません" }, { status: 404 });
     }
@@ -79,6 +108,9 @@ export async function PATCH(
     const customer = await prisma.customer.update({
       where: { id: params.id },
       data,
+      include: {
+        assigned_staff: { select: { id: true, name: true } },
+      },
     });
 
     return NextResponse.json({ customer });
