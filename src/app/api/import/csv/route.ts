@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import Encoding from "encoding-japanese";
 
 // ── 型 ──────────────────────────────────────────────────────────────────────
 
@@ -17,20 +18,19 @@ export interface CsvImportResult {
 // ── CSV パーサ（Shift-JIS / UTF-8 対応） ────────────────────────────────────
 
 function parseCSV(buffer: Buffer): string[][] {
-  // Try UTF-8 BOM first, then UTF-8, then Shift-JIS
+  // Detect encoding and convert to UTF-8 using encoding-japanese
+  const uint8 = new Uint8Array(buffer);
+  const detected = Encoding.detect(uint8);
   let text: string;
-  if (buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) {
-    text = buffer.slice(3).toString("utf-8");
+
+  if (detected && detected !== "UNICODE" && detected !== "UTF8") {
+    // Shift_JIS / EUC-JP → Unicode array → string
+    const unicodeArray = Encoding.convert(uint8, { to: "UNICODE", from: detected });
+    text = Encoding.codeToString(unicodeArray);
   } else {
-    try {
-      text = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
-    } catch {
-      try {
-        text = new TextDecoder("shift_jis").decode(buffer);
-      } catch {
-        text = buffer.toString("utf-8");
-      }
-    }
+    // UTF-8 (with or without BOM)
+    const bom = buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF;
+    text = buffer.slice(bom ? 3 : 0).toString("utf-8");
   }
 
   const rows: string[][] = [];
@@ -70,56 +70,137 @@ function parseCSV(buffer: Buffer): string[][] {
   return rows;
 }
 
-// ── カラム自動マッピング ──────────────────────────────────────────────────────
+// ── ハトサポ形式カラムマッピング ──────────────────────────────────────────────
 
+// Maps schema field name → list of possible CSV header names (Japanese or English)
 const COLUMN_MAPPINGS: Record<string, string[]> = {
-  legacy_id:       ["物件番号", "ID", "k_number", "id", "物件ID"],
-  property_type:   ["物件種別", "種別", "type", "物件タイプ"],
-  price:           ["価格", "売価", "販売価格", "売出価格", "price"],
-  city:            ["市区町村", "所在地_市区", "city", "市区", "エリア"],
-  town:            ["町名", "丁目", "所在地_町", "town"],
-  address:         ["番地", "住所", "番地以降", "address"],
-  postal_code:     ["郵便番号", "postal", "zip"],
-  station_name1:   ["最寄り駅", "最寄駅", "駅名", "station", "station_name"],
-  station_walk1:   ["徒歩", "徒歩分", "walk", "station_walk"],
-  station_line1:   ["路線", "路線名", "line", "station_line"],
-  area_land_m2:    ["土地面積", "敷地面積", "area_land", "土地㎡"],
-  area_build_m2:   ["建物面積", "延床面積", "area_build", "建物㎡"],
-  area_exclusive_m2: ["専有面積", "area_exclusive", "専有㎡"],
-  rooms:           ["間取り", "間取", "layout", "rooms"],
-  building_year:   ["築年", "建築年", "year", "築年月"],
-  building_month:  ["築月", "建築月"],
-  structure:       ["構造", "建物構造", "structure"],
-  floors_total:    ["総階数", "階数", "floors"],
-  floor_unit:      ["所在階", "階"],
-  reins_number:    ["レインズ番号", "レインズ", "reins"],
-  bcr:             ["建ぺい率", "建蔽率", "bcr"],
-  far:             ["容積率", "far"],
-  management_fee:  ["管理費", "管理費（月額）", "management_fee"],
-  repair_reserve:  ["修繕積立金", "修繕費", "repair_reserve"],
-  delivery_timing: ["引渡し", "引渡時期", "delivery"],
-  title:           ["物件名", "タイトル", "title"],
-  catch_copy:      ["キャッチコピー", "catch_copy"],
-  status:          ["ステータス", "status", "掲載状態"],
-  seller_company:  ["元付業者", "売主", "取扱業者", "seller_company"],
-  seller_contact:  ["元付連絡先", "業者電話", "seller_contact"],
-  internal_memo:   ["社内メモ", "備考", "memo", "notes"],
+  legacy_id:            ["物件番号", "管理番号", "k_number", "ID", "id", "物件ID"],
+  property_type:        ["物件種別", "種別", "type", "物件タイプ"],
+  status:               ["公開設定", "ステータス", "status", "掲載状態"],
+  title:                ["物件名", "タイトル", "title"],
+  catch_copy:           ["キャッチコピー", "catch_copy"],
+
+  // 所在地
+  postal_code:          ["郵便番号", "postal", "zip"],
+  city:                 ["市区町村", "所在地_市区", "city", "市区", "エリア"],
+  town:                 ["町名", "丁目", "所在地_町", "town"],
+  address:              ["番地", "番地以降", "address", "住所表示"],
+  address_chiban:       ["地番", "address_chiban", "住所（地番）"],
+
+  // 価格
+  price:                ["価格", "売価", "販売価格", "売出価格", "price"],
+
+  // 交通（最大3駅）
+  station_line1:        ["路線名1", "路線1", "路線", "路線名", "line", "station_line"],
+  station_name1:        ["駅名1", "最寄り駅1", "最寄り駅", "最寄駅", "駅名", "station", "station_name"],
+  station_walk1:        ["徒歩分数1", "徒歩1", "徒歩", "徒歩分", "walk", "station_walk"],
+  station_line2:        ["路線名2", "路線2"],
+  station_name2:        ["駅名2", "最寄り駅2"],
+  station_walk2:        ["徒歩分数2", "徒歩2"],
+  station_line3:        ["路線名3", "路線3"],
+  station_name3:        ["駅名3", "最寄り駅3"],
+  station_walk3:        ["徒歩分数3", "徒歩3"],
+
+  // 面積
+  area_land_m2:         ["土地面積(㎡)", "土地面積", "敷地面積", "area_land", "土地㎡"],
+  area_build_m2:        ["建物面積(㎡)", "建物面積", "延床面積", "area_build", "建物㎡"],
+  area_exclusive_m2:    ["専有面積(㎡)", "専有面積", "area_exclusive", "専有㎡"],
+
+  // 建物情報
+  rooms:                ["間取り", "間取", "layout", "rooms"],
+  building_year:        ["築年", "建築年", "築年月", "year"],
+  building_month:       ["築月", "建築月"],
+  structure:            ["構造", "建物構造", "structure"],
+  floors_total:         ["総階数", "地上階数", "floors"],
+  floors_basement:      ["地下階数", "basement_floors"],
+  floor_unit:           ["所在階", "階"],
+  direction:            ["向き", "direction"],
+  total_units:          ["総戸数", "戸数", "total_units"],
+
+  // 法令
+  city_plan:            ["都市計画", "city_plan"],
+  use_zone:             ["用途地域", "用途地域名称", "use_zone"],
+  bcr:                  ["建ぺい率", "建蔽率", "建ぺい率(%)", "bcr"],
+  far:                  ["容積率", "容積率(%)", "far"],
+  land_right:           ["権利形態", "土地権利", "land_right"],
+  land_category:        ["地目", "land_category"],
+  road_direction:       ["接道方向", "road_direction", "接道1_方位"],
+  road_width:           ["接道幅員", "road_width", "接道1_幅員(m)", "接道幅員(m)"],
+  road_type:            ["接道種別", "road_type", "接道1_種別"],
+
+  // 費用・管理
+  management_fee:       ["管理費", "管理費（月額）", "管理費(月)", "management_fee"],
+  repair_reserve:       ["修繕積立金", "修繕費", "修繕積立金(月)", "repair_reserve"],
+  other_monthly_fee:    ["その他月額費用", "other_monthly_fee"],
+  management_type:      ["管理形態", "management_type"],
+  management_company:   ["管理会社", "management_company"],
+
+  // 引渡し・レインズ
+  delivery_timing:      ["引渡し", "引渡時期", "delivery", "引渡し時期"],
+  delivery_condition:   ["現況", "現況確認", "delivery_condition", "引渡現況"],
+  reins_number:         ["レインズ番号", "レインズ", "reins"],
+
+  // 売主情報
+  seller_company:       ["元付業者", "売主", "取扱業者", "seller_company"],
+  seller_contact:       ["元付連絡先", "業者電話", "売主電話", "seller_contact", "seller_tel"],
+
+  // 周辺環境
+  env_elementary_school:   ["小学校区", "小学校", "env_elementary_school"],
+  env_junior_high_school:  ["中学校区", "中学校", "env_junior_high_school"],
+
+  // 内部メモ
+  internal_memo:        ["社内メモ", "備考", "memo", "notes", "設備備考"],
 };
 
 const PROPERTY_TYPE_MAP: Record<string, string> = {
-  "新築一戸建て": "NEW_HOUSE", "新築戸建": "NEW_HOUSE", "新築": "NEW_HOUSE",
-  "中古一戸建て": "USED_HOUSE", "中古戸建": "USED_HOUSE", "中古戸建て": "USED_HOUSE",
-  "中古マンション": "MANSION", "マンション": "MANSION",
+  "新築一戸建て": "NEW_HOUSE",
+  "新築戸建": "NEW_HOUSE",
+  "新築": "NEW_HOUSE",
+  "中古一戸建て": "USED_HOUSE",
+  "中古戸建": "USED_HOUSE",
+  "中古戸建て": "USED_HOUSE",
+  "一戸建て": "USED_HOUSE",
+  "中古マンション": "MANSION",
+  "マンション": "MANSION",
   "新築マンション": "NEW_MANSION",
-  "土地": "LAND", "売地": "LAND",
+  "土地": "LAND",
+  "売地": "LAND",
 };
+
+const STATUS_MAP: Record<string, string> = {
+  "下書き": "DRAFT",
+  "掲載中": "PUBLISHED_HP",
+  "HP掲載中": "PUBLISHED_HP",
+  "全掲載中": "PUBLISHED_ALL",
+  "成約": "SOLD",
+  "一時停止": "SUSPENDED",
+  "確認待ち": "PENDING",
+  "承認済み": "APPROVED",
+};
+
+// Numeric fields
+const NUMERIC_FIELDS = new Set([
+  "price", "station_walk1", "station_walk2", "station_walk3",
+  "area_land_m2", "area_build_m2", "area_exclusive_m2", "area_balcony_m2",
+  "building_year", "building_month", "floors_total", "floors_basement",
+  "floor_unit", "total_units", "bcr", "far", "road_width",
+  "management_fee", "repair_reserve", "other_monthly_fee", "land_lease_fee",
+  "fixed_asset_tax", "city_planning_tax",
+]);
+
+// ── カラム自動検出 ────────────────────────────────────────────────────────────
 
 function detectMappings(headers: string[]): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [field, patterns] of Object.entries(COLUMN_MAPPINGS)) {
     for (const header of headers) {
       const h = header.trim();
-      if (patterns.some(p => h === p || h.toLowerCase() === p.toLowerCase() || h.includes(p))) {
+      if (patterns.some(p =>
+        h === p ||
+        h.toLowerCase() === p.toLowerCase() ||
+        h.includes(p) ||
+        p.includes(h)
+      )) {
         result[field] = h;
         break;
       }
@@ -127,6 +208,8 @@ function detectMappings(headers: string[]): Record<string, string> {
   }
   return result;
 }
+
+// ── 行データ → Prisma プロパティ ──────────────────────────────────────────────
 
 function rowToProperty(
   rowData: Record<string, string>,
@@ -145,17 +228,11 @@ function rowToProperty(
 
     if (field === "property_type") {
       prop[field] = PROPERTY_TYPE_MAP[raw] ?? raw.toUpperCase();
-    } else if (["price", "station_walk1", "area_land_m2", "area_build_m2", "area_exclusive_m2",
-                 "building_year", "building_month", "floors_total", "floor_unit",
-                 "bcr", "far", "management_fee", "repair_reserve"].includes(field)) {
-      const n = parseFloat(raw.replace(/,/g, "").replace(/[万円㎡]/g, ""));
-      if (!isNaN(n)) prop[field] = n;
     } else if (field === "status") {
-      // Map Japanese status to enum
-      const statusMap: Record<string, string> = {
-        "下書き": "DRAFT", "掲載中": "PUBLISHED_HP", "成約": "SOLD", "一時停止": "SUSPENDED",
-      };
-      prop[field] = statusMap[raw] ?? "DRAFT";
+      prop[field] = STATUS_MAP[raw] ?? "DRAFT";
+    } else if (NUMERIC_FIELDS.has(field)) {
+      const n = parseFloat(raw.replace(/,/g, "").replace(/[万円㎡坪%]/g, ""));
+      if (!isNaN(n)) prop[field] = n;
     } else {
       prop[field] = raw;
     }
@@ -185,7 +262,6 @@ export async function POST(request: NextRequest) {
     const headers = rows[0].map(h => h.trim());
     const dataRows = rows.slice(1);
 
-    // Use provided mappings or auto-detect
     const mappings: Record<string, string> = mappingsJson
       ? JSON.parse(mappingsJson)
       : detectMappings(headers);
@@ -202,9 +278,20 @@ export async function POST(request: NextRequest) {
 
     // Import mode
     const result: CsvImportResult = {
-      total: dataRows.length, created: 0, updated: 0, skipped: 0,
-      errors: [], preview: [], headers, mappings,
+      total: dataRows.length,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [],
+      preview: [],
+      headers,
+      mappings,
     };
+
+    // Find the 公開設定 column header (if present)
+    const publicSettingHeader = mappings["status"]
+      ? (headers.includes("公開設定") ? "公開設定" : null)
+      : null;
 
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
@@ -212,33 +299,57 @@ export async function POST(request: NextRequest) {
       headers.forEach((h, j) => { rowData[h] = row[j] ?? ""; });
 
       try {
+        // Skip rows explicitly marked 非公開
+        const publicSetting = rowData["公開設定"] ?? "";
+        if (publicSetting === "非公開") {
+          result.skipped++;
+          continue;
+        }
+
         const prop = rowToProperty(rowData, mappings);
 
-        // Require at least property_type and price OR city
+        // Require at least property_type and (price or city)
         if (!prop.property_type || (!prop.price && !prop.city)) {
           result.skipped++;
-          result.errors.push({ row: i + 2, message: "必須項目（物件種別・価格または市区町村）が不足" });
+          result.errors.push({
+            row: i + 2,
+            message: "必須項目（物件種別・価格または市区町村）が不足",
+          });
           continue;
         }
 
         const legacyId = prop.legacy_id as string | undefined;
 
-        // Dedup: check legacy_id
+        // Deduplication: check legacy_id → update price/area if found
         if (legacyId) {
-          const existing = await prisma.property.findFirst({ where: { legacy_id: legacyId } });
+          const existing = await prisma.property.findFirst({
+            where: { legacy_id: legacyId },
+          });
           if (existing) {
-            delete prop.legacy_id;
-            await prisma.property.update({ where: { id: existing.id }, data: prop });
+            const updateData: Record<string, unknown> = {};
+            if (prop.price !== undefined) updateData.price = prop.price;
+            if (prop.area_land_m2 !== undefined) updateData.area_land_m2 = prop.area_land_m2;
+            if (prop.area_build_m2 !== undefined) updateData.area_build_m2 = prop.area_build_m2;
+            if (prop.area_exclusive_m2 !== undefined) updateData.area_exclusive_m2 = prop.area_exclusive_m2;
+            if (prop.status !== undefined) updateData.status = prop.status;
+            await prisma.property.update({
+              where: { id: existing.id },
+              data: updateData,
+            });
             result.updated++;
             continue;
           }
         }
 
         if (!prop.property_type) prop.property_type = "USED_HOUSE";
-        await prisma.property.create({ data: prop as Parameters<typeof prisma.property.create>[0]["data"] });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await prisma.property.create({ data: prop as any });
         result.created++;
       } catch (err) {
-        result.errors.push({ row: i + 2, message: err instanceof Error ? err.message : "不明なエラー" });
+        result.errors.push({
+          row: i + 2,
+          message: err instanceof Error ? err.message : "不明なエラー",
+        });
         result.skipped++;
       }
     }
@@ -247,7 +358,11 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("POST /api/import/csv error:", error);
     return NextResponse.json(
-      { error: `インポートに失敗しました: ${error instanceof Error ? error.message : String(error)}` },
+      {
+        error: `インポートに失敗しました: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      },
       { status: 500 }
     );
   }
