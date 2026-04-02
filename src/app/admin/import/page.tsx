@@ -217,18 +217,28 @@ export default function CsvImportPage() {
     if (!selectedFile) return;
     setLoadingPreview(true);
     setError("");
-    const fd = new FormData();
-    fd.append("file", selectedFile);
-    fd.append("mode", "preview");
-    const res = await fetch("/api/import/csv", { method: "POST", body: fd });
-    const data = await res.json() as { headers: string[]; mappings: Record<string, string>; preview: Record<string, string>[]; total: number; error?: string };
-    setLoadingPreview(false);
-    if (!res.ok) { setError(data.error ?? "プレビューに失敗しました"); return; }
-    setHeaders(data.headers);
-    setMappings(data.mappings);
-    setPreview(data.preview);
-    setTotalRows(data.total);
-    setStep(2);
+    try {
+      const fd = new FormData();
+      fd.append("file", selectedFile);
+      fd.append("mode", "preview");
+      const res = await fetch("/api/import/csv", { method: "POST", body: fd });
+      const contentType = res.headers.get("content-type");
+      if (!contentType?.includes("application/json")) {
+        setError(`サーバーエラー（${res.status}）が発生しました。しばらく待ってから再試行してください。`);
+        return;
+      }
+      const data = await res.json() as { headers: string[]; mappings: Record<string, string>; preview: Record<string, string>[]; total: number; error?: string };
+      if (!res.ok) { setError(data.error ?? "プレビューに失敗しました"); return; }
+      setHeaders(data.headers);
+      setMappings(data.mappings);
+      setPreview(data.preview);
+      setTotalRows(data.total);
+      setStep(2);
+    } catch (e) {
+      setError(`プレビューに失敗しました: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setLoadingPreview(false);
+    }
   };
 
   // ── Step 3 → 4: Import ──
@@ -236,16 +246,26 @@ export default function CsvImportPage() {
     if (!selectedFile) return;
     setImporting(true);
     setError("");
-    const fd = new FormData();
-    fd.append("file", selectedFile);
-    fd.append("mode", "import");
-    fd.append("mappings", JSON.stringify(mappings));
-    const res = await fetch("/api/import/csv", { method: "POST", body: fd });
-    const data = await res.json() as ImportResult & { error?: string };
-    setImporting(false);
-    if (!res.ok) { setError(data.error ?? "インポートに失敗しました"); return; }
-    setResult(data);
-    setStep(4);
+    try {
+      const fd = new FormData();
+      fd.append("file", selectedFile);
+      fd.append("mode", "import");
+      fd.append("mappings", JSON.stringify(mappings));
+      const res = await fetch("/api/import/csv", { method: "POST", body: fd });
+      const contentType = res.headers.get("content-type");
+      if (!contentType?.includes("application/json")) {
+        setError(`サーバーエラー（${res.status}）が発生しました。しばらく待ってから再試行してください。`);
+        return;
+      }
+      const data = await res.json() as ImportResult & { error?: string };
+      if (!res.ok) { setError(data.error ?? "インポートに失敗しました"); return; }
+      setResult(data);
+      setStep(4);
+    } catch (e) {
+      setError(`インポートに失敗しました: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setImporting(false);
+    }
   };
 
   const reset = () => {

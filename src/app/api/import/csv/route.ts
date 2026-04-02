@@ -246,6 +246,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error("POST /api/import/csv error:", error);
-    return NextResponse.json({ error: "インポートに失敗しました" }, { status: 500 });
+    return NextResponse.json(
+      { error: `インポートに失敗しました: ${error instanceof Error ? error.message : String(error)}` },
+      { status: 500 }
+    );
   }
 }
