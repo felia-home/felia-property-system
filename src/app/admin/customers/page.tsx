@@ -270,7 +270,7 @@ export default function CustomersPage() {
                     )}
                   </td>
                   <td style={{ padding: "10px 12px" }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{c.name}様</div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{c.name} 様</div>
                     {c.name_kana && <div style={{ fontSize: 10, color: "#706e68" }}>{c.name_kana}</div>}
                     {family && <div style={{ fontSize: 11, color: "#3a6a8a", marginTop: 2 }}>{family}</div>}
                   </td>

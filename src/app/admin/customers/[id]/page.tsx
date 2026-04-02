@@ -267,7 +267,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
       <div style={{ marginBottom: 20 }}>
         <button onClick={() => router.back()} style={{ fontSize: 12, color: "#706e68", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 8, fontFamily: "inherit" }}>← 顧客一覧</button>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <h1 style={{ fontSize: 20, fontWeight: 500 }}>{customer.name}様</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 500 }}>{customer.name} 様</h1>
           {customer.name_kana && <span style={{ fontSize: 12, color: "#706e68" }}>{customer.name_kana}</span>}
           <span style={{ ...badge, padding: "3px 12px", borderRadius: 99, fontSize: 11, fontWeight: 500 }}>
             {STATUS_LABELS[customer.status] ?? customer.status}
