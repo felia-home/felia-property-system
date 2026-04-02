@@ -41,6 +41,7 @@ export default function DashboardPage() {
   const [loadingProps, setLoadingProps] = useState(true);
   const [licenseAlerts, setLicenseAlerts] = useState<{ company: string; expiry: Date; daysLeft: number }[]>([]);
   const [takkenAlerts, setTakkenAlerts] = useState<{ name: string; daysLeft: number }[]>([]);
+  const [newInquiries, setNewInquiries] = useState(0);
 
   useEffect(() => {
     fetch("/api/properties?take=300")
@@ -61,6 +62,13 @@ export default function DashboardPage() {
           }] : []
         ).filter(a => a.daysLeft <= 90);
         setLicenseAlerts(alerts);
+      })
+      .catch(() => {});
+
+    fetch("/api/inquiries?status=NEW&limit=1")
+      .then(r => r.json())
+      .then((d: { statusCounts?: Record<string, number> }) => {
+        setNewInquiries(d.statusCounts?.NEW ?? 0);
       })
       .catch(() => {});
 
@@ -149,6 +157,13 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {newInquiries > 0 && (
+        <div style={{ background: "#ffebee", border: "1px solid #ef9a9a", borderRadius: 10, padding: "12px 18px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 14, color: "#c62828" }}>📧 未対応の反響が <strong>{newInquiries}件</strong> あります</span>
+          <a href="/admin/inquiries" style={{ fontSize: 13, color: "#c62828", fontWeight: 600, textDecoration: "none" }}>今すぐ確認 →</a>
+        </div>
+      )}
 
       {/* License alerts */}
       {licenseAlerts.map(a => (

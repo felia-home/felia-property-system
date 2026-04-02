@@ -315,6 +315,7 @@ model Property {
   store                 Store?    @relation(fields: [store_id], references: [id])
   agent                 Staff?    @relation("PropertyAgent", fields: [agent_id], references: [id])
   successor_agent       Staff?    @relation("PropertySuccessor", fields: [successor_agent_id], references: [id])
+  inquiries             Inquiry[]
   @@map("properties")
 }
 
@@ -492,6 +493,76 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+// ===== 反響（ポータルサイトからの問い合わせ） =====
+model Inquiry {
+  id                String    @id @default(cuid())
+
+  // 反響元
+  source            String    // SUUMO | ATHOME | YAHOO | HOMES | HP | TEL | WALK_IN | OTHER
+  source_email_id   String?   @unique // GmailのメッセージID（重複取込防止）
+  received_at       DateTime  // 反響受信日時
+  raw_email         String?   // 生メール本文（解析用）
+
+  // 問い合わせ物件
+  property_id       String?
+  property_number   String?   // 物件番号（DB未登録でも保持）
+  property_name     String?   // 物件名（メールから抽出）
+
+  // 問い合わせ内容
+  inquiry_type      String    @default("PROPERTY") // PROPERTY | ASSESSMENT | GENERAL
+  message           String?
+  visit_hope        Boolean   @default(false)
+  document_hope     Boolean   @default(false)
+
+  // 顧客情報（メールから自動抽出）
+  customer_id       String?
+  customer_name     String?
+  customer_email    String?
+  customer_tel      String?
+  customer_address  String?
+  customer_note     String?
+
+  // 担当者振り分け
+  assigned_to       String?
+  assigned_at       DateTime?
+  assigned_by       String?
+  assignment_reason String?
+
+  // 対応状況
+  status            String    @default("NEW") // NEW | CONTACTED | VISITING | NEGOTIATING | CLOSED | LOST
+  first_contact_at  DateTime?
+  response_time_min Int?
+  priority          String    @default("NORMAL") // HIGH | NORMAL | LOW
+  ai_score          Int?
+  ai_notes          String?
+
+  // メモ
+  internal_memo     String?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  // リレーション
+  customer          Customer? @relation(fields: [customer_id], references: [id])
+  property          Property? @relation(fields: [property_id], references: [id])
+  assigned_staff    Staff?    @relation("InquiryAgent", fields: [assigned_to], references: [id])
+  activities        InquiryActivity[]
+
+  @@map("inquiries")
+}
+
+// ===== 対応履歴 =====
+model InquiryActivity {
+  id          String   @id @default(cuid())
+  inquiry_id  String
+  inquiry     Inquiry  @relation(fields: [inquiry_id], references: [id])
+  staff_id    String?
+  type        String   // EMAIL | CALL | VISIT | NOTE | STATUS_CHANGE
+  content     String
+  created_at  DateTime @default(now())
+
+  @@map("inquiry_activities")
+}
+
 model Customer {
   id                 String    @id @default(cuid())
   crm_id             String?   @unique
@@ -515,6 +586,7 @@ model Customer {
   is_deleted         Boolean   @default(false)
   deleted_at         DateTime?
   contracts          Contract[]
+  inquiries           Inquiry[]
   created_at         DateTime  @default(now())
   updated_at         DateTime  @updatedAt
   @@map("customers")
@@ -635,6 +707,7 @@ model Staff {
   properties_as_successor Property[] @relation("PropertySuccessor")
   transfers_from PropertyTransfer[] @relation("TransferFrom")
   transfers_to   PropertyTransfer[] @relation("TransferTo")
+  inquiries_assigned  Inquiry[] @relation("InquiryAgent")
 
   @@map("staffs")
 }
