@@ -18,14 +18,17 @@ export interface CsvImportResult {
 // ── CSV パーサ（Shift-JIS / UTF-8 対応） ────────────────────────────────────
 
 function parseCSV(buffer: Buffer): string[][] {
-  // encoding-japanese で文字コードを自動検出・変換
-  // from: "AUTO" により Shift_JIS / EUC-JP / UTF-8 BOM 有無を問わず正しく処理される
-  // detect() が false / "BINARY" を返す場合は "SJIS" にフォールバック
+  // encoding-japanese で文字コードを自動検出して UTF-8 バイト列に変換し、
+  // TextDecoder で JavaScript 文字列化する（to:"UNICODE" + codeToString より確実）
   const uint8 = new Uint8Array(buffer);
   const detected = Encoding.detect(uint8);
   const from = (detected && detected !== "BINARY") ? detected : "SJIS";
-  const unicodeArray = Encoding.convert(uint8, { to: "UNICODE", from });
-  const text = Encoding.codeToString(unicodeArray);
+  console.log("[csv-import] 検出文字コード:", detected, "→ 使用:", from);
+
+  // UTF-8 バイト配列に変換 → TextDecoder で文字列化
+  const utf8Array = Encoding.convert(uint8, { to: "UTF8", from });
+  const text = new TextDecoder("utf-8").decode(new Uint8Array(utf8Array));
+  console.log("[csv-import] 変換後テキスト先頭:", text.slice(0, 80));
 
   const rows: string[][] = [];
   let field = "";
