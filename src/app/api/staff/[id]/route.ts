@@ -88,7 +88,18 @@ export async function PUT(
     if ("specialty_areas" in body) data.specialty_areas = body.specialty_areas as string[];
     if ("specialty_types" in body) data.specialty_types = body.specialty_types as string[];
 
-    const member = await prisma.staff.update({ where: { id: params.id }, data });
+    const member = await prisma.staff.update({
+      where: { id: params.id },
+      data,
+      include: {
+        store: { select: { id: true, name: true, store_code: true } },
+        _count: {
+          select: {
+            properties_as_agent: { where: { is_deleted: false } },
+          },
+        },
+      },
+    });
     return NextResponse.json({ staff: member });
   } catch (error) {
     console.error("PUT /api/staff/[id] error:", error);

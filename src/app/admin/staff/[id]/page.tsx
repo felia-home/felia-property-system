@@ -56,7 +56,7 @@ interface StaffFull {
   retirement_date: string | null;
   retirement_reason: string | null;
   successor_id: string | null;
-  _count: { properties_as_agent: number };
+  _count?: { properties_as_agent: number };
 }
 
 interface PropertyRow {
