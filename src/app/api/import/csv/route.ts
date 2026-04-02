@@ -368,22 +368,17 @@ export async function POST(request: NextRequest) {
 
         const legacyId = prop.legacy_id as string | undefined;
 
-        // Deduplication: check legacy_id → update price/area if found
+        // Deduplication: check legacy_id → full field update if found
         if (legacyId) {
           const existing = await prisma.property.findFirst({
             where: { legacy_id: legacyId },
           });
           if (existing) {
-            const updateData: Record<string, unknown> = {};
-            if (prop.price !== undefined) updateData.price = prop.price;
-            if (prop.area_land_m2 !== undefined) updateData.area_land_m2 = prop.area_land_m2;
-            if (prop.area_build_m2 !== undefined) updateData.area_build_m2 = prop.area_build_m2;
-            if (prop.area_exclusive_m2 !== undefined) updateData.area_exclusive_m2 = prop.area_exclusive_m2;
-            if (prop.status !== undefined) updateData.status = prop.status;
-            await prisma.property.update({
-              where: { id: existing.id },
-              data: updateData,
-            });
+            // legacy_id 自体は更新対象から除外してその他全フィールドを上書き
+            const { legacy_id: _lid, ...updateData } = prop;
+            void _lid;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await prisma.property.update({ where: { id: existing.id }, data: updateData as any });
             result.updated++;
             continue;
           }
