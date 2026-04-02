@@ -29,7 +29,9 @@ const selectSt: React.CSSProperties = {
 const FIELD_LABELS: Record<string, string> = {
   legacy_id: "物件番号", property_type: "物件種別", price: "価格（万円）",
   city: "市区町村", town: "町名", address: "番地以降", postal_code: "郵便番号",
-  station_name1: "最寄り駅", station_walk1: "徒歩（分）", station_line1: "路線名",
+  station_line1: "沿線1", station_name1: "駅1", station_walk1: "徒歩1（分）",
+  station_line2: "沿線2", station_name2: "駅2", station_walk2: "徒歩2（分）",
+  station_line3: "沿線3", station_name3: "駅3", station_walk3: "徒歩3（分）",
   area_land_m2: "土地面積（㎡）", area_build_m2: "建物面積（㎡）",
   area_exclusive_m2: "専有面積（㎡）", rooms: "間取り",
   building_year: "築年（西暦）", building_month: "築月", structure: "構造",
