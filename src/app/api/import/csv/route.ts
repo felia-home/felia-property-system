@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import Encoding from "encoding-japanese";
 
 // ── 型 ──────────────────────────────────────────────────────────────────────
 
@@ -15,21 +14,29 @@ export interface CsvImportResult {
   mappings: Record<string, string>;
 }
 
-// ── CSV パーサ（Shift-JIS / UTF-8 対応） ────────────────────────────────────
+// ── 文字コード変換（Shift-JIS / EUC-JP / UTF-8 → JS string） ────────────────
 
-function parseCSV(buffer: Buffer): string[][] {
-  // encoding-japanese で文字コードを自動検出して UTF-8 バイト列に変換し、
-  // TextDecoder で JavaScript 文字列化する（to:"UNICODE" + codeToString より確実）
-  const uint8 = new Uint8Array(buffer);
-  const detected = Encoding.detect(uint8);
-  const from = (detected && detected !== "BINARY") ? detected : "SJIS";
-  console.log("[csv-import] 検出文字コード:", detected, "→ 使用:", from);
+async function convertToUtf8(buffer: ArrayBuffer): Promise<string> {
+  // dynamic import で読み込む（静的 import だとビルド時バンドルで解決されないことがある）
+  const Encoding = (await import("encoding-japanese")).default;
+  const uint8Array = new Uint8Array(buffer);
 
-  // UTF-8 バイト配列に変換 → TextDecoder で文字列化
-  const utf8Array = Encoding.convert(uint8, { to: "UTF8", from });
-  const text = new TextDecoder("utf-8").decode(new Uint8Array(utf8Array));
-  console.log("[csv-import] 変換後テキスト先頭:", text.slice(0, 80));
+  const detected = Encoding.detect(uint8Array);
+  console.log("[CSV Import] 検出文字コード:", detected);
 
+  const utf8Array = Encoding.convert(uint8Array, {
+    to: "UTF8",
+    from: detected === false ? "SJIS" : detected,
+  });
+
+  const result = new TextDecoder("utf-8").decode(new Uint8Array(utf8Array));
+  console.log("[CSV Import] 変換後先頭100文字:", result.slice(0, 100));
+  return result;
+}
+
+// ── CSV パーサ（文字列を受け取る） ───────────────────────────────────────────
+
+function parseCSV(text: string): string[][] {
   const rows: string[][] = [];
   let field = "";
   let row: string[] = [];
@@ -314,14 +321,16 @@ export async function POST(request: NextRequest) {
 
     if (!file) return NextResponse.json({ error: "ファイルが必要です" }, { status: 400 });
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const rows = parseCSV(buffer);
+    // Shift_JIS / EUC-JP / UTF-8 を正しく文字列化してからパース
+    const csvText = await convertToUtf8(await file.arrayBuffer());
+    const rows = parseCSV(csvText);
 
     if (rows.length < 2) {
       return NextResponse.json({ error: "CSVにデータ行がありません" }, { status: 400 });
     }
 
     const headers = rows[0].map(h => h.trim());
+    console.log("[CSV Import] ヘッダー先頭5件:", headers.slice(0, 5));
     const dataRows = rows.slice(1);
 
     const mappings: Record<string, string> = mappingsJson
