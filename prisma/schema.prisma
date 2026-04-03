@@ -799,6 +799,12 @@ model Staff {
   retirement_reason String?
   successor_id      String?
 
+  // ===== 認証情報 =====
+  password_hash       String?
+  login_count         Int       @default(0)
+  is_locked           Boolean   @default(false)
+  failed_login_count  Int       @default(0)
+
   // ===== システム =====
   last_login_at     DateTime?
   created_at        DateTime  @default(now())

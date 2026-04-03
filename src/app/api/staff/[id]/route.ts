@@ -113,3 +113,31 @@ export async function PATCH(
 ) {
   return PUT(request, { params });
 }
+
+// DELETE /api/staff/[id]
+// 論理削除（is_active=false + retirement_date=now）
+// 呼び出し元でADMIN権限チェックを行う想定
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const existing = await prisma.staff.findUnique({ where: { id: params.id } });
+    if (!existing) {
+      return NextResponse.json({ error: "スタッフが見つかりません" }, { status: 404 });
+    }
+
+    await prisma.staff.update({
+      where: { id: params.id },
+      data: {
+        is_active: false,
+        retirement_date: existing.retirement_date ?? new Date(),
+      },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("DELETE /api/staff/[id] error:", error);
+    return NextResponse.json({ error: "削除に失敗しました" }, { status: 500 });
+  }
+}

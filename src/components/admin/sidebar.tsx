@@ -1,6 +1,13 @@
 ﻿"use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
+
+type CurrentUser = {
+  name?: string | null;
+  permission?: string | null;
+  staffId?: string | null;
+};
 
 const navItems = [
   { href: "/admin", label: "ダッシュボード", icon: "▦" },
@@ -19,7 +26,7 @@ const navItems = [
   { href: "/admin/settings", label: "会社・店舗設定", icon: "⚙" },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ currentUser }: { currentUser?: CurrentUser }) {
   const pathname = usePathname();
   return (
     <aside style={{
@@ -57,7 +64,19 @@ export default function Sidebar() {
         })}
       </nav>
       <div style={{ padding: "14px 20px", borderTop: "1px solid rgba(255,255,255,.07)", fontSize: 12 }}>
-        <div style={{ color: "rgba(255,255,255,.4)" }}>admin.felia-home.co.jp</div>
+        {currentUser?.name && (
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 13, color: "#fff", fontWeight: 500 }}>{currentUser.name}</div>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,.4)", marginTop: 2 }}>{currentUser.permission}</div>
+          </div>
+        )}
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          style={{ width: "100%", padding: "6px 0", background: "rgba(255,255,255,.08)", border: "none", borderRadius: 6, color: "rgba(255,255,255,.6)", fontSize: 12, cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}
+        >
+          ログアウト
+        </button>
+        <div style={{ color: "rgba(255,255,255,.3)" }}>admin.felia-home.co.jp</div>
       </div>
     </aside>
   );

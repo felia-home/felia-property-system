@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import PermissionBadge from "@/components/admin/PermissionBadge";
 import { PERMISSIONS, Permission } from "@/lib/permissions";
 
@@ -131,6 +132,13 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
   const [successorId, setSuccessorId] = useState("");
   const [retiring, setRetiring] = useState(false);
 
+  // Auth (password + delete)
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.permission === "ADMIN";
+  const [newPassword, setNewPassword] = useState("");
+  const [pwMsg, setPwMsg] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     fetch(`/api/staff/${params.id}`)
       .then(r => r.json())
@@ -211,6 +219,39 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
     } catch {
       setError("通信エラーが発生しました");
       setRetiring(false);
+    }
+  };
+
+  const handleSetPassword = async () => {
+    if (!newPassword) return;
+    setPwMsg("");
+    const res = await fetch(`/api/staff/${params.id}/set-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: newPassword }),
+    });
+    const d = await res.json() as { success?: boolean; error?: string };
+    setPwMsg(d.success ? "✅ パスワードを設定しました" : `❌ ${d.error}`);
+    if (d.success) setNewPassword("");
+    setTimeout(() => setPwMsg(""), 4000);
+  };
+
+  const handleUnlock = async () => {
+    await fetch(`/api/staff/${params.id}/set-password`, { method: "DELETE" });
+    setStaff(s => s ? { ...s, is_locked: false, failed_login_count: 0 } : s);
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`${staff?.name} を削除（退職処理）します。この操作後、このスタッフはログインできなくなります。よろしいですか？`)) return;
+    setDeleting(true);
+    const res = await fetch(`/api/staff/${params.id}`, { method: "DELETE" });
+    if (res.ok) {
+      alert("削除しました");
+      router.push("/admin/staff");
+    } else {
+      const d = await res.json() as { error?: string };
+      setError(d.error ?? "削除に失敗しました");
+      setDeleting(false);
     }
   };
 
@@ -380,6 +421,38 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
               {saving ? "保存中..." : "変更を保存"}
             </button>
           </div>
+
+          {/* パスワード設定（ADMIN のみ） */}
+          {isAdmin && (
+            <div style={{ ...section, marginTop: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12, color: "#3a2a1a" }}>🔑 パスワード設定</div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="新しいパスワード（8文字以上）"
+                  style={{ ...inp, flex: 1 }}
+                />
+                <button onClick={handleSetPassword}
+                  style={{ padding: "8px 16px", borderRadius: 8, background: "#1565c0", color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                  設定する
+                </button>
+              </div>
+              {pwMsg && <div style={{ fontSize: 13, color: pwMsg.startsWith("✅") ? "#2e7d32" : "#c62828" }}>{pwMsg}</div>}
+              {(staff as StaffFull & { is_locked?: boolean; failed_login_count?: number; last_login_at?: string | null; login_count?: number }).is_locked && (
+                <div style={{ marginTop: 8, fontSize: 12, color: "#c62828" }}>
+                  ⚠️ このアカウントはロックされています
+                  <button onClick={handleUnlock} style={{ marginLeft: 8, color: "#1565c0", background: "none", border: "none", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>ロックを解除する</button>
+                </div>
+              )}
+              {(staff as StaffFull & { last_login_at?: string | null; login_count?: number }).last_login_at && (
+                <div style={{ marginTop: 6, fontSize: 12, color: "#706e68" }}>
+                  最終ログイン: {new Date((staff as StaffFull & { last_login_at?: string | null }).last_login_at!).toLocaleString("ja-JP")}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -780,6 +853,20 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
                 </button>
               </div>
             </>
+          )}
+
+          {/* 危険な操作: ADMIN のみ */}
+          {isAdmin && (
+            <div style={{ marginTop: 24, padding: 20, border: "1px solid #ffcdd2", borderRadius: 12, background: "#fff5f5" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#c62828", marginBottom: 8 }}>⚠️ 危険な操作</div>
+              <p style={{ fontSize: 13, color: "#706e68", marginBottom: 16 }}>
+                スタッフを削除すると管理画面にログインできなくなります。担当物件がある場合は先に退職処理で引継ぎを行ってください。
+              </p>
+              <button onClick={handleDelete} disabled={deleting}
+                style={{ padding: "8px 20px", borderRadius: 8, background: "#c62828", color: "#fff", border: "none", cursor: deleting ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 500, fontFamily: "inherit" }}>
+                {deleting ? "処理中..." : "🗑️ このスタッフを削除する"}
+              </button>
+            </div>
           )}
         </div>
       )}

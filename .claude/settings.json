@@ -7,10 +7,35 @@
       "Bash(mkdir -p \"c:/Users/User/projects/felia-property-system/src/app/api/properties/[id]/images/analyze\")",
       "Bash(git push:*)",
       "Bash(npx next:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(ssh felia-vps:*)",
+      "Read(//c/Users/User/.ssh/**)",
+      "Bash(ls c:/Users/User/projects/felia-property-system/.env*)",
+      "Bash(DATABASE_URL=\"postgresql://dummy:dummy@localhost:5432/dummy\" npx prisma validate)",
+      "Bash(grep -n \"qualifications\\\\|specialty_areas\\\\|specialty_types\" c:/Users/User/projects/felia-property-system/src/app/admin/staff/[id]/page.tsx)",
+      "Bash(npx tsc:*)",
+      "Bash(ls c:/Users/User/projects/felia-property-system/README*)",
+      "Bash(gh run:*)",
+      "Bash(python3 -c \" import json,sys data = json.load\\(sys.stdin\\) runs = data.get\\('workflow_runs', []\\) if not runs: print\\('No runs found \\(or API auth needed\\)'\\) else: for r in runs: print\\(f'{r[\\\\\"name\\\\\"]} | {r[\\\\\"status\\\\\"]} | {r[\\\\\"conclusion\\\\\"]} | {r[\\\\\"head_commit\\\\\"][\\\\\"message\\\\\"][:50]}'\\) \")",
+      "Bash(git -C /c/Users/User/projects/felia-property-system add src/app/api/customers/route.ts src/app/api/customers/[id]/route.ts src/app/api/customers/[id]/activities/route.ts src/components/admin/sidebar.tsx)",
+      "Bash(git -C /c/Users/User/projects/felia-property-system status)",
+      "Bash(git -C /c/Users/User/projects/felia-property-system add prisma/schema.prisma src/app/admin/customers/page.tsx \"src/app/admin/customers/[id]/page.tsx\" prisma/migrations/20260402000002_integrate_inquiry_into_customer/)",
+      "Bash(git -C /c/Users/User/projects/felia-property-system commit -m ':*)",
+      "Bash(git -C /c/Users/User/projects/felia-property-system push origin main)",
+      "Bash(git -C /c/Users/User/projects/felia-property-system add prisma/schema.prisma prisma/migrations/20260402000003_expand_customer_model/migration.sql src/app/api/customers/route.ts 'src/app/api/customers/[id]/route.ts' 'src/app/api/customers/[id]/activities/route.ts' 'src/app/api/customers/[id]/family/route.ts' 'src/app/api/customers/[id]/family/[memberId]/route.ts' 'src/app/api/customers/[id]/analyze/route.ts' src/agents/customer-ai.ts src/app/admin/customers/page.tsx 'src/app/admin/customers/[id]/page.tsx')",
+      "Bash(git -C /c/Users/User/projects/felia-property-system status --short)",
+      "Bash(git -C /c/Users/User/projects/felia-property-system add src/app/admin/customers/page.tsx \"src/app/admin/customers/[id]/page.tsx\")",
+      "Bash(git -C /c/Users/User/projects/felia-property-system add src/agents/follow-up-agent.ts src/app/api/customers/follow-up/route.ts 'src/app/api/customers/[id]/follow-up-message/route.ts' src/app/admin/customers/follow-up/page.tsx 'src/app/admin/customers/[id]/page.tsx' src/components/admin/sidebar.tsx src/app/admin/page.tsx)",
+      "Bash(git -C /c/Users/User/projects/felia-property-system add src/app/admin/import/page.tsx src/app/api/import/csv/route.ts)",
+      "Bash(grep -n \"activeTab === \\\\\"retire\\\\\"\" c:/Users/User/projects/felia-property-system/src/app/admin/staff/[id]/page.tsx)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\User\\projects\\felia-property-system\\src\\app\\api\\properties\\[id]"
+      "c:\\Users\\User\\projects\\felia-property-system\\src\\app\\api\\properties\\[id]",
+      "c:\\Users\\User\\projects\\felia-property-system\\src\\app\\api\\properties\\[id]\\ad-confirmation",
+      "C:\\Users\\User\\projects\\felia-property-system\\src\\app\\api\\inquiries\\[id]",
+      "C:\\Users\\User\\projects\\felia-property-system\\src\\app\\admin\\inquiries",
+      "c:\\Users\\User\\projects\\felia-property-system\\src\\app\\api\\auth",
+      "c:\\Users\\User\\projects\\felia-property-system\\src\\app\\api\\staff\\[id]"
     ]
   }
 }

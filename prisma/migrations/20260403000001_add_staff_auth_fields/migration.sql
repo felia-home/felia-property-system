@@ -1,0 +1,5 @@
+-- AddColumn staff auth fields
+ALTER TABLE "staffs" ADD COLUMN IF NOT EXISTS "password_hash" TEXT;
+ALTER TABLE "staffs" ADD COLUMN IF NOT EXISTS "login_count" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "staffs" ADD COLUMN IF NOT EXISTS "is_locked" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "staffs" ADD COLUMN IF NOT EXISTS "failed_login_count" INTEGER NOT NULL DEFAULT 0;
