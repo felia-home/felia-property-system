@@ -840,6 +840,9 @@ model PrivateProperty {
   area_build_m2    Float?
   commission       String?
   note             String?
+  price_display    String?
+  transaction_type String?
+  info_date        DateTime?
   seller_name      String?
   agent_id         String?
   myosoku_url      String?

@@ -393,6 +393,8 @@ export default function PrivatePropertiesPage() {
   const [showAddCommission, setShowAddCommission] = useState(false);
   const [newCommissionLabel, setNewCommissionLabel] = useState("");
   const [addingCommission, setAddingCommission] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors?: string[] } | null>(null);
+  const [importing, setImporting] = useState(false);
 
   // 手数料マスタ取得
   const fetchCommissions = useCallback(async () => {
@@ -478,6 +480,31 @@ export default function PrivatePropertiesPage() {
     }
   };
 
+  const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch("/api/private-properties/import", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await res.json();
+      setImportResult(result);
+      if (result.success) {
+        await fetchProperties();
+      }
+    } catch {
+      setImportResult({ imported: 0, skipped: 0, errors: ["通信エラーが発生しました"] });
+    } finally {
+      setImporting(false);
+      e.target.value = "";
+    }
+  };
+
   const handleAddCommission = async () => {
     if (!newCommissionLabel.trim()) return;
     setAddingCommission(true);
@@ -535,6 +562,30 @@ export default function PrivatePropertiesPage() {
           style={{ ...btnBase, background: "#fff3e0", border: "1px solid #ffcc02", color: "#333" }}>
           閉じる
         </button>
+      </div>
+
+      {/* CSVインポート */}
+      <div style={{ marginBottom: 12, padding: "12px 16px", background: "#fff", borderRadius: 8, border: "1px solid #e0e0e0", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#333" }}>CSVインポート（Shift_JIS対応）</span>
+        <label style={{
+          padding: "5px 14px", fontSize: 12, background: importing ? "#999" : "#1565c0",
+          color: "#fff", borderRadius: 5, cursor: importing ? "not-allowed" : "pointer",
+          fontFamily: "inherit", fontWeight: 600,
+        }}>
+          {importing ? "インポート中..." : "CSVファイルを選択"}
+          <input type="file" accept=".csv" onChange={handleCsvImport} disabled={importing}
+            style={{ display: "none" }} />
+        </label>
+        {importResult && (
+          <span style={{
+            fontSize: 12,
+            color: importResult.imported > 0 ? "#2e7d32" : "#c62828",
+          }}>
+            {importResult.imported > 0
+              ? `✅ ${importResult.imported}件インポート完了（スキップ: ${importResult.skipped}件）`
+              : `❌ エラー: ${importResult.errors?.[0] ?? "インポート失敗"}`}
+          </span>
+        )}
       </div>
 
       {/* サマリー */}
