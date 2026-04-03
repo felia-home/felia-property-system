@@ -820,8 +820,46 @@ model Staff {
   transfers_to   PropertyTransfer[] @relation("TransferTo")
   inquiries_assigned  Inquiry[] @relation("InquiryAgent")
   customers_assigned  Customer[] @relation("CustomerAgent")
+  private_properties_as_agent PrivateProperty[] @relation("PrivatePropertyAgent")
 
   @@map("staffs")
+}
+
+// ===== 未公開物件DB =====
+model PrivateProperty {
+  id               String    @id @default(cuid())
+  property_no      String    @unique
+  listing_type     String    @default("SENIN") // SENIN | PRIVATE
+  is_land          Boolean   @default(false)
+  is_house         Boolean   @default(true)
+  is_mansion       Boolean   @default(false)
+  area             String?   // 区
+  town             String?   // 町名
+  price            Int?      // 万円
+  area_land_m2     Float?
+  area_build_m2    Float?
+  commission       String?
+  note             String?
+  seller_name      String?
+  agent_id         String?
+  myosoku_url      String?
+  myosoku_filename String?
+  status           String    @default("ACTIVE") // ACTIVE | CLOSED
+  confirmed_at     DateTime?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  agent            Staff?    @relation("PrivatePropertyAgent", fields: [agent_id], references: [id])
+  @@map("private_properties")
+}
+
+model CommissionMaster {
+  id         String   @id @default(cuid())
+  label      String
+  value      String
+  sort_order Int      @default(0)
+  created_at DateTime @default(now())
+  @@map("commission_masters")
 }
 
 model PropertyTransfer {
