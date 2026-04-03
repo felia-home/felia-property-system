@@ -487,6 +487,39 @@ function CompletionMeter({
   );
 }
 
+// ── Copy Field Component ──────────────────────────────────────────────────────
+
+function CopyField({
+  label, value, onChange, maxLen, rows = 2,
+}: {
+  label: string; value: string; onChange: (v: string) => void; maxLen: number; rows?: number;
+}) {
+  const len = value.length;
+  const over = len > maxLen;
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "#1c1b18" }}>{label}</span>
+        <span style={{ fontSize: 10, color: over ? "#e65100" : "#9e9e9e" }}>{len}/{maxLen}文字</span>
+      </div>
+      {rows <= 2 ? (
+        <input
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          style={{ width: "100%", padding: "8px 10px", border: `1px solid ${over ? "#e65100" : "#e0deda"}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+        />
+      ) : (
+        <textarea
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          rows={rows}
+          style={{ width: "100%", padding: "8px 10px", border: `1px solid ${over ? "#e65100" : "#e0deda"}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }}
+        />
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function PropertyDetailPage({ params }: { params: { id: string } }) {
@@ -494,11 +527,21 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
   const [property, setProperty] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
-  const [mainTab, setMainTab] = useState<"info" | "photos" | "ad_confirm" | "workflow">("workflow");
+  const [mainTab, setMainTab] = useState<"info" | "photos" | "ad_confirm" | "workflow" | "copy">("workflow");
   const [form, setForm] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  // 広告文タブ
+  const [copyFields, setCopyFields] = useState<Record<string, string>>({});
+  const [copyPoints, setCopyPoints] = useState<string[]>([]);
+  const [generating, setGenerating] = useState(false);
+  const [copyMsg, setCopyMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [copySaving, setCopySaving] = useState(false);
+
+  // 物件情報タブ内AI生成
+  const [generatingForm, setGeneratingForm] = useState(false);
 
   const loadProperty = async () => {
     const res = await fetch(`/api/properties/${params.id}`);
@@ -506,6 +549,14 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
     if (res.ok && d.property) {
       setProperty(d.property);
       setForm(propertyToForm(d.property));
+      setCopyFields({
+        title: String(d.property.title ?? ""),
+        catch_copy: String(d.property.catch_copy ?? ""),
+        description_hp: String(d.property.description_hp ?? ""),
+        description_suumo: String(d.property.description_suumo ?? ""),
+        description_athome: String(d.property.description_athome ?? ""),
+      });
+      setCopyPoints(Array.isArray(d.property.selling_points) ? d.property.selling_points : []);
     }
   };
 
@@ -558,6 +609,77 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
     } else {
       setMsg({ text: data.error ?? "更新に失敗しました", ok: false });
     }
+  };
+
+  const handleGenerateToForm = async () => {
+    if (!confirm("AIで広告文を生成します。現在の内容は上書きされます。よろしいですか？")) return;
+    setGeneratingForm(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/properties/${params.id}/generate-content`, { method: "POST" });
+      const contentType = res.headers.get("content-type");
+      if (!contentType?.includes("application/json")) {
+        throw new Error(`サーバーエラー（${res.status}）`);
+      }
+      const d = await res.json();
+      if (!res.ok) { setMsg({ text: d.error ?? "生成に失敗しました", ok: false }); return; }
+      const c = d.copy;
+      setForm(f => ({
+        ...f,
+        ...(c.title             ? { title:              c.title }             : {}),
+        ...(c.catch_copy        ? { catch_copy:         c.catch_copy }        : {}),
+        ...(c.description_hp    ? { description_hp:     c.description_hp }    : {}),
+        ...(c.description_suumo ? { description_suumo:  c.description_suumo } : {}),
+        ...(c.description_athome? { description_athome: c.description_athome }: {}),
+      }));
+      setMsg({ text: "✅ 広告文を生成しました。内容を確認して保存してください。", ok: true });
+      setTimeout(() => setMsg(null), 8000);
+    } catch (e) {
+      setMsg({ text: `エラー: ${String(e)}`, ok: false });
+    } finally {
+      setGeneratingForm(false);
+    }
+  };
+
+  const handleGenerateCopy = async () => {
+    setGenerating(true);
+    setCopyMsg(null);
+    try {
+      const res = await fetch(`/api/properties/${params.id}/generate-content`, { method: "POST" });
+      const d = await res.json();
+      if (!res.ok) { setCopyMsg({ text: d.error ?? "生成に失敗しました", ok: false }); return; }
+      const c = d.copy;
+      setCopyFields({
+        title: c.title ?? "",
+        catch_copy: c.catch_copy ?? "",
+        description_hp: c.description_hp ?? "",
+        description_suumo: c.description_suumo ?? "",
+        description_athome: c.description_athome ?? "",
+      });
+      setCopyPoints(Array.isArray(c.selling_points) ? c.selling_points : []);
+      setCopyMsg({ text: "広告文を生成しました。内容を確認して「保存」してください。", ok: true });
+    } catch { setCopyMsg({ text: "通信エラーが発生しました", ok: false }); }
+    finally { setGenerating(false); }
+  };
+
+  const handleSaveCopy = async () => {
+    setCopySaving(true);
+    setCopyMsg(null);
+    try {
+      const res = await fetch(`/api/properties/${params.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...copyFields,
+          selling_points: copyPoints.filter(p => p.trim()),
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setCopyMsg({ text: d.error ?? "保存に失敗しました", ok: false }); return; }
+      setProperty(d.property);
+      setCopyMsg({ text: "保存しました", ok: true });
+    } catch { setCopyMsg({ text: "通信エラーが発生しました", ok: false }); }
+    finally { setCopySaving(false); }
   };
 
   if (loading) return <div style={{ padding: 28, color: "#706e68", fontSize: 13 }}>読み込み中...</div>;
@@ -637,15 +759,22 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
           ["workflow", "アクション"],
           ["info", "物件情報"],
           ["photos", "写真管理"],
-        ] as const).map(([t, label]) => (
-          <button key={t} onClick={() => setMainTab(t)}
-            style={{ padding: "8px 20px", fontSize: 13, borderRadius: 8, border: "1px solid " + (mainTab === t ? "#234f35" : "#e0deda"), background: mainTab === t ? "#234f35" : "#fff", color: mainTab === t ? "#fff" : "#706e68", fontWeight: mainTab === t ? 600 : 400, cursor: "pointer", fontFamily: "inherit" }}>
-            {label}
-            {t === "workflow" && needsAdConfirm && (
-              <span title="広告確認が未完了です。アクションタブで対応してください" style={{ marginLeft: 5, fontSize: 10, background: "#e65100", color: "#fff", borderRadius: 99, padding: "1px 5px" }}>!</span>
-            )}
-          </button>
-        ))}
+          ["copy", "広告文"],
+        ] as const).map(([t, label]) => {
+          const hasCopy = !!(property.catch_copy);
+          return (
+            <button key={t} onClick={() => setMainTab(t)}
+              style={{ padding: "8px 20px", fontSize: 13, borderRadius: 8, border: "1px solid " + (mainTab === t ? "#234f35" : "#e0deda"), background: mainTab === t ? "#234f35" : "#fff", color: mainTab === t ? "#fff" : "#706e68", fontWeight: mainTab === t ? 600 : 400, cursor: "pointer", fontFamily: "inherit" }}>
+              {label}
+              {t === "workflow" && needsAdConfirm && (
+                <span title="広告確認が未完了です。アクションタブで対応してください" style={{ marginLeft: 5, fontSize: 10, background: "#e65100", color: "#fff", borderRadius: 99, padding: "1px 5px" }}>!</span>
+              )}
+              {t === "copy" && !hasCopy && (
+                <span title="広告文が未生成です" style={{ marginLeft: 5, fontSize: 10, background: "#9e9e9e", color: "#fff", borderRadius: 99, padding: "1px 5px" }}>未</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 24 }}>
@@ -657,7 +786,11 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
           />
         )}
         {mainTab === "info" && (
-          <PropertyFormTabs tab={tab} setTab={setTab} form={form} setForm={setForm} />
+          <PropertyFormTabs
+            tab={tab} setTab={setTab} form={form} setForm={setForm}
+            onGenerateContent={handleGenerateToForm}
+            generatingContent={generatingForm}
+          />
         )}
         {mainTab === "photos" && (
           <PhotoManager
@@ -666,6 +799,81 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
             lng={property.longitude as number | null}
             propertyType={String(property.property_type ?? "")}
           />
+        )}
+        {mainTab === "copy" && (
+          <div>
+            {/* Action bar */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+              <button onClick={handleGenerateCopy} disabled={generating}
+                style={{ padding: "9px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: generating ? "#888" : "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                {generating ? "🤖 生成中..." : "🤖 AIで広告文を生成"}
+              </button>
+              <button onClick={handleSaveCopy} disabled={copySaving}
+                style={{ padding: "9px 20px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#fff", border: "1px solid #234f35", color: "#234f35", cursor: "pointer", fontFamily: "inherit" }}>
+                {copySaving ? "保存中..." : "保存する"}
+              </button>
+              <span style={{ fontSize: 11, color: "#9e9e9e" }}>生成後に内容を確認・編集してから保存してください</span>
+            </div>
+            {copyMsg && (
+              <div style={{ background: copyMsg.ok ? "#e8f5e9" : "#fdeaea", color: copyMsg.ok ? "#1b5e20" : "#8c1f1f", padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
+                {copyMsg.text}
+              </div>
+            )}
+
+            {/* Fields */}
+            <CopyField
+              label="タイトル" maxLen={50}
+              value={copyFields.title ?? ""}
+              onChange={v => setCopyFields(f => ({ ...f, title: v }))}
+            />
+            <CopyField
+              label="キャッチコピー" maxLen={40}
+              value={copyFields.catch_copy ?? ""}
+              onChange={v => setCopyFields(f => ({ ...f, catch_copy: v }))}
+            />
+            <CopyField
+              label="HP掲載文" maxLen={600} rows={8}
+              value={copyFields.description_hp ?? ""}
+              onChange={v => setCopyFields(f => ({ ...f, description_hp: v }))}
+            />
+            <CopyField
+              label="SUUMO掲載文" maxLen={300} rows={5}
+              value={copyFields.description_suumo ?? ""}
+              onChange={v => setCopyFields(f => ({ ...f, description_suumo: v }))}
+            />
+            <CopyField
+              label="at home掲載文" maxLen={300} rows={5}
+              value={copyFields.description_athome ?? ""}
+              onChange={v => setCopyFields(f => ({ ...f, description_athome: v }))}
+            />
+
+            {/* Selling points */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#1c1b18", marginBottom: 8 }}>
+                セールスポイント <span style={{ fontWeight: 400, color: "#9e9e9e" }}>（各20文字以内・5項目）</span>
+              </div>
+              {[0, 1, 2, 3, 4].map(i => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, color: "#9e9e9e", width: 14 }}>{i + 1}</span>
+                  <input
+                    value={copyPoints[i] ?? ""}
+                    onChange={e => setCopyPoints(pts => {
+                      const next = [...pts];
+                      while (next.length <= i) next.push("");
+                      next[i] = e.target.value;
+                      return next;
+                    })}
+                    maxLength={20}
+                    placeholder={`セールスポイント${i + 1}`}
+                    style={{ flex: 1, padding: "7px 10px", border: "1px solid #e0deda", borderRadius: 7, fontSize: 13, fontFamily: "inherit" }}
+                  />
+                  <span style={{ fontSize: 10, color: (copyPoints[i]?.length ?? 0) > 18 ? "#e65100" : "#9e9e9e", width: 36, textAlign: "right" }}>
+                    {copyPoints[i]?.length ?? 0}/20
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>

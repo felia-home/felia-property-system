@@ -57,6 +57,7 @@ const UPDATABLE_FIELDS = [
   "last_confirmed_at","last_confirmed_by","last_check_result",
   "days_on_market","inquiry_count","pending_tasks",
   "published_at",
+  "selling_points",
 ];
 
 export async function GET(

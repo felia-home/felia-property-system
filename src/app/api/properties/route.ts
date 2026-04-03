@@ -7,9 +7,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
+    const storeId = searchParams.get("store_id");
+    const agentId = searchParams.get("agent_id");
+    const noCopy = searchParams.get("noCopy") === "true";
 
     const where: Record<string, unknown> = { is_deleted: false };
     if (status) where.status = status;
+    if (storeId) where.store_id = storeId;
+    if (agentId) where.agent_id = agentId;
+    if (noCopy) where.catch_copy = null;
     if (search) {
       where.OR = [
         { city: { contains: search } },

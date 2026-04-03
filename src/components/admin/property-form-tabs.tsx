@@ -751,9 +751,11 @@ interface TabsProps {
   setTab: (n: number) => void;
   form: Record<string, string>;
   setForm: SetForm;
+  onGenerateContent?: () => void;
+  generatingContent?: boolean;
 }
 
-export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
+export function PropertyFormTabs({ tab, setTab, form, setForm, onGenerateContent, generatingContent }: TabsProps) {
   const isLand = form.property_type === "LAND";
   const isMansion = form.property_type === "MANSION" || form.property_type === "NEW_MANSION";
 
@@ -811,12 +813,56 @@ export function PropertyFormTabs({ tab, setTab, form, setForm }: TabsProps) {
               {v:"あり",l:"あり"},{v:"なし",l:"なし"},
             ]} />
           </div>
+          {/* AI広告文生成ボタン */}
+          {onGenerateContent && (
+            <div style={{
+              background: "linear-gradient(135deg, #f3e5f5, #e8eaf6)",
+              border: "1px solid #ce93d8",
+              borderRadius: 12,
+              padding: "16px 20px",
+              marginBottom: 4,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14, color: "#4a148c" }}>
+                  ✨ AI広告文を自動生成
+                </div>
+                <div style={{ fontSize: 12, color: "#706e68", marginTop: 2 }}>
+                  タイトル・キャッチコピー・HP掲載文・SUUMO文・athome文を一括生成します
+                </div>
+              </div>
+              <button
+                onClick={onGenerateContent}
+                disabled={generatingContent}
+                style={{
+                  padding: "10px 20px", borderRadius: 8, fontSize: 13,
+                  background: generatingContent ? "#888" : "#6a1b9a",
+                  color: "#fff", border: "none",
+                  cursor: generatingContent ? "not-allowed" : "pointer",
+                  fontWeight: 600, whiteSpace: "nowrap", fontFamily: "inherit",
+                }}
+              >
+                {generatingContent ? "⏳ 生成中..." : "🤖 AIで生成する"}
+              </button>
+            </div>
+          )}
           <div style={grid2}>
             <FI label="タイトル" name="title" form={form} setForm={setForm} placeholder="○○区○○ 中古戸建｜○○駅 徒歩5分 3LDK" />
             <FI label="キャッチコピー（40文字以内）" name="catch_copy" form={form} setForm={setForm} placeholder="南向き角地・駅徒歩5分の閑静な住宅街" />
           </div>
           <div style={rowSt}>
-            <label style={labelSt}>HP掲載文</label>
+            <label style={labelSt}>
+              HP掲載文
+              <span style={{
+                marginLeft: 8, fontSize: 11,
+                color: (form.description_hp?.length ?? 0) < 300 ? "#e65100" : "#2e7d32",
+              }}>
+                {form.description_hp?.length ?? 0}文字
+                {(form.description_hp?.length ?? 0) < 300 && " （推奨300文字以上）"}
+              </span>
+            </label>
             <textarea value={form.description_hp ?? ""} rows={4}
               onChange={(e) => setForm(f => ({ ...f, description_hp: e.target.value }))}
               style={{ ...inputSt, resize: "vertical" }} />

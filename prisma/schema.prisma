@@ -293,6 +293,9 @@ model Property {
   // タスク管理
   pending_tasks           String[]
 
+  // 広告文
+  selling_points          String[]
+
   // AIチェック結果
   last_confirmed_by       String?
   last_check_result       Json?

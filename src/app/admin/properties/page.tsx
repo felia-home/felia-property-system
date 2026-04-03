@@ -30,6 +30,7 @@ interface Property {
   photo_has_exterior: boolean;
   photo_has_floor_plan: boolean;
   ad_confirmed_at: string | null;
+  catch_copy: string | null;
   pending_tasks: string[];
   published_at: string | null;
   created_at: string;
@@ -56,6 +57,9 @@ export default function PropertiesPage() {
   const [storeFilter, setStoreFilter] = useState("");
   const [agentFilter, setAgentFilter] = useState("");
   const [alertOnly, setAlertOnly] = useState(false);
+  const [noCopyOnly, setNoCopyOnly] = useState(false);
+  const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [bulkMsg, setBulkMsg] = useState<string | null>(null);
 
   const [stores, setStores] = useState<Store[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
@@ -77,6 +81,7 @@ export default function PropertiesPage() {
       if (status) params.set("status", status);
       if (storeFilter) params.set("store_id", storeFilter);
       if (agentFilter) params.set("agent_id", agentFilter);
+      if (noCopyOnly) params.set("noCopy", "true");
       const res = await fetch(`/api/properties?${params}`);
       const data = await res.json();
       let props: Property[] = data.properties ?? [];
@@ -85,7 +90,25 @@ export default function PropertiesPage() {
       setTotal(alertOnly ? props.length : (data.total ?? 0));
     } catch { /* ignore */ }
     finally { setLoading(false); }
-  }, [search, status, storeFilter, agentFilter, alertOnly]);
+  }, [search, status, storeFilter, agentFilter, alertOnly, noCopyOnly]);
+
+  const handleBulkGenerate = async () => {
+    const targets = properties.filter(p => !p.catch_copy);
+    if (targets.length === 0) { setBulkMsg("広告文未生成の物件はありません"); return; }
+    if (!confirm(`広告文が未生成の${targets.length}件を一括生成します。時間がかかる場合があります。よろしいですか？`)) return;
+    setBulkGenerating(true);
+    setBulkMsg(null);
+    let ok = 0, fail = 0;
+    for (const p of targets) {
+      try {
+        const res = await fetch(`/api/properties/${p.id}/generate-content`, { method: "POST" });
+        if (res.ok) ok++; else fail++;
+      } catch { fail++; }
+    }
+    setBulkGenerating(false);
+    setBulkMsg(`完了: ${ok}件生成、${fail}件失敗`);
+    fetchProperties();
+  };
 
   useEffect(() => { fetchProperties(); }, [fetchProperties]);
 
@@ -97,6 +120,10 @@ export default function PropertiesPage() {
           <p style={{ fontSize: 12, color: "#706e68", marginTop: 4 }}>登録物件の管理・掲載設定</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={handleBulkGenerate} disabled={bulkGenerating}
+            style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: bulkGenerating ? "#888" : "#fff", border: "1px solid #e0deda", color: bulkGenerating ? "#fff" : "#1c1b18", cursor: "pointer", fontFamily: "inherit" }}>
+            {bulkGenerating ? "🤖 生成中..." : "🤖 広告文一括生成"}
+          </button>
           <a href="/admin/import" style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#fff", border: "1px solid #e0deda", color: "#1c1b18", textDecoration: "none" }}>📥 CSVインポート</a>
           <a href="/admin/properties/import?tab=scrape" style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#fff", border: "1px solid #e0deda", color: "#1c1b18", textDecoration: "none" }}>🔗 URLから取込</a>
           <a href="/admin/properties/import" style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#fff", border: "1px solid #e0deda", color: "#1c1b18", textDecoration: "none" }}>📄 PDF取込</a>
@@ -141,6 +168,12 @@ export default function PropertiesPage() {
               style={{ cursor: "pointer" }} />
             要対応のみ
           </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, cursor: "pointer", color: noCopyOnly ? "#7b1fa2" : "#706e68", whiteSpace: "nowrap" }}>
+            <input type="checkbox" checked={noCopyOnly} onChange={e => setNoCopyOnly(e.target.checked)}
+              style={{ cursor: "pointer" }} />
+            広告文なし
+          </label>
+          {bulkMsg && <span style={{ fontSize: 11, color: "#706e68" }}>{bulkMsg}</span>}
           {!loading && (
             <span style={{ fontSize: 12, color: "#706e68", marginLeft: "auto" }}>{total}件</span>
           )}
@@ -149,16 +182,16 @@ export default function PropertiesPage() {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#f7f6f2" }}>
-              {["", "物件情報", "ステータス", "写真", "完成度", "価格", "掲載日数", ""].map(h => (
+              {["", "物件情報", "ステータス", "写真", "広告文", "完成度", "価格", "掲載日数", ""].map(h => (
                 <th key={h} style={{ textAlign: "left", fontSize: 10, fontWeight: 500, color: "#706e68", letterSpacing: ".07em", textTransform: "uppercase", padding: "10px 14px", borderBottom: "1px solid #e0deda", whiteSpace: "nowrap" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>読み込み中...</td></tr>
+              <tr><td colSpan={9} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>読み込み中...</td></tr>
             ) : properties.length === 0 ? (
-              <tr><td colSpan={8} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>物件データがありません。</td></tr>
+              <tr><td colSpan={9} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>物件データがありません。</td></tr>
             ) : (
               properties.map(p => {
                 const def = getStatusDef(p.status);
@@ -213,6 +246,15 @@ export default function PropertiesPage() {
                           📷{photoCount}枚{photoCount < 5 ? <span title="掲載には5枚以上の写真が推奨されます"> △</span> : ""}
                           {adOk && <span style={{ marginLeft: 4, fontSize: 10, color: "#234f35" }}>✅広告OK</span>}
                         </span>
+                      )}
+                    </td>
+
+                    {/* Copy status */}
+                    <td style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>
+                      {p.catch_copy ? (
+                        <span title={p.catch_copy} style={{ fontSize: 10, background: "#e8f5e9", color: "#1b5e20", padding: "2px 7px", borderRadius: 10, fontWeight: 600 }}>✅ 生成済</span>
+                      ) : (
+                        <span style={{ fontSize: 10, background: "#f3f2ef", color: "#9e9e9e", padding: "2px 7px", borderRadius: 10 }}>未生成</span>
                       )}
                     </td>
 

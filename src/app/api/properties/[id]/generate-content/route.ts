@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { generatePropertyContent } from "@/agents/document-parser";
-import { generateLifestyleContent, generateEnvironmentSummary, buildPhotoContext } from "@/agents/property-copy";
+import { generatePropertyCopy, buildPhotoContext } from "@/agents/property-copy";
 
 // POST /api/properties/[id]/generate-content
 export async function POST(
@@ -25,32 +24,29 @@ export async function POST(
 
     const propertyData = property as Record<string, unknown>;
 
-    // Build photo context from AI-analyzed images
     const photos = (property.images ?? [])
       .filter(img => img.room_type && img.ai_pr_text)
       .map(img => ({ room_type: img.room_type!, ai_pr_text: img.ai_pr_text! }));
 
-    const [content, lifestyle, environment] = await Promise.all([
-      generatePropertyContent(propertyData),
-      generateLifestyleContent(propertyData, photos),
-      generateEnvironmentSummary(propertyData),
-    ]);
+    const copy = await generatePropertyCopy(propertyData, photos);
 
     await prisma.property.update({
       where: { id: params.id },
       data: {
-        title: content.title || undefined,
-        catch_copy: content.catch_copy || undefined,
-        description_hp: content.description_hp || undefined,
-        description_portal: content.description_portal || undefined,
+        title:              copy.title              || undefined,
+        catch_copy:         copy.catch_copy         || undefined,
+        description_hp:     copy.description_hp     || undefined,
+        description_suumo:  copy.description_suumo  || undefined,
+        description_athome: copy.description_athome || undefined,
+        selling_points:     copy.selling_points.length > 0 ? copy.selling_points : undefined,
       },
     });
 
-    return NextResponse.json({ content, lifestyle, environment });
+    return NextResponse.json({ copy });
   } catch (error) {
     console.error("POST /api/properties/[id]/generate-content error:", error);
     return NextResponse.json(
-      { error: "コンテンツ生成に失敗しました" },
+      { error: "広告文生成に失敗しました" },
       { status: 500 }
     );
   }

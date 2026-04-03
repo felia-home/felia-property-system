@@ -93,6 +93,72 @@ ${photoSection}
   }
 }
 
+export interface PropertyCopy {
+  title: string;
+  catch_copy: string;
+  description_hp: string;
+  description_suumo: string;
+  description_athome: string;
+  selling_points: string[];
+}
+
+export async function generatePropertyCopy(
+  property: PropertyInput,
+  photos?: PhotoContext[]
+): Promise<PropertyCopy> {
+  const photoSection = photos?.length
+    ? `\n## 写真AI分析結果（訴求文に自然に組み込んでください）\n${buildPhotoContext(photos)}\n`
+    : "";
+
+  const response = await client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 3000,
+    messages: [
+      {
+        role: "user",
+        content: `あなたはフェリアホームの不動産広告コピーライターです。以下の物件情報から、各掲載先向けの広告文を生成してください。
+
+## 物件情報
+${JSON.stringify(property, null, 2)}
+${photoSection}
+## 生成形式（JSONのみ返答）
+{
+  "title": "物件タイトル（50文字以内・物件種別・エリア・特徴を含む）",
+  "catch_copy": "キャッチコピー（40文字以内・感情に訴える一文・！や？は使わない）",
+  "description_hp": "HP掲載文（400〜600文字・生活シーン・周辺環境・建物の魅力を詳しく・段落分け可）",
+  "description_suumo": "SUUMO掲載文（200〜300文字・箇条書き不可・スペック重視・簡潔に）",
+  "description_athome": "at home掲載文（200〜300文字・ファミリー・DINKSを意識・温かみのある文体）",
+  "selling_points": ["セールスポイント1（20文字以内）", "セールスポイント2（20文字以内）", "セールスポイント3（20文字以内）", "セールスポイント4（20文字以内）", "セールスポイント5（20文字以内）"]
+}
+
+## ルール
+- 不動産公正競争規約を遵守（「最高」「完璧」等の最上級表現禁止、根拠のない断定禁止）
+- 物件情報に記載のある事実のみ記述（推測で情報を作らない）
+- 交通は「○○線○○駅 徒歩○分」の形式で明記（80m/分換算）
+- 価格・面積・築年等の数値は正確に記載
+- selling_pointsは必ず5項目・各20文字以内
+- JSONのみ返答（前後にテキスト不要）`,
+      },
+    ],
+  });
+
+  const text =
+    response.content[0].type === "text" ? response.content[0].text : "{}";
+  const cleaned = text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+  try {
+    return JSON.parse(cleaned) as PropertyCopy;
+  } catch {
+    return {
+      title: "",
+      catch_copy: "",
+      description_hp: "",
+      description_suumo: "",
+      description_athome: "",
+      selling_points: [],
+    };
+  }
+}
+
 export async function generateEnvironmentSummary(
   property: PropertyInput
 ): Promise<EnvironmentSummary> {
