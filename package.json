@@ -18,7 +18,8 @@
     "db:seed": "ts-node prisma/seed.ts",
     "db:reset": "prisma migrate reset",
     "check-env": "ts-node scripts/check-env.ts",
-    "agent:demo": "ts-node src/agents/orchestrator.ts"
+    "agent:demo": "ts-node src/agents/orchestrator.ts",
+    "seed:staff": "ts-node -e \"require('ts-node').register({module:'commonjs'})\" src/scripts/seed-staff-photos.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
