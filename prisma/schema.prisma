@@ -856,6 +856,45 @@ model PrivateProperty {
   @@map("private_properties")
 }
 
+// ===== 会員システム =====
+model Member {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  password_hash   String
+  name            String
+  name_kana       String?
+  phone           String?
+  prefecture      String?
+  city            String?
+  budget_min      Int?
+  budget_max      Int?
+  desired_area    String?
+  desired_type    String?
+  is_active       Boolean   @default(true)
+  email_verified  Boolean   @default(false)
+  last_login_at   DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  inquiries       MemberInquiry[]
+
+  @@map("members")
+}
+
+model MemberInquiry {
+  id            String   @id @default(cuid())
+  member_id     String
+  member        Member   @relation(fields: [member_id], references: [id])
+  property_type String?
+  property_ref  String?
+  message       String?  @db.Text
+  inquiry_type  String   @default("DOCUMENT")
+  status        String   @default("NEW")
+  created_at    DateTime @default(now())
+
+  @@map("member_inquiries")
+}
+
 model CommissionMaster {
   id         String   @id @default(cuid())
   label      String
