@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 const STATUS_LABELS: Record<string, string> = {
   NEW: "新規", CONTACTING: "連絡中", VISITING: "内見調整中",
@@ -68,6 +68,14 @@ export default function CustomersPage() {
   const [syncMsg, setSyncMsg] = useState("");
   const [error, setError] = useState("");
 
+  // PDF modal state
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const [parsedData, setParsedData] = useState<Record<string, unknown> | null>(null);
+  const [pdfSaving, setPdfSaving] = useState(false);
+  const [pdfError, setPdfError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const fetchCustomers = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -119,6 +127,93 @@ export default function CustomersPage() {
     finally { setSyncing(false); }
   };
 
+  // ── PDF parse handlers ──
+  const handlePdfFileSelect = async (file?: File) => {
+    if (!file) return;
+    setParsing(true);
+    setPdfError("");
+    setParsedData(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/customers/parse-pdf", { method: "POST", body: fd });
+      const data = await res.json() as { success?: boolean; data?: Record<string, unknown>; error?: string };
+      if (data.success && data.data) {
+        setParsedData(data.data);
+      } else {
+        setPdfError(data.error ?? "解析に失敗しました");
+      }
+    } catch {
+      setPdfError("通信エラーが発生しました");
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const handlePdfDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file?.type === "application/pdf") handlePdfFileSelect(file);
+  };
+
+  const handlePdfRegister = async () => {
+    if (!parsedData) return;
+    setPdfSaving(true);
+    setPdfError("");
+    try {
+      const res = await fetch("/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: parsedData.name,
+          name_kana: parsedData.name_kana,
+          email: parsedData.email,
+          tel: parsedData.tel,
+          tel_mobile: parsedData.tel_mobile,
+          postal_code: parsedData.postal_code,
+          prefecture: parsedData.prefecture,
+          city: parsedData.city,
+          address: parsedData.address,
+          current_housing_type: parsedData.current_housing_type,
+          current_rent: parsedData.current_rent,
+          occupation: parsedData.occupation,
+          annual_income: parsedData.annual_income,
+          source: parsedData.source ?? "OTHER",
+          desired_property_type: parsedData.desired_property_type ?? [],
+          desired_areas: parsedData.desired_areas ?? [],
+          desired_budget_max: parsedData.desired_budget_max,
+          desired_move_timing: parsedData.desired_move_timing,
+          finance_type: parsedData.finance_type,
+          down_payment: parsedData.down_payment,
+          has_property_to_sell: parsedData.has_property_to_sell ?? false,
+          internal_memo: [parsedData.inquiry_note, parsedData.internal_memo].filter(Boolean).join("\n") || null,
+          status: "NEW",
+        }),
+      });
+      const result = await res.json() as { customer?: { id: string }; error?: string };
+      if (!res.ok || !result.customer) {
+        setPdfError(result.error ?? "登録に失敗しました");
+        return;
+      }
+      // 家族構成を登録
+      const members = (parsedData.family_members as Record<string, unknown>[] | undefined) ?? [];
+      for (const m of members) {
+        await fetch(`/api/customers/${result.customer.id}/family`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(m),
+        });
+      }
+      setShowPdfModal(false);
+      setParsedData(null);
+      fetchCustomers();
+    } catch {
+      setPdfError("通信エラーが発生しました");
+    } finally {
+      setPdfSaving(false);
+    }
+  };
+
   const familyLabel = (members: FamilyMember[] = []) => {
     if (!members.length) return null;
     const spouse = members.find(m => m.relation === "配偶者");
@@ -147,6 +242,10 @@ export default function CustomersPage() {
           <button onClick={handleSync} disabled={syncing}
             style={{ padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: syncing ? "#888" : "#1565c0", color: "#fff", border: "none", cursor: syncing ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
             {syncing ? "取込中..." : "📧 反響取込"}
+          </button>
+          <button onClick={() => { setShowPdfModal(true); setParsedData(null); setPdfError(""); }}
+            style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#6a1b9a", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+            📄 顧客簿から登録
           </button>
           <button onClick={() => setShowForm(true)}
             style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
@@ -308,6 +407,135 @@ export default function CustomersPage() {
           </tbody>
         </table>
       </div>
+
+      {/* PDF upload modal */}
+      {showPdfModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 32, width: 560, maxHeight: "90vh", overflowY: "auto", position: "relative" }}>
+            <button
+              onClick={() => { setShowPdfModal(false); setParsedData(null); setPdfError(""); }}
+              style={{ position: "absolute", top: 14, right: 16, background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#706e68", lineHeight: 1 }}
+            >×</button>
+
+            <h2 style={{ fontSize: 17, fontWeight: 600, marginBottom: 4 }}>📄 顧客簿PDFから登録</h2>
+            <p style={{ fontSize: 12, color: "#706e68", marginBottom: 20 }}>
+              フェリアホームの顧客簿PDFをアップロードするとAIが自動で顧客情報を読み取ります
+            </p>
+
+            {pdfError && (
+              <div style={{ background: "#fdeaea", color: "#8c1f1f", padding: "10px 14px", borderRadius: 8, fontSize: 13, marginBottom: 16 }}>{pdfError}</div>
+            )}
+
+            {/* Step 1: ファイル選択 */}
+            {!parsedData && !parsing && (
+              <div>
+                <div
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={handlePdfDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{ border: "2px dashed #c8c6c0", borderRadius: 12, padding: "40px 20px", textAlign: "center", cursor: "pointer", background: "#fafaf8" }}
+                >
+                  <div style={{ fontSize: 36, marginBottom: 8 }}>📄</div>
+                  <div style={{ fontSize: 14, color: "#706e68" }}>PDFをドラッグ＆ドロップ<br />またはクリックしてファイルを選択</div>
+                </div>
+                <input ref={fileInputRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={e => handlePdfFileSelect(e.target.files?.[0])} />
+              </div>
+            )}
+
+            {parsing && (
+              <div style={{ textAlign: "center", padding: "40px 0", color: "#706e68" }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>🤖</div>
+                <div style={{ fontSize: 14 }}>AIが顧客情報を解析中...</div>
+                <div style={{ fontSize: 12, marginTop: 6 }}>しばらくお待ちください（10〜20秒）</div>
+              </div>
+            )}
+
+            {/* Step 2: 解析結果確認 */}
+            {parsedData && !pdfSaving && (
+              <div>
+                <div style={{ background: "#e8f5e9", borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 20, color: "#2e7d32" }}>
+                  ✅ AI解析完了。内容を確認して登録してください。
+                </div>
+
+                {/* 基本情報 */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#706e68", marginBottom: 8, textTransform: "uppercase", letterSpacing: ".06em" }}>基本情報</div>
+                  {[
+                    { label: "氏名", value: parsedData.name as string },
+                    { label: "フリガナ", value: parsedData.name_kana as string },
+                    { label: "メール①", value: parsedData.email as string },
+                    { label: "メール②", value: parsedData.email2 as string },
+                    { label: "携帯", value: parsedData.tel_mobile as string },
+                    { label: "TEL", value: parsedData.tel as string },
+                    { label: "住所", value: [parsedData.prefecture, parsedData.city, parsedData.address].filter(Boolean).join("") as string },
+                    { label: "現在のお住まい", value: parsedData.current_housing_type as string },
+                    { label: "職業", value: parsedData.occupation as string },
+                    { label: "年収", value: parsedData.annual_income ? `${parsedData.annual_income}万円` : null },
+                  ].filter(row => row.value).map(({ label, value }) => (
+                    <div key={label} style={{ display: "flex", gap: 8, padding: "5px 0", borderBottom: "1px solid #f3f2ef", fontSize: 13 }}>
+                      <span style={{ color: "#706e68", minWidth: 100, fontSize: 12 }}>{label}</span>
+                      <span style={{ flex: 1 }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 希望条件 */}
+                {(parsedData.desired_budget_max || (parsedData.desired_areas as string[] | undefined)?.length || (parsedData.desired_property_type as string[] | undefined)?.length) && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "#706e68", marginBottom: 8, textTransform: "uppercase", letterSpacing: ".06em" }}>希望条件</div>
+                    {[
+                      { label: "予算上限", value: parsedData.desired_budget_max ? `${parsedData.desired_budget_max}万円` : null },
+                      { label: "希望地域", value: (parsedData.desired_areas as string[] | undefined)?.join("・") },
+                      { label: "物件種別", value: (parsedData.desired_property_type as string[] | undefined)?.join("・") },
+                      { label: "購入時期", value: parsedData.desired_move_timing as string },
+                    ].filter(row => row.value).map(({ label, value }) => (
+                      <div key={label} style={{ display: "flex", gap: 8, padding: "5px 0", borderBottom: "1px solid #f3f2ef", fontSize: 13 }}>
+                        <span style={{ color: "#706e68", minWidth: 100, fontSize: 12 }}>{label}</span>
+                        <span>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 家族構成 */}
+                {(parsedData.family_members as Record<string, unknown>[] | undefined)?.length ? (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "#706e68", marginBottom: 8, textTransform: "uppercase", letterSpacing: ".06em" }}>家族構成</div>
+                    {(parsedData.family_members as Record<string, unknown>[]).map((m, i) => (
+                      <div key={i} style={{ display: "flex", gap: 8, padding: "5px 0", borderBottom: "1px solid #f3f2ef", fontSize: 13 }}>
+                        <span style={{ color: "#706e68", minWidth: 60, fontSize: 12 }}>{m.relation as string}</span>
+                        <span>{m.name as string}{m.age ? ` / ${m.age}歳` : ""}{m.occupation ? ` / ${m.occupation}` : ""}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {/* 備考 */}
+                {(parsedData.inquiry_note || parsedData.internal_memo) && (
+                  <div style={{ background: "#f8f6f3", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#5a4a3a", marginBottom: 16 }}>
+                    {[parsedData.inquiry_note, parsedData.internal_memo].filter(Boolean).join("\n")}
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <button onClick={() => { setParsedData(null); setPdfError(""); }}
+                    style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #e0deda", background: "#fff", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
+                    やり直す
+                  </button>
+                  <button onClick={handlePdfRegister}
+                    style={{ flex: 2, padding: "10px", borderRadius: 8, background: "#234f35", color: "#fff", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>
+                    この内容で顧客登録する
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {pdfSaving && (
+              <div style={{ textAlign: "center", padding: "40px 0", color: "#706e68", fontSize: 14 }}>登録中...</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
