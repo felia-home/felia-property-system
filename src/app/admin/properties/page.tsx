@@ -60,6 +60,9 @@ export default function PropertiesPage() {
   const [noCopyOnly, setNoCopyOnly] = useState(false);
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [bulkMsg, setBulkMsg] = useState<string | null>(null);
+  const [bulkProgress, setBulkProgress] = useState(0);
+  const [bulkTotal, setBulkTotal] = useState(0);
+  const [bulkErrors, setBulkErrors] = useState(0);
 
   const [stores, setStores] = useState<Store[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
@@ -93,20 +96,49 @@ export default function PropertiesPage() {
   }, [search, status, storeFilter, agentFilter, alertOnly, noCopyOnly]);
 
   const handleBulkGenerate = async () => {
-    const targets = properties.filter(p => !p.catch_copy);
-    if (targets.length === 0) { setBulkMsg("広告文未生成の物件はありません"); return; }
-    if (!confirm(`広告文が未生成の${targets.length}件を一括生成します。時間がかかる場合があります。よろしいですか？`)) return;
-    setBulkGenerating(true);
-    setBulkMsg(null);
-    let ok = 0, fail = 0;
-    for (const p of targets) {
-      try {
-        const res = await fetch(`/api/properties/${p.id}/generate-content`, { method: "POST" });
-        if (res.ok) ok++; else fail++;
-      } catch { fail++; }
+    // 広告文未入力の物件を取得（現在表示中のリストから or APIから）
+    const res = await fetch("/api/properties?noCopy=true");
+    const contentType = res.headers.get("content-type");
+    if (!contentType?.includes("application/json")) {
+      alert(`サーバーエラー（${res.status}）`);
+      return;
     }
+    const data = await res.json();
+    const targets: Property[] = data.properties ?? [];
+
+    if (targets.length === 0) {
+      setBulkMsg("広告文未入力の物件はありません");
+      return;
+    }
+
+    if (!confirm(`${targets.length}件の物件に広告文をAI生成します。\n処理時間の目安: 約${targets.length * 10}秒\nよろしいですか？`)) return;
+
+    setBulkGenerating(true);
+    setBulkTotal(targets.length);
+    setBulkProgress(0);
+    setBulkErrors(0);
+    setBulkMsg(null);
+
+    let errorCount = 0;
+
+    for (let i = 0; i < targets.length; i++) {
+      try {
+        const genRes = await fetch(`/api/properties/${targets[i].id}/generate-content`, { method: "POST" });
+        if (!genRes.ok) errorCount++;
+      } catch {
+        errorCount++;
+      }
+      setBulkProgress(i + 1);
+      setBulkErrors(errorCount);
+
+      // 2秒待機（Anthropic APIのレート制限対策）
+      if (i < targets.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+
     setBulkGenerating(false);
-    setBulkMsg(`完了: ${ok}件生成、${fail}件失敗`);
+    setBulkMsg(`✅ 完了: ${targets.length - errorCount}件生成、${errorCount}件失敗`);
     fetchProperties();
   };
 
@@ -120,9 +152,11 @@ export default function PropertiesPage() {
           <p style={{ fontSize: 12, color: "#706e68", marginTop: 4 }}>登録物件の管理・掲載設定</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={handleBulkGenerate} disabled={bulkGenerating}
-            style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: bulkGenerating ? "#888" : "#fff", border: "1px solid #e0deda", color: bulkGenerating ? "#fff" : "#1c1b18", cursor: "pointer", fontFamily: "inherit" }}>
-            {bulkGenerating ? "🤖 生成中..." : "🤖 広告文一括生成"}
+          <button
+            onClick={bulkGenerating ? undefined : handleBulkGenerate}
+            disabled={bulkGenerating}
+            style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: bulkGenerating ? "#555" : "#6a1b9a", color: "#fff", border: "none", cursor: bulkGenerating ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+            {bulkGenerating ? `✨ 生成中 ${bulkProgress}/${bulkTotal}件...` : "✨ 広告文未入力を一括AI生成"}
           </button>
           <a href="/admin/import" style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#fff", border: "1px solid #e0deda", color: "#1c1b18", textDecoration: "none" }}>📥 CSVインポート</a>
           <a href="/admin/properties/import?tab=scrape" style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#fff", border: "1px solid #e0deda", color: "#1c1b18", textDecoration: "none" }}>🔗 URLから取込</a>
@@ -292,6 +326,30 @@ export default function PropertiesPage() {
           </tbody>
         </table>
       </div>
+
+      {/* 進捗トースト */}
+      {bulkGenerating && (
+        <div style={{
+          position: "fixed", bottom: 20, right: 20,
+          background: "#fff", border: "1px solid #e0deda",
+          borderRadius: 12, padding: "16px 20px",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+          zIndex: 100, minWidth: 280,
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>✨ AI広告文生成中...</div>
+          <div style={{ background: "#e0deda", borderRadius: 4, height: 8, marginBottom: 8 }}>
+            <div style={{
+              background: "#6a1b9a", borderRadius: 4, height: 8,
+              width: `${bulkTotal > 0 ? (bulkProgress / bulkTotal) * 100 : 0}%`,
+              transition: "width 0.3s ease",
+            }} />
+          </div>
+          <div style={{ fontSize: 13, color: "#706e68" }}>
+            {bulkProgress} / {bulkTotal} 件完了
+            {bulkErrors > 0 && ` （エラー: ${bulkErrors}件）`}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
