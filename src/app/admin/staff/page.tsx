@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import PermissionBadge from "@/components/admin/PermissionBadge";
 import { PERMISSIONS, Permission } from "@/lib/permissions";
@@ -30,6 +30,10 @@ export default function StaffListPage() {
   const [activeFilter, setActiveFilter] = useState<"active" | "retired">("active");
   const [search, setSearch] = useState("");
   const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     setLoading(true);
@@ -56,6 +60,24 @@ export default function StaffListPage() {
 
   useEffect(() => { load(); }, [permFilter, storeFilter, activeFilter, search]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleCsvImport = async (file?: File) => {
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/staff/import-csv", { method: "POST", body: fd });
+      const data = await res.json() as { success?: boolean; message?: string; error?: string };
+      setImportResult(data);
+      if (data.success) load();
+    } catch {
+      setImportResult({ message: "通信エラーが発生しました" });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const tabBtnSt = (active: boolean): React.CSSProperties => ({
     padding: "6px 16px", fontSize: 12, fontWeight: active ? 700 : 400,
     background: active ? "#234f35" : "#f7f6f2",
@@ -68,12 +90,18 @@ export default function StaffListPage() {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <h1 style={{ fontSize: 20, fontWeight: 600, color: "#1c1b18" }}>スタッフ管理</h1>
-        <Link href="/admin/staff/new" style={{
-          background: "#8c1f1f", color: "#fff", padding: "8px 20px",
-          borderRadius: 8, textDecoration: "none", fontSize: 13, fontWeight: 600,
-        }}>
-          + スタッフ追加
-        </Link>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => { setShowImportModal(true); setImportResult(null); }}
+            style={{ background: "#1565c0", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+            📥 CSVインポート
+          </button>
+          <Link href="/admin/staff/new" style={{
+            background: "#8c1f1f", color: "#fff", padding: "8px 20px",
+            borderRadius: 8, textDecoration: "none", fontSize: 13, fontWeight: 600,
+          }}>
+            + スタッフ追加
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
@@ -162,6 +190,58 @@ export default function StaffListPage() {
               </Link>
             </div>
           ))}
+        </div>
+      )}
+      {showImportModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 32, width: 480, position: "relative" }}>
+            <button onClick={() => { setShowImportModal(false); setImportResult(null); }}
+              style={{ position: "absolute", top: 14, right: 16, background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#706e68", lineHeight: 1 }}>×</button>
+
+            <h2 style={{ fontSize: 17, fontWeight: 600, marginBottom: 6 }}>📥 スタッフCSVインポート</h2>
+            <p style={{ fontSize: 12, color: "#706e68", marginBottom: 20 }}>
+              jinjer（ジンジャー）の社員台帳CSVをアップロードしてスタッフを一括登録します。<br />
+              社員番号またはメールアドレスで照合し、既存スタッフは更新します。
+            </p>
+
+            {!importing && (
+              <div
+                onClick={() => csvInputRef.current?.click()}
+                style={{ border: "2px dashed #c8c6c0", borderRadius: 12, padding: "32px 20px", textAlign: "center", cursor: "pointer", background: "#fafaf8" }}
+              >
+                <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
+                <div style={{ fontSize: 13, color: "#706e68" }}>クリックしてCSVファイルを選択</div>
+                <div style={{ fontSize: 11, color: "#aaa", marginTop: 4 }}>jinjer_社員台帳_簡易版_*.csv（Shift_JIS対応）</div>
+              </div>
+            )}
+
+            <input ref={csvInputRef} type="file" accept=".csv" style={{ display: "none" }}
+              onChange={e => handleCsvImport(e.target.files?.[0])} />
+
+            {importing && (
+              <div style={{ textAlign: "center", padding: "32px 0", color: "#706e68" }}>
+                <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
+                <div style={{ fontSize: 13 }}>インポート中...</div>
+              </div>
+            )}
+
+            {importResult && (
+              <div style={{
+                marginTop: 16, padding: "12px 14px", borderRadius: 8, fontSize: 13,
+                background: importResult.success ? "#e8f5e9" : "#fdeaea",
+                color: importResult.success ? "#2e7d32" : "#8c1f1f",
+              }}>
+                {importResult.success ? "✅ " : "❌ "}{importResult.message ?? importResult.error}
+              </div>
+            )}
+
+            <div style={{ marginTop: 20 }}>
+              <button onClick={() => { setShowImportModal(false); setImportResult(null); }}
+                style={{ width: "100%", padding: "10px", borderRadius: 8, border: "1px solid #e0deda", background: "#fff", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
+                閉じる
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
