@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import type { ParseResult, GeneratedContent } from "@/agents/document-parser";
 import { Suspense } from "react";
 
@@ -225,6 +226,7 @@ interface Staff { id: string; full_name: string }
 function ImportPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session } = useSession();
   const initialTab = searchParams.get("tab") === "scrape" ? "scrape" : searchParams.get("tab") === "url" ? "url" : "pdf";
   const [tab, setTab] = useState<"pdf" | "url" | "scrape">(initialTab);
 
@@ -234,11 +236,17 @@ function ImportPageInner() {
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [selectedStore, setSelectedStore] = useState("");
   const [selectedAgent, setSelectedAgent] = useState("");
+  const [autoSelected, setAutoSelected] = useState(false);
   const [propertyNumberPreview, setPropertyNumberPreview] = useState<string | null>(null);
   const [loadingStores, setLoadingStores] = useState(true);
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [agentError, setAgentError] = useState("");
 
+  // セッションから店舗を自動選択
+  const sessionStoreId = session?.user?.storeId;
+  const sessionStaffId = session?.user?.staffId;
+
+  // 店舗一覧を取得（初回のみ）
   useEffect(() => {
     fetch("/api/stores")
       .then(r => r.json())
@@ -247,8 +255,17 @@ function ImportPageInner() {
       .finally(() => setLoadingStores(false));
   }, []);
 
+  // セッションの店舗を自動選択（stores取得完了 & セッション取得完了後）
   useEffect(() => {
-    if (!selectedStore) { setStaffList([]); setSelectedAgent(""); return; }
+    if (stores.length > 0 && sessionStoreId && !selectedStore) {
+      setSelectedStore(sessionStoreId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stores, sessionStoreId]);
+
+  // 選択店舗が変わったらスタッフ一覧を取得
+  useEffect(() => {
+    if (!selectedStore) { setStaffList([]); setSelectedAgent(""); setAutoSelected(false); return; }
     setLoadingStaff(true);
     fetch(`/api/staff?store_id=${selectedStore}`)
       .then(r => r.json())
@@ -256,6 +273,18 @@ function ImportPageInner() {
       .catch(() => {})
       .finally(() => setLoadingStaff(false));
   }, [selectedStore]);
+
+  // セッションの担当者を自動選択（staffList取得完了 & セッション取得完了後）
+  useEffect(() => {
+    if (staffList.length > 0 && sessionStaffId && !selectedAgent) {
+      const found = staffList.find(s => s.id === sessionStaffId);
+      if (found) {
+        setSelectedAgent(sessionStaffId);
+        setAutoSelected(true);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staffList, sessionStaffId]);
 
   useEffect(() => {
     if (!selectedStore) { setPropertyNumberPreview(null); return; }
@@ -478,7 +507,7 @@ function ImportPageInner() {
               {loadingStaff ? (
                 <div style={{ fontSize: 12, color: "#888" }}>読み込み中...</div>
               ) : (
-                <select value={selectedAgent} onChange={e => setSelectedAgent(e.target.value)}
+                <select value={selectedAgent} onChange={e => { setSelectedAgent(e.target.value); setAutoSelected(false); }}
                   disabled={!selectedStore}
                   style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0deda", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: selectedStore ? "#fff" : "#f7f6f2", color: selectedStore ? "#1c1b18" : "#888" }}>
                   <option value="">担当者を選択してください</option>
@@ -496,7 +525,14 @@ function ImportPageInner() {
               </div>
             )}
 
-            <p style={{ fontSize: 11, color: "#888", marginBottom: 14 }}>※ 担当者を選択しないと次に進めません</p>
+            {autoSelected && (
+              <p style={{ fontSize: 11, color: "#4a8c5c", marginBottom: 14, lineHeight: 1.5 }}>
+                ログイン中のスタッフが自動選択されています。別の担当者で登録する場合は変更してください。
+              </p>
+            )}
+            {!selectedAgent && (
+              <p style={{ fontSize: 11, color: "#888", marginBottom: 14 }}>※ 担当者を選択しないと次に進めません</p>
+            )}
 
             {agentError && <p style={{ fontSize: 12, color: "#8c1f1f", marginBottom: 12 }}>{agentError}</p>}
 

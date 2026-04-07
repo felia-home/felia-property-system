@@ -296,7 +296,7 @@ export default function DashboardPage() {
             販売資料（PDF）をアップロードして物件情報を自動取込するのがおすすめです。
           </p>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <a href="/admin/properties/new"
+            <a href="/admin/properties/import"
               style={{
                 display: "inline-flex", alignItems: "center", gap: 8,
                 background: "#c9a96e", color: "#fff", padding: "14px 28px",
@@ -318,10 +318,11 @@ export default function DashboardPage() {
             </a>
             <a href="/admin/properties/new?mode=manual"
               style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                color: "rgba(255,255,255,0.5)", fontSize: 13,
-                textDecoration: "underline", textUnderlineOffset: 3,
-                padding: "14px 8px",
+                display: "inline-flex", alignItems: "center", gap: 7,
+                background: "rgba(255,255,255,0.12)", color: "#fff",
+                border: "1px solid rgba(255,255,255,0.3)",
+                padding: "14px 22px", borderRadius: 10, fontWeight: 700, fontSize: 13,
+                textDecoration: "none",
               }}>
               ✏️ 手動で入力
             </a>
