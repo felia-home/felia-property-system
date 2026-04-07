@@ -293,15 +293,16 @@ export default function DashboardPage() {
             新しい物件を登録する
           </h2>
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", marginBottom: 20, lineHeight: 1.6 }}>
-            販売資料（PDF）をアップロードして情報を自動取込するのがおすすめです。URLからの取込・手動入力も可能です。
+            販売資料（PDF）をアップロードして物件情報を自動取込するのがおすすめです。
           </p>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <a href="/admin/properties/new"
               style={{
-                display: "inline-flex", alignItems: "center", gap: 7,
-                background: "#c9a96e", color: "#fff", padding: "10px 22px",
-                borderRadius: 10, fontWeight: 700, fontSize: 13,
+                display: "inline-flex", alignItems: "center", gap: 8,
+                background: "#c9a96e", color: "#fff", padding: "14px 28px",
+                borderRadius: 10, fontWeight: 700, fontSize: 15,
                 textDecoration: "none",
+                boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
               }}>
               📄 PDFから取込
             </a>
@@ -310,16 +311,17 @@ export default function DashboardPage() {
                 display: "inline-flex", alignItems: "center", gap: 7,
                 background: "rgba(255,255,255,0.12)", color: "#fff",
                 border: "1px solid rgba(255,255,255,0.3)",
-                padding: "10px 22px", borderRadius: 10, fontWeight: 700, fontSize: 13,
+                padding: "14px 22px", borderRadius: 10, fontWeight: 700, fontSize: 13,
                 textDecoration: "none",
               }}>
               🔗 URLから取込
             </a>
             <a href="/admin/properties/new?mode=manual"
               style={{
-                display: "inline-flex", alignItems: "center", gap: 7,
-                color: "rgba(255,255,255,0.6)", fontSize: 13,
-                textDecoration: "none", padding: "10px 16px",
+                display: "inline-flex", alignItems: "center", gap: 6,
+                color: "rgba(255,255,255,0.5)", fontSize: 13,
+                textDecoration: "underline", textUnderlineOffset: 3,
+                padding: "14px 8px",
               }}>
               ✏️ 手動で入力
             </a>
