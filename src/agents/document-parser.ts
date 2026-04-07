@@ -72,6 +72,8 @@ export interface ExtractedProperty {
   // 売主・元付業者情報（内部管理・非公開）
   seller_company?: string;
   seller_contact?: string;
+  seller_fax?: string;
+  seller_agent?: string;
   seller_transaction_type?: string;
   seller_brokerage_type?: string;
   our_transaction_type?: string;
@@ -328,12 +330,13 @@ function buildExtractionPrompt(): string {
 4. 「媒介」「取引態様」と一緒に記載されている会社名
 5. 電話番号・FAX番号の近く
 
-### 抽出する情報
-- 会社名（例: 株式会社〇〇不動産、〇〇ホーム 渋谷店）
-- 電話番号・FAX番号
-- 担当者名（記載があれば）
-- 宅建業免許番号（記載があれば）
-- 取引態様（専任媒介・専属専任媒介・一般媒介・売主・代理）
+### 抽出する情報 → 対応するJSONフィールド
+- 会社名 → seller_company（例: 株式会社〇〇不動産、〇〇ホーム 渋谷店）
+- 電話番号 → seller_contact
+- FAX番号 → seller_fax（電話番号とは別フィールド）
+- 担当者名 → seller_agent（記載があれば）
+- 宅建業免許番号（記載があれば — raw_notesに記載）
+- 取引態様 → seller_transaction_type（専任媒介・専属専任媒介・一般媒介・売主・代理）
 
 ### 重要な区別
 - この情報は「元付業者（販売図面を作成した不動産会社）」の情報です
@@ -412,6 +415,8 @@ function buildExtractionPrompt(): string {
     "our_transaction_type": "仲介",
     "seller_company": "株式会社〇〇不動産 目黒店",
     "seller_contact": "03-1234-5678",
+    "seller_fax": "03-1234-5679",
+    "seller_agent": "山田太郎",
     "seller_transaction_type": "専任媒介",
     "seller_brokerage_type": "専任",
     "ad_transfer_ok": true,

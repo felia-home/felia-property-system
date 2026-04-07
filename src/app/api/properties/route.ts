@@ -161,6 +161,14 @@ export async function POST(request: NextRequest) {
         delivery_status:  b.delivery_status  ? String(b.delivery_status)  : null,
         reins_number:     b.reins_number     ? String(b.reins_number)     : null,
 
+        // 元付業者情報
+        seller_company:          b.seller_company          ? String(b.seller_company)          : null,
+        seller_contact:          b.seller_contact          ? String(b.seller_contact)          : null,
+        seller_agent:            b.seller_agent            ? String(b.seller_agent)            : null,
+        seller_fax:              b.seller_fax              ? String(b.seller_fax)              : null,
+        seller_transaction_type: b.seller_transaction_type ? String(b.seller_transaction_type) : null,
+        seller_brokerage_type:   b.seller_brokerage_type   ? String(b.seller_brokerage_type)   : null,
+
         // 設備
         eq_autolock:        bool(b.eq_autolock ?? b.eq_auto_lock),
         eq_elevator:        bool(b.eq_elevator),

@@ -14,13 +14,24 @@ export async function GET(
       select: {
         seller_company: true,
         seller_contact: true,
+        seller_fax: true,
+        seller_agent: true,
         prefecture: true,
         city: true,
         town: true,
+        address: true,
         property_type: true,
         price: true,
-        reins_number: true,
+        area_land_m2: true,
+        area_build_m2: true,
+        area_exclusive_m2: true,
+        published_hp: true,
+        published_suumo: true,
+        published_athome: true,
+        published_yahoo: true,
+        published_homes: true,
         store_id: true,
+        agent_id: true,
       },
     });
 
@@ -28,10 +39,13 @@ export async function GET(
       return NextResponse.json({ error: "物件が見つかりません" }, { status: 404 });
     }
 
-    // Get company info from store or use defaults
-    let companyName = "フェリアホーム株式会社";
+    // Get company/store/agent info
+    let companyName = "株式会社フェリアホーム";
+    let storeName: string | null = null;
     let licenseNumber: string | null = null;
     let phone: string | null = null;
+    let companyFax: string | null = null;
+    let agentName: string | null = null;
 
     if (property.store_id) {
       const store = await prisma.store.findUnique({
@@ -40,15 +54,30 @@ export async function GET(
       });
       if (store) {
         companyName = store.company?.name ?? companyName;
+        storeName = store.name;
         licenseNumber = store.company?.license_number ?? null;
         phone = store.phone ?? null;
+        companyFax = store.company?.fax ?? null;
+      }
+    }
+
+    if (property.agent_id) {
+      const agent = await prisma.staff.findUnique({
+        where: { id: property.agent_id },
+        select: { name: true },
+      });
+      if (agent) {
+        agentName = agent.name;
       }
     }
 
     const html = generateAdConfirmationHTML(property, {
       name: companyName,
+      store_name: storeName,
       license_number: licenseNumber,
       phone,
+      fax: companyFax,
+      agent_name: agentName,
     });
 
     const fullHtml = `<!DOCTYPE html>

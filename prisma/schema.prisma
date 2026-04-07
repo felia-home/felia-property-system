@@ -136,6 +136,7 @@ model Property {
   // 売主情報（内部管理・非公開）
   seller_company          String?
   seller_contact          String?
+  seller_fax              String?
   seller_agent            String?
   seller_transaction_type String?
   seller_brokerage_type   String?

@@ -46,6 +46,8 @@ const FIELDS: FieldDef[] = [
 const SELLER_FIELDS: FieldDef[] = [
   { key: "seller_company",          label: "元付業者名",     type: "text" },
   { key: "seller_contact",          label: "連絡先（電話）", type: "text" },
+  { key: "seller_fax",              label: "FAX",            type: "text" },
+  { key: "seller_agent",            label: "担当者名",       type: "text" },
   { key: "seller_transaction_type", label: "取引態様（元付）",type: "text" },
 ];
 
