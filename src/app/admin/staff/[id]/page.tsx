@@ -53,6 +53,7 @@ interface StaffFull {
   catchphrase: string | null;
   published_hp: boolean;
   hp_order: number;
+  staff_code: string | null;
   is_active: boolean;
   retirement_date: string | null;
   retirement_reason: string | null;
@@ -361,6 +362,11 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
               <div style={row}>
                 <label style={lbl}>部署</label>
                 <input style={inp} value={form.department ?? ""} onChange={e => setF("department", e.target.value)} placeholder="営業部" />
+              </div>
+              <div style={row}>
+                <label style={lbl}>物件番号コード</label>
+                <input style={{ ...inp, fontFamily: "monospace" }} value={form.staff_code ?? ""} onChange={e => setF("staff_code", e.target.value || null)} placeholder="例: kato" />
+                <div style={{ fontSize: 11, color: "#aaa", marginTop: 4 }}>物件番号に使用されます（例: kato-001）。変更すると既存の物件番号には影響しません。</div>
               </div>
             </div>
           </div>
