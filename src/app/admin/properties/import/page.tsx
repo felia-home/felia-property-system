@@ -231,7 +231,6 @@ function ImportPageInner() {
   const [tab, setTab] = useState<"pdf" | "url" | "scrape">(initialTab);
 
   // ── Agent/Store selection ──
-  const [agentStep, setAgentStep] = useState<"select" | "done">("select");
   const [stores, setStores] = useState<Store[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [selectedStore, setSelectedStore] = useState("");
@@ -240,7 +239,7 @@ function ImportPageInner() {
   const [propertyNumberPreview, setPropertyNumberPreview] = useState<string | null>(null);
   const [loadingStores, setLoadingStores] = useState(true);
   const [loadingStaff, setLoadingStaff] = useState(false);
-  const [agentError, setAgentError] = useState("");
+  const agentReady = !!(selectedStore && selectedAgent);
 
   // セッションから店舗を自動選択
   const sessionStoreId = session?.user?.storeId;
@@ -293,13 +292,6 @@ function ImportPageInner() {
       .then(d => setPropertyNumberPreview(d.preview ?? null))
       .catch(() => {});
   }, [selectedStore]);
-
-  const handleAgentNext = () => {
-    if (!selectedStore) { setAgentError("店舗を選択してください"); return; }
-    if (!selectedAgent) { setAgentError("担当者を選択してください"); return; }
-    setAgentError("");
-    setAgentStep("done");
-  };
 
   // ── PDF state ──
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -471,7 +463,7 @@ function ImportPageInner() {
   // Render
   // ============================================================
   return (
-    <div style={{ padding: 28, maxWidth: 860 }}>
+    <div style={{ padding: 28, maxWidth: 1100 }}>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <button onClick={() => router.back()} style={{ fontSize: 12, color: "#706e68", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 8, fontFamily: "inherit" }}>← 物件一覧</button>
@@ -479,262 +471,262 @@ function ImportPageInner() {
         <p style={{ fontSize: 12, color: "#706e68", marginTop: 4 }}>販売図面PDF・ポータルサイトのテキストから物件情報をAIで自動抽出します</p>
       </div>
 
-      {/* ── STEP 1: Agent/Store selection ── */}
-      {agentStep === "select" ? (
-        <div style={{ maxWidth: 480 }}>
-          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 28 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 20 }}>STEP 1: 担当者・店舗を選択</h2>
+      {/* ── Two-column layout ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 24, alignItems: "start" }}>
 
-            <div style={{ marginBottom: 18 }}>
-              <label style={{ fontSize: 12, fontWeight: 700, color: "#5a4a3a", display: "block", marginBottom: 7, letterSpacing: ".04em" }}>
-                店舗 <span style={{ color: "#8c1f1f" }}>*</span>
-              </label>
-              {loadingStores ? (
-                <div style={{ fontSize: 12, color: "#888" }}>読み込み中...</div>
-              ) : (
-                <select value={selectedStore} onChange={e => setSelectedStore(e.target.value)}
-                  style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0deda", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#fff" }}>
-                  <option value="">店舗を選択してください</option>
-                  {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              )}
-            </div>
+        {/* ── Left column: Store/Agent selection ── */}
+        <div style={{ background: "#f9f8f6", borderRadius: 12, border: "1px solid #e0deda", padding: 20 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>担当者・店舗</h2>
 
-            <div style={{ marginBottom: 18 }}>
-              <label style={{ fontSize: 12, fontWeight: 700, color: "#5a4a3a", display: "block", marginBottom: 7, letterSpacing: ".04em" }}>
-                担当者 <span style={{ color: "#8c1f1f" }}>*</span>
-              </label>
-              {loadingStaff ? (
-                <div style={{ fontSize: 12, color: "#888" }}>読み込み中...</div>
-              ) : (
-                <select value={selectedAgent} onChange={e => { setSelectedAgent(e.target.value); setAutoSelected(false); }}
-                  disabled={!selectedStore}
-                  style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0deda", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: selectedStore ? "#fff" : "#f7f6f2", color: selectedStore ? "#1c1b18" : "#888" }}>
-                  <option value="">担当者を選択してください</option>
-                  {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              )}
-              {selectedStore && staffList.length === 0 && !loadingStaff && (
-                <p style={{ fontSize: 11, color: "#888", marginTop: 4 }}>この店舗にはスタッフが登録されていません。</p>
-              )}
-            </div>
-
-            {propertyNumberPreview && (
-              <div style={{ background: "#f7f6f2", borderRadius: 8, padding: "10px 14px", marginBottom: 18, fontSize: 12, color: "#706e68" }}>
-                物件番号（予定）: <strong style={{ color: "#1c1b18", fontSize: 13 }}>{propertyNumberPreview}</strong>
-              </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "#5a4a3a", display: "block", marginBottom: 6, letterSpacing: ".04em" }}>
+              店舗 <span style={{ color: "#8c1f1f" }}>*</span>
+            </label>
+            {loadingStores ? (
+              <div style={{ fontSize: 12, color: "#888" }}>読み込み中...</div>
+            ) : (
+              <select value={selectedStore} onChange={e => setSelectedStore(e.target.value)}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #e0deda", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#fff" }}>
+                <option value="">店舗を選択</option>
+                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
             )}
-
-            {autoSelected && (
-              <p style={{ fontSize: 11, color: "#4a8c5c", marginBottom: 14, lineHeight: 1.5 }}>
-                ログイン中のスタッフが自動選択されています。別の担当者で登録する場合は変更してください。
-              </p>
-            )}
-            {!selectedAgent && (
-              <p style={{ fontSize: 11, color: "#888", marginBottom: 14 }}>※ 担当者を選択しないと次に進めません</p>
-            )}
-
-            {agentError && <p style={{ fontSize: 12, color: "#8c1f1f", marginBottom: 12 }}>{agentError}</p>}
-
-            <button onClick={handleAgentNext}
-              style={{ width: "100%", padding: "10px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
-              次へ: 物件情報を取込む →
-            </button>
           </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "#5a4a3a", display: "block", marginBottom: 6, letterSpacing: ".04em" }}>
+              担当者 <span style={{ color: "#8c1f1f" }}>*</span>
+            </label>
+            {loadingStaff ? (
+              <div style={{ fontSize: 12, color: "#888" }}>読み込み中...</div>
+            ) : (
+              <select value={selectedAgent} onChange={e => { setSelectedAgent(e.target.value); setAutoSelected(false); }}
+                disabled={!selectedStore}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #e0deda", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: selectedStore ? "#fff" : "#f7f6f2", color: selectedStore ? "#1c1b18" : "#888" }}>
+                <option value="">担当者を選択</option>
+                {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            )}
+            {selectedStore && staffList.length === 0 && !loadingStaff && (
+              <p style={{ fontSize: 11, color: "#888", marginTop: 4 }}>この店舗にはスタッフが登録されていません。</p>
+            )}
+          </div>
+
+          {propertyNumberPreview && (
+            <div style={{ background: "#fff", borderRadius: 8, padding: "8px 12px", marginBottom: 14, fontSize: 12, color: "#706e68" }}>
+              物件番号（予定）: <strong style={{ color: "#1c1b18", fontSize: 13 }}>{propertyNumberPreview}</strong>
+            </div>
+          )}
+
+          {autoSelected && (
+            <p style={{ fontSize: 11, color: "#4a8c5c", marginBottom: 0, lineHeight: 1.5 }}>
+              ログイン中のスタッフが自動選択されています。別の担当者で登録する場合は変更してください。
+            </p>
+          )}
+          {!selectedAgent && (
+            <p style={{ fontSize: 11, color: "#888", marginBottom: 0 }}>※ 担当者を選択しないと取込できません</p>
+          )}
         </div>
-      ) : (
-      <>
-      {/* Agent summary banner */}
-      <div style={{ background: "#e8f5e9", borderRadius: 8, padding: "8px 14px", marginBottom: 20, fontSize: 12, color: "#1b5e20", display: "flex", gap: 12, alignItems: "center" }}>
-        <span>店舗: <strong>{stores.find(s => s.id === selectedStore)?.name ?? "—"}</strong></span>
-        <span>担当: <strong>{staffList.find(s => s.id === selectedAgent)?.full_name ?? "—"}</strong></span>
-        {propertyNumberPreview && <span>物件番号: <strong>{propertyNumberPreview}</strong></span>}
-        <button onClick={() => setAgentStep("select")} style={{ marginLeft: "auto", fontSize: 11, color: "#706e68", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>変更する</button>
-      </div>
 
-      {/* Tab switcher */}
-      <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottom: "2px solid #e0deda" }}>
-        {([["pdf", "📄 PDFから取込"], ["url", "📋 テキストから取込"], ["scrape", "🔗 URLから自動取得"]] as const).map(([t, label]) => (
-          <button key={t} onClick={() => setTab(t)}
-            style={{ padding: "10px 24px", fontSize: 13, fontWeight: tab === t ? 600 : 400, color: tab === t ? "#8c1f1f" : "#706e68", background: "none", border: "none", borderBottom: tab === t ? "2px solid #8c1f1f" : "2px solid transparent", marginBottom: -2, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── PDF Tab ── */}
-      {tab === "pdf" && (
-        <>
-          {!pdfResult ? (
-            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 24, marginBottom: 20 }}>
-              <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
-                onClick={() => !selectedFile && fileInputRef.current?.click()}
-                style={{ border: `2px dashed ${dragging ? "#234f35" : "#c8c6c0"}`, borderRadius: 10, padding: "36px 24px", textAlign: "center", background: dragging ? "#f0f7f3" : "#fafaf8", cursor: selectedFile ? "default" : "pointer", transition: "all .15s" }}>
-                {selectedFile ? (
-                  <div>
-                    <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
-                    <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>{selectedFile.name}</div>
-                    <div style={{ fontSize: 11, color: "#706e68", marginBottom: 12 }}>{(selectedFile.size / 1024).toFixed(0)} KB</div>
-                    <button onClick={e => { e.stopPropagation(); resetPdf(); }} style={{ fontSize: 11, color: "#8c1f1f", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>ファイルを変更</button>
-                  </div>
-                ) : (
-                  <div>
-                    <div style={{ fontSize: 36, marginBottom: 12 }}>☁</div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "#1c1b18", marginBottom: 6 }}>ここにファイルをドラッグ&ドロップ</div>
-                    <div style={{ fontSize: 12, color: "#706e68", marginBottom: 14 }}>または</div>
-                    <button onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }} style={{ padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>ファイルを選択</button>
-                    <div style={{ fontSize: 11, color: "#706e68", marginTop: 10 }}>PDF・JPG・PNG（最大20MB）</div>
-                  </div>
-                )}
+        {/* ── Right column: Import tabs ── */}
+        <div style={{ position: "relative" }}>
+          {/* Disabled overlay when agent not ready */}
+          {!agentReady && (
+            <div style={{
+              position: "absolute", inset: 0, zIndex: 10,
+              background: "rgba(255,255,255,0.6)", borderRadius: 12,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              pointerEvents: "all",
+            }}>
+              <div style={{ background: "#fff", border: "1px solid #e0deda", borderRadius: 10, padding: "16px 28px", fontSize: 13, color: "#706e68", fontWeight: 500, textAlign: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+                ← 先に店舗・担当者を選択してください
               </div>
-              <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" style={{ display: "none" }} onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
-              {parseError && <div style={{ background: "#fdeaea", color: "#8c1f1f", padding: "8px 14px", borderRadius: 8, marginTop: 12, fontSize: 13 }}>{parseError}</div>}
-              {selectedFile && (
-                <div style={{ marginTop: 16, textAlign: "center" }}>
-                  <button onClick={handleParse} disabled={parsing} style={{ padding: "10px 32px", borderRadius: 8, fontSize: 14, fontWeight: 500, background: parsing ? "#888" : "#234f35", color: "#fff", border: "none", cursor: parsing ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-                    {parsing ? "AI解析中..." : "解析開始"}
-                  </button>
-                  {parsing && <p style={{ fontSize: 12, color: "#706e68", marginTop: 8 }}>AIが物件情報を読み取っています...</p>}
+            </div>
+          )}
+
+          {/* Tab switcher */}
+          <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottom: "2px solid #e0deda" }}>
+            {([["pdf", "📄 PDFから取込"], ["url", "📋 テキストから取込"], ["scrape", "🔗 URLから自動取得"]] as const).map(([t, label]) => (
+              <button key={t} onClick={() => setTab(t)}
+                style={{ padding: "10px 24px", fontSize: 13, fontWeight: tab === t ? 600 : 400, color: tab === t ? "#8c1f1f" : "#706e68", background: "none", border: "none", borderBottom: tab === t ? "2px solid #8c1f1f" : "2px solid transparent", marginBottom: -2, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── PDF Tab ── */}
+          {tab === "pdf" && (
+            <>
+              {!pdfResult ? (
+                <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 24, marginBottom: 20 }}>
+                  <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
+                    onClick={() => !selectedFile && fileInputRef.current?.click()}
+                    style={{ border: `2px dashed ${dragging ? "#234f35" : "#c8c6c0"}`, borderRadius: 10, padding: "36px 24px", textAlign: "center", background: dragging ? "#f0f7f3" : "#fafaf8", cursor: selectedFile ? "default" : "pointer", transition: "all .15s" }}>
+                    {selectedFile ? (
+                      <div>
+                        <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
+                        <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>{selectedFile.name}</div>
+                        <div style={{ fontSize: 11, color: "#706e68", marginBottom: 12 }}>{(selectedFile.size / 1024).toFixed(0)} KB</div>
+                        <button onClick={e => { e.stopPropagation(); resetPdf(); }} style={{ fontSize: 11, color: "#8c1f1f", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>ファイルを変更</button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ fontSize: 36, marginBottom: 12 }}>☁</div>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: "#1c1b18", marginBottom: 6 }}>ここにファイルをドラッグ&ドロップ</div>
+                        <div style={{ fontSize: 12, color: "#706e68", marginBottom: 14 }}>または</div>
+                        <button onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }} style={{ padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>ファイルを選択</button>
+                        <div style={{ fontSize: 11, color: "#706e68", marginTop: 10 }}>PDF・JPG・PNG（最大20MB）</div>
+                      </div>
+                    )}
+                  </div>
+                  <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" style={{ display: "none" }} onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
+                  {parseError && <div style={{ background: "#fdeaea", color: "#8c1f1f", padding: "8px 14px", borderRadius: 8, marginTop: 12, fontSize: 13 }}>{parseError}</div>}
+                  {selectedFile && (
+                    <div style={{ marginTop: 16, textAlign: "center" }}>
+                      <button onClick={handleParse} disabled={parsing} style={{ padding: "10px 32px", borderRadius: 8, fontSize: 14, fontWeight: 500, background: parsing ? "#888" : "#234f35", color: "#fff", border: "none", cursor: parsing ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                        {parsing ? "AI解析中..." : "解析開始"}
+                      </button>
+                      {parsing && <p style={{ fontSize: 12, color: "#706e68", marginTop: 8 }}>AIが物件情報を読み取っています...</p>}
+                    </div>
+                  )}
                 </div>
+              ) : (
+                <ResultForm
+                  result={pdfResult}
+                  form={form} setForm={setForm}
+                  generated={pdfResult.generated}
+                  registering={registering} registerError={registerError}
+                  generating={generating} generatedContent={generatedContent}
+                  onRegister={handleRegister}
+                  onReset={resetPdf}
+                />
               )}
-            </div>
-          ) : (
-            <ResultForm
-              result={pdfResult}
-              form={form} setForm={setForm}
-              generated={pdfResult.generated}
-              registering={registering} registerError={registerError}
-              generating={generating} generatedContent={generatedContent}
-              onRegister={handleRegister}
-              onReset={resetPdf}
-            />
+            </>
           )}
-        </>
-      )}
 
-      {/* ── Scrape Tab ── */}
-      {tab === "scrape" && (
-        <>
-          {!scrapeResult ? (
-            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 24, marginBottom: 20 }}>
-              <div style={{ background: "#f8f6f3", borderRadius: 10, padding: 16, marginBottom: 20, fontSize: 13, color: "#3a2a1a" }}>
-                <div style={{ fontWeight: 600, marginBottom: 8 }}>対応サイト</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <span style={{ background: "#e6f4ea", color: "#234f35", padding: "2px 8px", borderRadius: 99, fontSize: 11, fontWeight: 600 }}>✓ 対応</span>
-                  <span>ハトサポシステム使用サイト（東宝ハウス各社・多数の不動産会社）</span>
-                </div>
-                <div style={{ fontSize: 11, color: "#706e68", marginTop: 8 }}>
-                  URL例: https://www.toho-setagaya.co.jp/realestate/detail.php?k_number=...
-                </div>
-              </div>
+          {/* ── Scrape Tab ── */}
+          {tab === "scrape" && (
+            <>
+              {!scrapeResult ? (
+                <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 24, marginBottom: 20 }}>
+                  <div style={{ background: "#f8f6f3", borderRadius: 10, padding: 16, marginBottom: 20, fontSize: 13, color: "#3a2a1a" }}>
+                    <div style={{ fontWeight: 600, marginBottom: 8 }}>対応サイト</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <span style={{ background: "#e6f4ea", color: "#234f35", padding: "2px 8px", borderRadius: 99, fontSize: 11, fontWeight: 600 }}>✓ 対応</span>
+                      <span>ハトサポシステム使用サイト（東宝ハウス各社・多数の不動産会社）</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#706e68", marginTop: 8 }}>
+                      URL例: https://www.toho-setagaya.co.jp/realestate/detail.php?k_number=...
+                    </div>
+                  </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 16 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#5a4a3a" }}>物件詳細ページのURLを入力してください</label>
-                <input
-                  type="url"
-                  value={scrapeUrl}
-                  onChange={e => setScrapeUrl(e.target.value)}
-                  placeholder="https://www.toho-setagaya.co.jp/realestate/detail.php?k_number=H001..."
-                  style={{ border: "1px solid #e0deda", borderRadius: 7, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", width: "100%", boxSizing: "border-box" }}
-                  onKeyDown={e => { if (e.key === "Enter") handleScrape(); }}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#5a4a3a" }}>物件詳細ページのURLを入力してください</label>
+                    <input
+                      type="url"
+                      value={scrapeUrl}
+                      onChange={e => setScrapeUrl(e.target.value)}
+                      placeholder="https://www.toho-setagaya.co.jp/realestate/detail.php?k_number=H001..."
+                      style={{ border: "1px solid #e0deda", borderRadius: 7, padding: "9px 12px", fontSize: 13, fontFamily: "inherit", width: "100%", boxSizing: "border-box" }}
+                      onKeyDown={e => { if (e.key === "Enter") handleScrape(); }}
+                    />
+                  </div>
+
+                  {scrapeError && <div style={{ background: "#fdeaea", color: "#8c1f1f", padding: "8px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>{scrapeError}</div>}
+
+                  <div style={{ textAlign: "center" }}>
+                    <button onClick={handleScrape} disabled={scraping || !scrapeUrl.startsWith("http")}
+                      style={{ padding: "10px 36px", borderRadius: 8, fontSize: 14, fontWeight: 600, background: scraping ? "#888" : "#8c1f1f", color: "#fff", border: "none", cursor: (scraping || !scrapeUrl.startsWith("http")) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: !scrapeUrl.startsWith("http") ? 0.6 : 1 }}>
+                      {scraping ? "取得中..." : "物件情報を取得する"}
+                    </button>
+                    {scraping && <p style={{ fontSize: 12, color: "#706e68", marginTop: 8 }}>物件ページから情報を取得しています...</p>}
+                  </div>
+                </div>
+              ) : (
+                <ResultForm
+                  result={scrapeResult}
+                  form={form} setForm={setForm}
+                  generated={undefined}
+                  registering={registering} registerError={registerError}
+                  generating={generating} generatedContent={generatedContent}
+                  onRegister={handleRegister}
+                  onReset={resetScrape}
                 />
-              </div>
-
-              {scrapeError && <div style={{ background: "#fdeaea", color: "#8c1f1f", padding: "8px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>{scrapeError}</div>}
-
-              <div style={{ textAlign: "center" }}>
-                <button onClick={handleScrape} disabled={scraping || !scrapeUrl.startsWith("http")}
-                  style={{ padding: "10px 36px", borderRadius: 8, fontSize: 14, fontWeight: 600, background: scraping ? "#888" : "#8c1f1f", color: "#fff", border: "none", cursor: (scraping || !scrapeUrl.startsWith("http")) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: !scrapeUrl.startsWith("http") ? 0.6 : 1 }}>
-                  {scraping ? "取得中..." : "物件情報を取得する"}
-                </button>
-                {scraping && <p style={{ fontSize: 12, color: "#706e68", marginTop: 8 }}>物件ページから情報を取得しています...</p>}
-              </div>
-            </div>
-          ) : (
-            <ResultForm
-              result={scrapeResult}
-              form={form} setForm={setForm}
-              generated={undefined}
-              registering={registering} registerError={registerError}
-              generating={generating} generatedContent={generatedContent}
-              onRegister={handleRegister}
-              onReset={resetScrape}
-            />
+              )}
+            </>
           )}
-        </>
-      )}
 
-      {/* ── URL Text Tab ── */}
-      {tab === "url" && (
-        <>
-          {!textResult ? (
-            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 24, marginBottom: 20 }}>
-              {/* Instructions */}
-              <div style={{ background: "#f8f6f3", borderRadius: 10, padding: 16, marginBottom: 20, fontSize: 13, color: "#3a2a1a" }}>
-                <div style={{ fontWeight: 600, marginBottom: 10 }}>取込手順</div>
-                <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 2 }}>
-                  <li>不動産ポータルサイト（SUUMO・athome等）の物件詳細ページを開く</li>
-                  <li>ページ上で <kbd style={{ background: "#fff", border: "1px solid #ccc", padding: "1px 6px", borderRadius: 4, fontSize: 11 }}>Ctrl+A</kbd> → <kbd style={{ background: "#fff", border: "1px solid #ccc", padding: "1px 6px", borderRadius: 4, fontSize: 11 }}>Ctrl+C</kbd> でページ全体をコピー</li>
-                  <li>下のテキストエリアに貼り付ける</li>
-                </ol>
-                <div style={{ marginTop: 10, padding: "8px 12px", background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 7, fontSize: 12, color: "#664d03" }}>
-                  ⚠️ ページのテキストを手動でコピーしたものをAIで整理・構造化します。サーバーからの自動取得（スクレイピング）は行いません。
+          {/* ── URL Text Tab ── */}
+          {tab === "url" && (
+            <>
+              {!textResult ? (
+                <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 24, marginBottom: 20 }}>
+                  {/* Instructions */}
+                  <div style={{ background: "#f8f6f3", borderRadius: 10, padding: 16, marginBottom: 20, fontSize: 13, color: "#3a2a1a" }}>
+                    <div style={{ fontWeight: 600, marginBottom: 10 }}>取込手順</div>
+                    <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 2 }}>
+                      <li>不動産ポータルサイト（SUUMO・athome等）の物件詳細ページを開く</li>
+                      <li>ページ上で <kbd style={{ background: "#fff", border: "1px solid #ccc", padding: "1px 6px", borderRadius: 4, fontSize: 11 }}>Ctrl+A</kbd> → <kbd style={{ background: "#fff", border: "1px solid #ccc", padding: "1px 6px", borderRadius: 4, fontSize: 11 }}>Ctrl+C</kbd> でページ全体をコピー</li>
+                      <li>下のテキストエリアに貼り付ける</li>
+                    </ol>
+                    <div style={{ marginTop: 10, padding: "8px 12px", background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 7, fontSize: 12, color: "#664d03" }}>
+                      ⚠️ ページのテキストを手動でコピーしたものをAIで整理・構造化します。サーバーからの自動取得（スクレイピング）は行いません。
+                    </div>
+                  </div>
+
+                  {/* Textarea */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#5a4a3a" }}>
+                      コピーしたページテキストを貼り付け <span style={{ color: "#8c1f1f" }}>*</span>
+                    </label>
+                    <textarea
+                      value={pastedText}
+                      onChange={e => setPastedText(e.target.value)}
+                      placeholder="ここにページのテキストを貼り付けてください...&#10;（Ctrl+A で全選択後 Ctrl+C でコピーしたもの）"
+                      rows={10}
+                      style={{ border: "1px solid #e0deda", borderRadius: 8, padding: "12px 14px", fontSize: 13, fontFamily: "inherit", resize: "vertical", width: "100%", boxSizing: "border-box" }}
+                    />
+                    <div style={{ fontSize: 11, color: "#888" }}>{pastedText.length.toLocaleString()} 文字</div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: "#5a4a3a" }}>参照元URL（任意）</label>
+                      <input type="url" value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder="https://suumo.jp/..." style={{ border: "1px solid #e0deda", borderRadius: 7, padding: "8px 11px", fontSize: 13, fontFamily: "inherit" }} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: "#5a4a3a" }}>情報源の種別</label>
+                      <select value={sourceType} onChange={e => setSourceType(e.target.value)} style={{ border: "1px solid #e0deda", borderRadius: 7, padding: "8px 11px", fontSize: 13, fontFamily: "inherit" }}>
+                        {SOURCE_TYPE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {extractError && <div style={{ background: "#fdeaea", color: "#8c1f1f", padding: "8px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>{extractError}</div>}
+
+                  <div style={{ textAlign: "center" }}>
+                    <button onClick={handleExtract} disabled={extracting || pastedText.trim().length < 50}
+                      style={{ padding: "10px 36px", borderRadius: 8, fontSize: 14, fontWeight: 600, background: extracting ? "#888" : "#8c1f1f", color: "#fff", border: "none", cursor: (extracting || pastedText.trim().length < 50) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: pastedText.trim().length < 50 ? 0.6 : 1 }}>
+                      {extracting ? "AIで解析中..." : "AIで物件情報を抽出する"}
+                    </button>
+                    {extracting && <p style={{ fontSize: 12, color: "#706e68", marginTop: 8 }}>AIがテキストから物件情報を読み取っています...</p>}
+                  </div>
                 </div>
-              </div>
-
-              {/* Textarea */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 16 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#5a4a3a" }}>
-                  ③ コピーしたページテキストを貼り付け <span style={{ color: "#8c1f1f" }}>*</span>
-                </label>
-                <textarea
-                  value={pastedText}
-                  onChange={e => setPastedText(e.target.value)}
-                  placeholder="ここにページのテキストを貼り付けてください...&#10;（Ctrl+A で全選択後 Ctrl+C でコピーしたもの）"
-                  rows={10}
-                  style={{ border: "1px solid #e0deda", borderRadius: 8, padding: "12px 14px", fontSize: 13, fontFamily: "inherit", resize: "vertical", width: "100%", boxSizing: "border-box" }}
+              ) : (
+                <ResultForm
+                  result={textResult}
+                  form={form} setForm={setForm}
+                  generated={undefined}
+                  registering={registering} registerError={registerError}
+                  generating={generating} generatedContent={generatedContent}
+                  onRegister={handleRegister}
+                  onReset={resetText}
                 />
-                <div style={{ fontSize: 11, color: "#888" }}>{pastedText.length.toLocaleString()} 文字</div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#5a4a3a" }}>④ 参照元URL（任意）</label>
-                  <input type="url" value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder="https://suumo.jp/..." style={{ border: "1px solid #e0deda", borderRadius: 7, padding: "8px 11px", fontSize: 13, fontFamily: "inherit" }} />
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#5a4a3a" }}>⑤ 情報源の種別</label>
-                  <select value={sourceType} onChange={e => setSourceType(e.target.value)} style={{ border: "1px solid #e0deda", borderRadius: 7, padding: "8px 11px", fontSize: 13, fontFamily: "inherit" }}>
-                    {SOURCE_TYPE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              {extractError && <div style={{ background: "#fdeaea", color: "#8c1f1f", padding: "8px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>{extractError}</div>}
-
-              <div style={{ textAlign: "center" }}>
-                <button onClick={handleExtract} disabled={extracting || pastedText.trim().length < 50}
-                  style={{ padding: "10px 36px", borderRadius: 8, fontSize: 14, fontWeight: 600, background: extracting ? "#888" : "#8c1f1f", color: "#fff", border: "none", cursor: (extracting || pastedText.trim().length < 50) ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: pastedText.trim().length < 50 ? 0.6 : 1 }}>
-                  {extracting ? "AIで解析中..." : "AIで物件情報を抽出する"}
-                </button>
-                {extracting && <p style={{ fontSize: 12, color: "#706e68", marginTop: 8 }}>AIがテキストから物件情報を読み取っています...</p>}
-              </div>
-            </div>
-          ) : (
-            <ResultForm
-              result={textResult}
-              form={form} setForm={setForm}
-              generated={undefined}
-              registering={registering} registerError={registerError}
-              generating={generating} generatedContent={generatedContent}
-              onRegister={handleRegister}
-              onReset={resetText}
-            />
+              )}
+            </>
           )}
-        </>
-      )}
-    </>
-  )}
+        </div>
+      </div>
     </div>
   );
 }
