@@ -221,7 +221,7 @@ interface TextParseResult {
 // ============================================================
 
 interface Store { id: string; name: string }
-interface Staff { id: string; full_name: string }
+interface Staff { id: string; name: string }
 
 function ImportPageInner() {
   const router = useRouter();
@@ -511,7 +511,7 @@ function ImportPageInner() {
                   disabled={!selectedStore}
                   style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0deda", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: selectedStore ? "#fff" : "#f7f6f2", color: selectedStore ? "#1c1b18" : "#888" }}>
                   <option value="">担当者を選択してください</option>
-                  {staffList.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+                  {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               )}
               {selectedStore && staffList.length === 0 && !loadingStaff && (
