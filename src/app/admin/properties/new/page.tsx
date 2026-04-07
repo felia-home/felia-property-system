@@ -6,7 +6,15 @@ import {
 } from "@/components/admin/property-form-tabs";
 
 interface Store { id: string; name: string }
-interface Staff { id: string; full_name: string; role: string }
+interface StaffItem {
+  id: string;
+  full_name: string;
+  name: string;
+  role: string;
+  staff_code: string | null;
+  position: string | null;
+}
+
 
 export default function NewPropertyPage() {
   const router = useRouter();
@@ -16,14 +24,18 @@ export default function NewPropertyPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Agent/store selection
+  // Store / agent
   const [stores, setStores] = useState<Store[]>([]);
-  const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [staffList, setStaffList] = useState<StaffItem[]>([]);
   const [selectedStore, setSelectedStore] = useState("");
   const [selectedAgent, setSelectedAgent] = useState("");
-  const [propertyNumberPreview, setPropertyNumberPreview] = useState<string | null>(null);
   const [loadingStores, setLoadingStores] = useState(true);
   const [loadingStaff, setLoadingStaff] = useState(false);
+
+  // Property number preview
+  const [previewNumber, setPreviewNumber] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [selectedStaffCode, setSelectedStaffCode] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/stores")
@@ -36,7 +48,7 @@ export default function NewPropertyPage() {
   useEffect(() => {
     if (!selectedStore) { setStaffList([]); setSelectedAgent(""); return; }
     setLoadingStaff(true);
-    fetch(`/api/staff?store_id=${selectedStore}`)
+    fetch(`/api/staff?store_id=${selectedStore}&active=true`)
       .then(r => r.json())
       .then(d => setStaffList(d.staff ?? []))
       .catch(() => {})
@@ -44,18 +56,24 @@ export default function NewPropertyPage() {
   }, [selectedStore]);
 
   useEffect(() => {
-    if (!selectedStore) { setPropertyNumberPreview(null); return; }
-    fetch(`/api/property-number/preview?store_id=${selectedStore}`)
+    if (!selectedAgent) { setPreviewNumber(null); setSelectedStaffCode(null); return; }
+
+    const found = staffList.find(s => s.id === selectedAgent);
+    if (!found?.staff_code) { setSelectedStaffCode(null); setPreviewNumber(null); return; }
+    setSelectedStaffCode(found.staff_code);
+
+    setPreviewLoading(true);
+    fetch(`/api/staff/${selectedAgent}/preview-property-number`)
       .then(r => r.json())
-      .then(d => setPropertyNumberPreview(d.preview ?? null))
-      .catch(() => {});
-  }, [selectedStore]);
+      .then(d => setPreviewNumber(d.preview ?? null))
+      .catch(() => setPreviewNumber(null))
+      .finally(() => setPreviewLoading(false));
+  }, [selectedAgent, staffList]);
 
   const handleAgentNext = () => {
     if (!selectedStore) { setError("店舗を選択してください"); return; }
     if (!selectedAgent) { setError("担当者を選択してください"); return; }
     setError("");
-    // Inject into form
     setForm(f => ({ ...f, store_id: selectedStore, agent_id: selectedAgent }));
     setStep("form");
   };
@@ -88,6 +106,8 @@ export default function NewPropertyPage() {
     }
   };
 
+  const selectedStaffItem = staffList.find(s => s.id === selectedAgent);
+
   return (
     <div style={{ padding: 28 }}>
       {/* Sticky header */}
@@ -109,7 +129,7 @@ export default function NewPropertyPage() {
             {error && <span style={{ fontSize: 12, color: "#8c1f1f" }}>{error}</span>}
             <button onClick={handleSave} disabled={saving}
               style={{ padding: "8px 20px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: saving ? "#888" : "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
-              {saving ? "登録中..." : "登録する"}
+              {saving ? "登録中..." : "✅ 登録する"}
             </button>
           </div>
         )}
@@ -117,10 +137,41 @@ export default function NewPropertyPage() {
 
       {/* STEP 1: Agent/Store selection */}
       {step === "agent" && (
-        <div style={{ maxWidth: 480 }}>
-          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 28 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 20 }}>STEP 1: 担当者・店舗を選択</h2>
+        <div style={{ maxWidth: 520 }}>
 
+          {/* Step indicator */}
+          <div style={{ display: "flex", gap: 0, marginBottom: 24 }}>
+            {[
+              { n: 1, label: "担当者選択", active: true },
+              { n: 2, label: "物件情報入力", active: false },
+              { n: 3, label: "登録完了 → 広告確認へ", active: false },
+            ].map((s, i) => (
+              <div key={s.n} style={{ display: "flex", alignItems: "center", flex: i < 2 ? 1 : "none" }}>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: "50%", margin: "0 auto 4px",
+                    background: s.active ? "#234f35" : "#e0deda",
+                    color: s.active ? "#fff" : "#aaa",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 12, fontWeight: 700,
+                  }}>{s.n}</div>
+                  <div style={{ fontSize: 10, color: s.active ? "#234f35" : "#aaa", fontWeight: s.active ? 700 : 400, whiteSpace: "nowrap" }}>{s.label}</div>
+                </div>
+                {i < 2 && (
+                  <div style={{ flex: 1, height: 1, background: "#e0deda", margin: "0 8px", marginBottom: 18 }} />
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e0deda", padding: 28 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>担当者・店舗を選択</h2>
+            <p style={{ fontSize: 12, color: "#888", marginBottom: 22, lineHeight: 1.6 }}>
+              担当者のスタッフコードをもとに物件番号が自動採番されます。<br />
+              上司・課長名で登録する場合も選択できます。
+            </p>
+
+            {/* Store */}
             <div style={{ marginBottom: 18 }}>
               <label style={{ fontSize: 12, fontWeight: 700, color: "#5a4a3a", display: "block", marginBottom: 7, letterSpacing: ".04em" }}>
                 店舗 <span style={{ color: "#8c1f1f" }}>*</span>
@@ -129,15 +180,14 @@ export default function NewPropertyPage() {
                 <div style={{ fontSize: 12, color: "#888" }}>読み込み中...</div>
               ) : (
                 <select value={selectedStore} onChange={e => setSelectedStore(e.target.value)}
-                  style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0deda", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#fff" }}>
+                  style={{ width: "100%", padding: "9px 12px", border: "1px solid #e0deda", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#fff" }}>
                   <option value="">店舗を選択してください</option>
-                  {stores.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
+                  {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               )}
             </div>
 
+            {/* Agent */}
             <div style={{ marginBottom: 18 }}>
               <label style={{ fontSize: 12, fontWeight: 700, color: "#5a4a3a", display: "block", marginBottom: 7, letterSpacing: ".04em" }}>
                 担当者 <span style={{ color: "#8c1f1f" }}>*</span>
@@ -147,10 +197,14 @@ export default function NewPropertyPage() {
               ) : (
                 <select value={selectedAgent} onChange={e => setSelectedAgent(e.target.value)}
                   disabled={!selectedStore}
-                  style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0deda", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: selectedStore ? "#fff" : "#f7f6f2", color: selectedStore ? "#1c1b18" : "#888" }}>
+                  style={{ width: "100%", padding: "9px 12px", border: "1px solid #e0deda", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: selectedStore ? "#fff" : "#f7f6f2", color: selectedStore ? "#1c1b18" : "#888" }}>
                   <option value="">担当者を選択してください</option>
                   {staffList.map(s => (
-                    <option key={s.id} value={s.id}>{s.full_name}</option>
+                    <option key={s.id} value={s.id}>
+                      {s.name ?? s.full_name}
+                      {s.position ? `（${s.position}）` : ""}
+                      {s.staff_code ? ` — ${s.staff_code}` : " — コード未設定"}
+                    </option>
                   ))}
                 </select>
               )}
@@ -159,18 +213,54 @@ export default function NewPropertyPage() {
               )}
             </div>
 
-            {propertyNumberPreview && (
-              <div style={{ background: "#f7f6f2", borderRadius: 8, padding: "10px 14px", marginBottom: 18, fontSize: 12, color: "#706e68" }}>
-                物件番号（予定）: <strong style={{ color: "#1c1b18", fontSize: 13 }}>{propertyNumberPreview}</strong>
+            {/* Property number preview */}
+            {selectedAgent && (
+              <div style={{
+                borderRadius: 10,
+                border: "1px solid #e0deda",
+                overflow: "hidden",
+                marginBottom: 22,
+              }}>
+                <div style={{ background: "#f7f6f2", padding: "8px 14px", fontSize: 11, fontWeight: 700, color: "#706e68", letterSpacing: ".05em" }}>
+                  この物件の番号（自動採番）
+                </div>
+                <div style={{ padding: "12px 14px" }}>
+                  {previewLoading ? (
+                    <div style={{ fontSize: 12, color: "#aaa" }}>採番中...</div>
+                  ) : !selectedStaffCode ? (
+                    <div style={{ fontSize: 12, color: "#e65100" }}>
+                      ⚠️ {selectedStaffItem?.name ?? "この担当者"}のスタッフコードが未設定です。
+                      <a href="/admin/staff" style={{ marginLeft: 6, color: "#234f35", fontSize: 11, textDecoration: "underline" }}>スタッフ管理でコードを設定 →</a>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ fontFamily: "monospace", fontSize: 22, fontWeight: 700, color: "#1a3a2a", marginBottom: 4 }}>
+                        {previewNumber ?? "—"}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#aaa" }}>
+                        コード: <strong style={{ color: "#706e68" }}>{selectedStaffCode}</strong> — 登録確定時に発行
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
             {error && <p style={{ fontSize: 12, color: "#8c1f1f", marginBottom: 12 }}>{error}</p>}
 
             <button onClick={handleAgentNext}
-              style={{ width: "100%", padding: "10px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
-              次へ: 物件情報を入力 →
+              style={{ width: "100%", padding: "11px 20px", borderRadius: 9, fontSize: 13, fontWeight: 700, background: "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+              次へ：物件情報を入力 →
             </button>
+
+            {/* Notice about staff code */}
+            {!selectedStaffCode && selectedAgent && (
+              <div style={{ marginTop: 12, background: "#fff8e1", border: "1px solid #ffe082", borderRadius: 8, padding: "10px 12px", fontSize: 12, color: "#8a5200" }}>
+                💡 スタッフコードは
+                <a href="/admin/staff" style={{ color: "#234f35", margin: "0 4px", fontWeight: 600 }}>スタッフ管理</a>
+                から一括生成できます。コードがない場合でも登録は続行できますが物件番号が自動採番されません。
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -178,11 +268,15 @@ export default function NewPropertyPage() {
       {/* STEP 2: Property form */}
       {step === "form" && (
         <>
-          {/* Agent summary */}
-          <div style={{ background: "#e8f5e9", borderRadius: 8, padding: "8px 14px", marginBottom: 14, fontSize: 12, color: "#1b5e20", display: "flex", gap: 12 }}>
-            <span>店舗: <strong>{stores.find(s => s.id === selectedStore)?.name ?? "—"}</strong></span>
-            <span>担当: <strong>{staffList.find(s => s.id === selectedAgent)?.full_name ?? "—"}</strong></span>
-            {propertyNumberPreview && <span>物件番号: <strong>{propertyNumberPreview}</strong></span>}
+          {/* Summary bar */}
+          <div style={{ background: "#e8f5e9", borderRadius: 8, padding: "8px 16px", marginBottom: 14, fontSize: 12, color: "#1b5e20", display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+            <span>🏪 <strong>{stores.find(s => s.id === selectedStore)?.name ?? "—"}</strong></span>
+            <span>👤 <strong>{selectedStaffItem?.name ?? selectedStaffItem?.full_name ?? "—"}</strong></span>
+            {previewNumber && (
+              <span style={{ fontFamily: "monospace", fontWeight: 700, color: "#234f35" }}>
+                📋 物件番号: {previewNumber}
+              </span>
+            )}
           </div>
           {error && <p style={{ fontSize: 12, color: "#8c1f1f", marginBottom: 12 }}>{error}</p>}
           <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 24 }}>

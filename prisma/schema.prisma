@@ -807,6 +807,9 @@ model Staff {
   retirement_reason String?
   successor_id      String?
 
+  // ===== 物件番号コード =====
+  staff_code          String?   @unique  // 物件番号用コード（例: r.kato）
+
   // ===== 認証情報 =====
   password_hash       String?
   login_count         Int       @default(0)

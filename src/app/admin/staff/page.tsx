@@ -16,6 +16,7 @@ interface StaffMember {
   email_work: string | null;
   tel_work: string | null;
   is_active: boolean;
+  staff_code: string | null;
   store: { id: string; name: string; store_code: string } | null;
   _count?: { properties_as_agent: number };
 }
@@ -34,6 +35,8 @@ export default function StaffListPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const [generatingCodes, setGeneratingCodes] = useState(false);
+  const [codeGenResult, setCodeGenResult] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -91,6 +94,29 @@ export default function StaffListPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <h1 style={{ fontSize: 20, fontWeight: 600, color: "#1c1b18" }}>スタッフ管理</h1>
         <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={async () => {
+              setGeneratingCodes(true);
+              setCodeGenResult(null);
+              try {
+                const res = await fetch("/api/staff/generate-codes", { method: "POST" });
+                const d = await res.json() as { generated?: number; total?: number; error?: string };
+                if (res.ok) {
+                  setCodeGenResult(`✅ ${d.generated}件生成（全${d.total}名）`);
+                  load();
+                } else {
+                  setCodeGenResult(`❌ ${d.error ?? "エラー"}`);
+                }
+              } catch {
+                setCodeGenResult("❌ 通信エラー");
+              } finally {
+                setGeneratingCodes(false);
+              }
+            }}
+            disabled={generatingCodes}
+            style={{ background: "#333", color: "#fff", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", fontFamily: "inherit", opacity: generatingCodes ? 0.6 : 1 }}>
+            {generatingCodes ? "生成中..." : "🔧 コード一括生成"}
+          </button>
           <button onClick={() => { setShowImportModal(true); setImportResult(null); }}
             style={{ background: "#1565c0", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", fontFamily: "inherit" }}>
             📥 CSVインポート
@@ -103,6 +129,20 @@ export default function StaffListPage() {
           </Link>
         </div>
       </div>
+
+      {/* Code gen result toast */}
+      {codeGenResult && (
+        <div style={{
+          background: codeGenResult.startsWith("✅") ? "#e8f5e9" : "#fdeaea",
+          border: `1px solid ${codeGenResult.startsWith("✅") ? "#a5d6a7" : "#ffcdd2"}`,
+          borderRadius: 8, padding: "10px 14px", marginBottom: 12,
+          fontSize: 13, color: codeGenResult.startsWith("✅") ? "#2e7d32" : "#c62828",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}>
+          {codeGenResult}
+          <button onClick={() => setCodeGenResult(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#aaa", fontFamily: "inherit" }}>×</button>
+        </div>
+      )}
 
       {/* Filters */}
       <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: "16px 20px", marginBottom: 20 }}>
@@ -179,6 +219,17 @@ export default function StaffListPage() {
               {(s.qualifications ?? []).length > 0 && (
                 <div style={{ fontSize: 11, color: "#706e68" }}>{(s.qualifications ?? []).slice(0, 2).join("・")}{(s.qualifications ?? []).length > 2 ? `他${(s.qualifications ?? []).length - 2}件` : ""}</div>
               )}
+
+              {/* Staff code badge */}
+              <div style={{
+                fontSize: 11, fontFamily: "monospace",
+                background: s.staff_code ? "#f0f7f3" : "#fafaf8",
+                color: s.staff_code ? "#234f35" : "#aaa",
+                border: `1px solid ${s.staff_code ? "#c3e6cb" : "#e0deda"}`,
+                borderRadius: 6, padding: "3px 8px", display: "inline-block",
+              }}>
+                {s.staff_code ? `📋 ${s.staff_code}` : "コード未設定"}
+              </div>
 
               {s._count && (
                 <div style={{ fontSize: 12, color: "#888" }}>担当物件: <strong style={{ color: "#1c1b18" }}>{s._count.properties_as_agent}</strong>件</div>

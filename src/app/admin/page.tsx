@@ -273,6 +273,62 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      {/* 新規物件登録 CTA */}
+      <div style={{
+        background: "linear-gradient(135deg, #1a3a2a 0%, #2d5a3e 100%)",
+        borderRadius: 16, padding: "28px 32px", marginBottom: 24,
+        position: "relative", overflow: "hidden",
+      }}>
+        {/* 装飾 */}
+        <div style={{
+          position: "absolute", right: 24, top: "50%", transform: "translateY(-50%)",
+          fontSize: 100, opacity: 0.08, lineHeight: 1,
+        }}>🏠</div>
+
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <div style={{ fontSize: 10, color: "#c9a96e", fontWeight: 700, letterSpacing: ".15em", marginBottom: 8 }}>
+            STEP 1 からスタート
+          </div>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: "#fff", marginBottom: 6 }}>
+            新しい物件を登録する
+          </h2>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", marginBottom: 20, lineHeight: 1.6 }}>
+            担当者コードで物件番号を自動採番。販売資料（PDF）またはURLから情報を自動取込できます。
+          </p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <a href="/admin/properties/new"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 7,
+                background: "#c9a96e", color: "#fff", padding: "10px 22px",
+                borderRadius: 10, fontWeight: 700, fontSize: 13,
+                textDecoration: "none", border: "none",
+              }}>
+              ✏️ 手動で登録する
+            </a>
+            <a href="/admin/properties/import"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 7,
+                background: "rgba(255,255,255,0.12)", color: "#fff",
+                border: "1px solid rgba(255,255,255,0.3)",
+                padding: "10px 22px", borderRadius: 10, fontWeight: 700, fontSize: 13,
+                textDecoration: "none",
+              }}>
+              📄 PDFから取込
+            </a>
+            <a href="/admin/properties/import?tab=scrape"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 7,
+                background: "rgba(255,255,255,0.12)", color: "#fff",
+                border: "1px solid rgba(255,255,255,0.3)",
+                padding: "10px 22px", borderRadius: 10, fontWeight: 700, fontSize: 13,
+                textDecoration: "none",
+              }}>
+              🔗 URLから取込
+            </a>
+          </div>
+        </div>
+      </div>
+
       {/* あなたのタスク — Workflow Step Cards */}
       {!loadingProps && (
         <div style={{ marginBottom: 24 }}>

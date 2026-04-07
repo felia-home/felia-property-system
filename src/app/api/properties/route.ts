@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { generatePropertyNumber } from "@/lib/staffCode";
 
 // GET /api/properties
 export async function GET(request: NextRequest) {
@@ -57,6 +58,18 @@ export async function POST(request: NextRequest) {
     const b = body as Record<string, unknown>;
     const n = (v: unknown) => (v !== undefined && v !== null && v !== "" ? Number(v) : null);
     const bool = (v: unknown) => v === true || v === "true" || v === 1;
+
+    // 物件番号の自動生成: agent_idのstaff_codeを使用
+    let propertyNumber: string | null = b.property_number ? String(b.property_number) : null;
+    if (!propertyNumber && b.agent_id) {
+      const agentStaff = await prisma.staff.findUnique({
+        where: { id: String(b.agent_id) },
+        select: { staff_code: true },
+      });
+      if (agentStaff?.staff_code) {
+        propertyNumber = await generatePropertyNumber(agentStaff.staff_code);
+      }
+    }
 
     const property = await prisma.property.create({
       data: {
@@ -196,10 +209,11 @@ export async function POST(request: NextRequest) {
         athome_id:     b.athome_id     ? String(b.athome_id)     : null,
         yahoo_id:      b.yahoo_id      ? String(b.yahoo_id)      : null,
         homes_id:      b.homes_id      ? String(b.homes_id)      : null,
-        agent_id:      b.agent_id      ? String(b.agent_id)      : null,
-        store_id:      b.store_id      ? String(b.store_id)      : null,
-        internal_memo: b.internal_memo ? String(b.internal_memo) : null,
-        source:        b.source        ? String(b.source)        : null,
+        agent_id:        b.agent_id        ? String(b.agent_id)        : null,
+        store_id:        b.store_id        ? String(b.store_id)        : null,
+        property_number: propertyNumber,
+        internal_memo:   b.internal_memo   ? String(b.internal_memo)   : null,
+        source:          b.source          ? String(b.source)          : null,
       },
     });
 
