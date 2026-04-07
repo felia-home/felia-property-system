@@ -293,24 +293,14 @@ export default function DashboardPage() {
             新しい物件を登録する
           </h2>
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", marginBottom: 20, lineHeight: 1.6 }}>
-            担当者コードで物件番号を自動採番。販売資料（PDF）またはURLから情報を自動取込できます。
+            販売資料（PDF）をアップロードして情報を自動取込するのがおすすめです。URLからの取込・手動入力も可能です。
           </p>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <a href="/admin/properties/new"
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <a href="/admin/properties/import"
               style={{
                 display: "inline-flex", alignItems: "center", gap: 7,
                 background: "#c9a96e", color: "#fff", padding: "10px 22px",
                 borderRadius: 10, fontWeight: 700, fontSize: 13,
-                textDecoration: "none", border: "none",
-              }}>
-              ✏️ 手動で登録する
-            </a>
-            <a href="/admin/properties/import"
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 7,
-                background: "rgba(255,255,255,0.12)", color: "#fff",
-                border: "1px solid rgba(255,255,255,0.3)",
-                padding: "10px 22px", borderRadius: 10, fontWeight: 700, fontSize: 13,
                 textDecoration: "none",
               }}>
               📄 PDFから取込
@@ -324,6 +314,14 @@ export default function DashboardPage() {
                 textDecoration: "none",
               }}>
               🔗 URLから取込
+            </a>
+            <a href="/admin/properties/new"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 7,
+                color: "rgba(255,255,255,0.6)", fontSize: 13,
+                textDecoration: "none", padding: "10px 16px",
+              }}>
+              ✏️ 手動で入力
             </a>
           </div>
         </div>
