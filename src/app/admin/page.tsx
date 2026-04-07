@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PROPERTY_STATUS, KANBAN_COLUMNS, getStatusDef } from "@/lib/workflow-status";
+import { TaskCard, type TaskCardProperty } from "@/components/admin/TaskCard";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -271,6 +272,109 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* あなたのタスク — Workflow Step Cards */}
+      {!loadingProps && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h2 style={{ fontSize: 14, fontWeight: 600, color: "#3a2a1a" }}>あなたのタスク</h2>
+            <span style={{ fontSize: 11, color: "#aaa" }}>入稿ワークフロー別 対応件数</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
+            {/* STEP1: 下書き入力待ち */}
+            <TaskCard
+              step={1}
+              icon="✏️"
+              title="情報入力"
+              subtitle="下書き → 広告確認申請"
+              count={(byStatus.get("DRAFT") ?? []).length}
+              urgent={false}
+              color="#757575"
+              bg="#f5f5f5"
+              properties={(byStatus.get("DRAFT") ?? []).slice(0, 5).map<TaskCardProperty>(p => ({
+                id: p.id,
+                label: `${p.city}${p.town ?? ""}`,
+                sub: `${p.price.toLocaleString()}万円`,
+              }))}
+              href="/admin/properties?status=DRAFT"
+            />
+            {/* STEP2: 広告確認 */}
+            <TaskCard
+              step={2}
+              icon="📨"
+              title="広告確認"
+              subtitle="元付業者から承諾を取得"
+              count={(byStatus.get("AD_PENDING") ?? []).length + (byStatus.get("AD_SENT") ?? []).length}
+              urgent
+              color="#e65100"
+              bg="#fff3e0"
+              properties={[
+                ...(byStatus.get("AD_PENDING") ?? []),
+                ...(byStatus.get("AD_SENT") ?? []),
+              ].slice(0, 5).map<TaskCardProperty>(p => ({
+                id: p.id,
+                label: `${p.city}${p.town ?? ""}`,
+                sub: p.status === "AD_SENT" ? "確認書送付済み" : "送付待ち",
+              }))}
+              href="/admin/properties?status=AD_PENDING"
+            />
+            {/* STEP3: 写真撮影 */}
+            <TaskCard
+              step={3}
+              icon="📷"
+              title="写真・原稿"
+              subtitle="AD_OK後に撮影・登録"
+              count={noPhotoProps.length + lowPhotoProps.length}
+              urgent={noPhotoProps.length > 0}
+              color="#6a1b9a"
+              bg="#f3e5f5"
+              properties={[...noPhotoProps, ...lowPhotoProps].slice(0, 5).map<TaskCardProperty>(p => ({
+                id: p.id,
+                label: `${p.city}${p.town ?? ""}`,
+                sub: (p.photo_count ?? p._count?.images ?? 0) === 0 ? "写真なし" : `写真${p.photo_count ?? p._count?.images ?? 0}枚`,
+              }))}
+              href="/admin/properties"
+            />
+            {/* STEP4: 掲載準備 */}
+            <TaskCard
+              step={4}
+              icon="🔧"
+              title="掲載準備"
+              subtitle="写真確認 → 掲載設定"
+              count={(byStatus.get("PHOTO_NEEDED") ?? []).length + (byStatus.get("PUBLISHING") ?? []).length}
+              urgent={false}
+              color="#1565c0"
+              bg="#e3f2fd"
+              properties={[
+                ...(byStatus.get("PHOTO_NEEDED") ?? []),
+                ...(byStatus.get("PUBLISHING") ?? []),
+              ].slice(0, 5).map<TaskCardProperty>(p => ({
+                id: p.id,
+                label: `${p.city}${p.town ?? ""}`,
+                sub: p.status === "PUBLISHING" ? "掲載準備中" : "写真待ち",
+              }))}
+              href="/admin/properties?status=PHOTO_NEEDED"
+            />
+            {/* STEP5: 成約確認 */}
+            <TaskCard
+              step={5}
+              icon="🔔"
+              title="成約確認"
+              subtitle="成約アラート → 確認"
+              count={(byStatus.get("SOLD_ALERT") ?? []).length}
+              urgent={(byStatus.get("SOLD_ALERT") ?? []).length > 0}
+              color="#b71c1c"
+              bg="#fce4ec"
+              properties={(byStatus.get("SOLD_ALERT") ?? []).slice(0, 5).map<TaskCardProperty>(p => ({
+                id: p.id,
+                label: `${p.city}${p.town ?? ""}`,
+                sub: `${p.price.toLocaleString()}万円`,
+              }))}
+              href="/admin/properties?status=SOLD_ALERT"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Workflow Kanban */}
       <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>

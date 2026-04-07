@@ -308,6 +308,11 @@ model Property {
   internal_memo         String?
   source                String?
 
+  // 広告承諾（売主からの広告承諾取得記録）
+  ad_approval_contact   String?   // 承諾取得先担当者名
+  ad_approval_method    String?   // EMAIL | PHONE | SELF
+  ad_approval_date      DateTime? // 承諾取得日
+
   is_deleted            Boolean   @default(false)
   deleted_at            DateTime?
   created_at            DateTime  @default(now())

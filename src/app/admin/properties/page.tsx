@@ -66,9 +66,21 @@ export default function PropertiesPage() {
 
   const [stores, setStores] = useState<Store[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetch("/api/stores").then(r => r.json()).then(d => setStores(d.stores ?? [])).catch(() => {});
+    // Fetch all properties for status count badges (no status filter)
+    fetch("/api/properties?take=1000")
+      .then(r => r.json())
+      .then((d: { properties?: Property[] }) => {
+        const counts: Record<string, number> = {};
+        for (const p of d.properties ?? []) {
+          counts[p.status] = (counts[p.status] ?? 0) + 1;
+        }
+        setStatusCounts(counts);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -165,24 +177,61 @@ export default function PropertiesPage() {
         </div>
       </div>
 
-      <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", overflow: "hidden" }}>
-        <div style={{ padding: "14px 20px", borderBottom: "1px solid #e0deda", display: "flex", gap: 8, alignItems: "center" }}>
+      {/* Status tab bar */}
+      <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", overflow: "hidden", marginBottom: 0 }}>
+        <div style={{ display: "flex", gap: 0, overflowX: "auto", borderBottom: "1px solid #e0deda", padding: "0 16px" }}>
+          {[{ value: "", label: "すべて" }, ...STATUS_OPTIONS].map(o => {
+            const count = o.value === "" ? Object.values(statusCounts).reduce((a, b) => a + b, 0) : (statusCounts[o.value] ?? 0);
+            const active = status === o.value;
+            const def = o.value ? PROPERTY_STATUS[o.value as keyof typeof PROPERTY_STATUS] : null;
+            return (
+              <button
+                key={o.value}
+                onClick={() => setStatus(o.value)}
+                style={{
+                  padding: "10px 14px",
+                  border: "none",
+                  borderBottom: `2px solid ${active ? (def?.color ?? "#234f35") : "transparent"}`,
+                  background: "transparent",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  fontSize: 12,
+                  fontWeight: active ? 700 : 400,
+                  color: active ? (def?.color ?? "#234f35") : "#706e68",
+                  whiteSpace: "nowrap",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  transition: "color .15s",
+                }}
+              >
+                {def?.icon} {o.label}
+                {count > 0 && (
+                  <span style={{
+                    fontSize: 10,
+                    background: active ? (def?.color ?? "#234f35") : "#e8e4e0",
+                    color: active ? "#fff" : "#706e68",
+                    borderRadius: 99,
+                    padding: "1px 6px",
+                    fontWeight: 700,
+                    minWidth: 18,
+                    textAlign: "center",
+                  }}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid #e0deda", display: "flex", gap: 8, alignItems: "center" }}>
           <input
             placeholder="住所・駅名で検索"
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ padding: "6px 12px", border: "1px solid #e0deda", borderRadius: 7, fontSize: 12, width: 200, fontFamily: "inherit" }}
           />
-          <select
-            value={status}
-            onChange={e => setStatus(e.target.value)}
-            style={{ padding: "6px 10px", border: "1px solid #e0deda", borderRadius: 7, fontSize: 12, fontFamily: "inherit" }}
-          >
-            <option value="">全ステータス</option>
-            {STATUS_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
           {stores.length > 0 && (
             <select value={storeFilter} onChange={e => setStoreFilter(e.target.value)}
               style={{ padding: "6px 10px", border: "1px solid #e0deda", borderRadius: 7, fontSize: 12, fontFamily: "inherit" }}>
