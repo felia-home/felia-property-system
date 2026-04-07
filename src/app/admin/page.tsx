@@ -296,7 +296,7 @@ export default function DashboardPage() {
             販売資料（PDF）をアップロードして情報を自動取込するのがおすすめです。URLからの取込・手動入力も可能です。
           </p>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <a href="/admin/properties/import"
+            <a href="/admin/properties/new"
               style={{
                 display: "inline-flex", alignItems: "center", gap: 7,
                 background: "#c9a96e", color: "#fff", padding: "10px 22px",
@@ -315,7 +315,7 @@ export default function DashboardPage() {
               }}>
               🔗 URLから取込
             </a>
-            <a href="/admin/properties/new"
+            <a href="/admin/properties/new?mode=manual"
               style={{
                 display: "inline-flex", alignItems: "center", gap: 7,
                 color: "rgba(255,255,255,0.6)", fontSize: 13,
