@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import type { ParseResult, GeneratedContent } from "@/agents/document-parser";
+import type { ParseResult, GeneratedContent, MultiUnitInfo } from "@/agents/document-parser";
 import { Suspense } from "react";
 
 // ============================================================
@@ -66,6 +66,13 @@ const fieldBg = (conf?: Confidence) =>
 // Extract-result form (shared between PDF and URL tabs)
 // ============================================================
 
+interface DuplicateMatch {
+  id: string; property_number: string | null; title: string | null;
+  city: string; town: string | null; address: string;
+  price: number; rooms: string | null; status: string;
+  area_land_m2: number | null; area_build_m2: number | null; area_exclusive_m2: number | null;
+}
+
 interface ResultFormProps {
   result: ParseResult | TextParseResult;
   form: Record<string, string>;
@@ -73,15 +80,22 @@ interface ResultFormProps {
   generated?: GeneratedContent | null;
   registering: boolean;
   registerError: string;
-  generating: boolean;
-  generatedContent?: { title: string; catch_copy: string; description_hp: string } | null;
+  checkingDuplicate: boolean;
+  showDuplicateWarning: boolean;
+  duplicates: DuplicateMatch[];
+  multiUnit?: MultiUnitInfo;
+  multiUnitMode: "single" | "separate";
+  onMultiUnitModeChange: (mode: "single" | "separate") => void;
   onRegister: () => void;
   onReset: () => void;
+  onDismissDuplicate: () => void;
 }
 
 function ResultForm({
   result, form, setForm, generated, registering, registerError,
-  generating, generatedContent, onRegister, onReset,
+  checkingDuplicate, showDuplicateWarning, duplicates,
+  multiUnit, multiUnitMode, onMultiUnitModeChange,
+  onRegister, onReset, onDismissDuplicate,
 }: ResultFormProps) {
   const confidence = (result.confidence ?? {}) as Record<string, Confidence>;
   const needsReview = new Set(result.needs_review ?? []);
@@ -101,6 +115,40 @@ function ResultForm({
           <span style={{ fontSize: 11, background: "#fdeaea", color: "#8c1f1f", padding: "3px 10px", borderRadius: 99, fontWeight: 500 }}>精度低 {result.low_confidence_fields.length}件</span>
         )}
       </div>
+
+      {/* 多棟検出 */}
+      {multiUnit?.detected && multiUnit.units.length > 1 && (
+        <div style={{ background: "#e8f0fe", border: "2px solid #4285f4", borderRadius: 10, padding: 20, marginBottom: 20 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#1a56db", marginBottom: 14 }}>
+            🏠 複数棟が検出されました（{multiUnit.units.map(u => u.name).join("・")}）
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", padding: "10px 14px", background: multiUnitMode === "separate" ? "#fff" : "transparent", borderRadius: 8, border: multiUnitMode === "separate" ? "2px solid #4285f4" : "2px solid transparent" }}>
+              <input type="radio" name="multi_unit" checked={multiUnitMode === "separate"} onChange={() => onMultiUnitModeChange("separate")} style={{ marginTop: 2 }} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>棟ごとに別々の物件として登録（推奨）</div>
+                <div style={{ fontSize: 12, color: "#706e68", marginTop: 4 }}>
+                  {multiUnit.units.map(u => (
+                    <div key={u.name} style={{ marginBottom: 2 }}>
+                      → {u.name}: {u.price ? `${u.price.toLocaleString()}万円` : "—"} / {u.rooms ?? "—"} / {u.area_build_m2 ? `${u.area_build_m2}㎡` : u.area_land_m2 ? `${u.area_land_m2}㎡` : "—"}
+                    </div>
+                  ))}
+                  <div style={{ marginTop: 2, color: "#888" }}>それぞれ独立した物件として{multiUnit.units.length}件登録</div>
+                </div>
+              </div>
+            </label>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", padding: "10px 14px", background: multiUnitMode === "single" ? "#fff" : "transparent", borderRadius: 8, border: multiUnitMode === "single" ? "2px solid #4285f4" : "2px solid transparent" }}>
+              <input type="radio" name="multi_unit" checked={multiUnitMode === "single"} onChange={() => onMultiUnitModeChange("single")} style={{ marginTop: 2 }} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>まとめて1物件として登録</div>
+                <div style={{ fontSize: 12, color: "#706e68", marginTop: 2 }}>
+                  「{multiUnit.units.map(u => u.name).join("＆")}」として1件登録
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+      )}
 
       {/* AI generated content */}
       {generated && (
@@ -179,23 +227,53 @@ function ResultForm({
 
       {registerError && <div style={{ background: "#fdeaea", color: "#8c1f1f", padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>{registerError}</div>}
 
-      {generating && (
-        <div style={{ background: "#e6f4ea", border: "1px solid #234f35", borderRadius: 8, padding: "14px 20px", marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "#234f35", marginBottom: 4 }}>✓ 物件登録完了 — AIコンテンツ生成中...</div>
-        </div>
-      )}
-      {generatedContent && (
-        <div style={{ background: "#e6f4ea", border: "1px solid #234f35", borderRadius: 8, padding: "14px 20px", marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "#234f35", marginBottom: 10 }}>✓ AIコンテンツ生成完了 — 物件詳細ページへ移動します</div>
-          {generatedContent.title && <div style={{ fontSize: 12, marginBottom: 4 }}><b>タイトル:</b> {generatedContent.title}</div>}
+      {/* 重複警告 */}
+      {showDuplicateWarning && duplicates.length > 0 && (
+        <div style={{ background: "#fff8e1", border: "2px solid #f0ad4e", borderRadius: 10, padding: 20, marginBottom: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#8a5200", marginBottom: 14 }}>
+            ⚠️ 類似物件が既に登録されています
+          </div>
+          {duplicates.map(d => {
+            const area = d.area_exclusive_m2 ?? d.area_build_m2 ?? d.area_land_m2;
+            const statusLabel: Record<string, string> = {
+              DRAFT: "下書き", REVIEW: "レビュー中", PENDING: "確認待ち",
+              APPROVED: "承認済み", PUBLISHED_HP: "HP掲載中", PUBLISHED_ALL: "全掲載中",
+              SUSPENDED: "一時停止", SOLD: "成約済み",
+            };
+            return (
+              <div key={d.id} style={{ background: "#fff", border: "1px solid #e0deda", borderRadius: 8, padding: 14, marginBottom: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+                  {d.property_number ?? "—"}　{d.city}{d.town ?? ""}{d.address}
+                </div>
+                <div style={{ fontSize: 12, color: "#706e68", marginBottom: 8 }}>
+                  {d.price ? `${d.price.toLocaleString()}万円` : "—"} / {d.rooms ?? "—"} / {area ? `${area}㎡` : "—"}
+                  　ステータス: {statusLabel[d.status] ?? d.status}
+                </div>
+                <a href={`/admin/properties/${d.id}`} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 12, color: "#234f35", fontWeight: 500, textDecoration: "underline" }}>
+                  既存物件を開く →
+                </a>
+              </div>
+            );
+          })}
+          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+            <button onClick={onDismissDuplicate}
+              style={{ padding: "8px 18px", borderRadius: 8, fontSize: 12, border: "1px solid #e0deda", background: "#fff", cursor: "pointer", fontFamily: "inherit" }}>
+              戻る
+            </button>
+            <button onClick={onRegister}
+              style={{ padding: "8px 18px", borderRadius: 8, fontSize: 12, fontWeight: 500, background: "#8a5200", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+              それでも新規登録する
+            </button>
+          </div>
         </div>
       )}
 
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
         <button onClick={onReset} style={{ padding: "9px 20px", borderRadius: 8, fontSize: 13, border: "1px solid #e0deda", background: "#fff", cursor: "pointer", fontFamily: "inherit" }}>やり直す</button>
-        <button onClick={onRegister} disabled={registering}
-          style={{ padding: "9px 24px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: registering ? "#888" : "#234f35", color: "#fff", border: "none", cursor: registering ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-          {registering ? "登録中..." : "この内容で登録する"}
+        <button onClick={onRegister} disabled={registering || checkingDuplicate}
+          style={{ padding: "9px 24px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: (registering || checkingDuplicate) ? "#888" : "#234f35", color: "#fff", border: "none", cursor: (registering || checkingDuplicate) ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+          {checkingDuplicate ? "重複チェック中..." : registering ? "登録中..." : "この内容で登録する"}
         </button>
       </div>
     </div>
@@ -319,8 +397,14 @@ function ImportPageInner() {
   const [form, setForm] = useState<Record<string, string>>({});
   const [registering, setRegistering] = useState(false);
   const [registerError, setRegisterError] = useState("");
-  const [generating, setGenerating] = useState(false);
-  const [generatedContent, setGeneratedContent] = useState<{ title: string; catch_copy: string; description_hp: string } | null>(null);
+
+  // ── Duplicate check state ──
+  const [duplicates, setDuplicates] = useState<DuplicateMatch[]>([]);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+
+  // ── Multi-unit state ──
+  const [multiUnitMode, setMultiUnitMode] = useState<"single" | "separate">("separate");
 
   // ── File handlers ──
   const handleFile = useCallback((file: File) => {
@@ -388,47 +472,97 @@ function ImportPageInner() {
     finally { setExtracting(false); }
   };
 
-  // ── Register ──
+  // ── Build payload ──
+  const buildPayload = () => {
+    const payload: Record<string, unknown> = { prefecture: "東京都" };
+    if (selectedStore) payload.store_id = selectedStore;
+    if (selectedAgent) payload.agent_id = selectedAgent;
+    for (const field of [...FIELDS, ...SELLER_FIELDS]) {
+      const val = form[field.key];
+      if (!val) continue;
+      payload[field.key] = field.type === "number" ? Number(val) : val;
+    }
+    if (form.ad_transfer_consent) payload.ad_transfer_consent = form.ad_transfer_consent;
+    return payload;
+  };
+
+  // ── Register (with duplicate check) ──
   const handleRegister = async () => {
     const required = ["property_type", "price", "city"];
     for (const f of required) {
       if (!form[f]) { setRegisterError(`必須項目「${FIELDS.find(x => x.key === f)?.label ?? f}」を入力してください`); return; }
     }
-    setRegistering(true);
     setRegisterError("");
-    try {
-      const payload: Record<string, unknown> = { prefecture: "東京都" };
-      if (selectedStore) payload.store_id = selectedStore;
-      if (selectedAgent) payload.agent_id = selectedAgent;
-      for (const field of [...FIELDS, ...SELLER_FIELDS]) {
-        const val = form[field.key];
-        if (!val) continue;
-        payload[field.key] = field.type === "number" ? Number(val) : val;
-      }
-      // Seller fields not in FIELDS/SELLER_FIELDS
-      if (form.ad_transfer_consent) payload.ad_transfer_consent = form.ad_transfer_consent;
-      // AI content
-      const src = pdfResult ?? textResult;
-      if ((src as ParseResult)?.generated?.title) payload.title = (src as ParseResult).generated!.title;
-      if ((src as ParseResult)?.generated?.catch_copy) payload.catch_copy = (src as ParseResult).generated!.catch_copy;
-      if ((src as ParseResult)?.generated?.description_hp) payload.description_hp = (src as ParseResult).generated!.description_hp;
 
-      const res = await fetch("/api/properties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const data = await res.json();
-      if (!res.ok) { setRegisterError(data.error ?? "登録に失敗しました"); return; }
-      const propertyId: string = data.property.id;
-      setGenerating(true);
+    // 重複チェック（まだ警告を承認していない場合）
+    if (!showDuplicateWarning) {
+      setCheckingDuplicate(true);
       try {
-        const genRes = await fetch(`/api/properties/${propertyId}/generate-content`, { method: "POST" });
-        if (genRes.ok) {
-          const genData = await genRes.json();
-          setGeneratedContent({ title: genData.content?.title ?? "", catch_copy: genData.content?.catch_copy ?? "", description_hp: genData.content?.description_hp ?? "" });
-          setTimeout(() => router.push(`/admin/properties/${propertyId}`), 2000);
-        } else { router.push(`/admin/properties/${propertyId}`); }
-      } catch { router.push(`/admin/properties/${propertyId}`); }
-      finally { setGenerating(false); }
+        const dupRes = await fetch("/api/properties/check-duplicate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            reins_number: form.reins_number,
+            city: form.city,
+            town: form.town,
+            address: form.address,
+            price: form.price ? Number(form.price) : undefined,
+            area_land_m2: form.area_land_m2 ? Number(form.area_land_m2) : undefined,
+            area_build_m2: form.area_build_m2 ? Number(form.area_build_m2) : undefined,
+            area_exclusive_m2: form.area_exclusive_m2 ? Number(form.area_exclusive_m2) : undefined,
+            station_name1: form.station_name1,
+            station_walk1: form.station_walk1 ? Number(form.station_walk1) : undefined,
+          }),
+        });
+        const dupData = await dupRes.json();
+        if (dupData.isDuplicate && dupData.matches?.length > 0) {
+          setDuplicates(dupData.matches);
+          setShowDuplicateWarning(true);
+          setCheckingDuplicate(false);
+          return; // 警告を表示して処理を中断
+        }
+      } catch { /* 重複チェック失敗は無視して登録続行 */ }
+      setCheckingDuplicate(false);
+    }
+
+    // 登録実行
+    setRegistering(true);
+    try {
+      const src = pdfResult ?? scrapeResult;
+      const multiUnit = src && "multi_unit" in src ? (src as ParseResult).multi_unit : undefined;
+
+      // 多棟を棟ごとに別々登録
+      if (multiUnit?.detected && multiUnitMode === "separate" && multiUnit.units.length > 1) {
+        const basePayload = buildPayload();
+        const ids: string[] = [];
+        for (const unit of multiUnit.units) {
+          const unitPayload = {
+            ...basePayload,
+            title: `${form.city ?? ""}${form.town ?? ""} ${unit.name}`,
+            price: unit.price ?? basePayload.price,
+            area_land_m2: unit.area_land_m2 ?? basePayload.area_land_m2,
+            area_build_m2: unit.area_build_m2 ?? basePayload.area_build_m2,
+            area_exclusive_m2: unit.area_exclusive_m2 ?? basePayload.area_exclusive_m2,
+            rooms: unit.rooms ?? basePayload.rooms,
+          };
+          const res = await fetch("/api/properties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(unitPayload) });
+          const data = await res.json();
+          if (!res.ok) { setRegisterError(`${unit.name}の登録に失敗: ${data.error ?? "エラー"}`); return; }
+          ids.push(data.property.id);
+        }
+        // 最初の物件に遷移
+        router.push(`/admin/properties/${ids[0]}`);
+      } else {
+        // 通常の1物件登録
+        const payload = buildPayload();
+        const res = await fetch("/api/properties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!res.ok) { setRegisterError(data.error ?? "登録に失敗しました"); return; }
+        const propertyId: string = data.property.id;
+        router.push(`/admin/properties/${propertyId}`);
+      }
     } catch { setRegisterError("通信エラーが発生しました"); }
-    finally { setRegistering(false); }
+    finally { setRegistering(false); setShowDuplicateWarning(false); setDuplicates([]); }
   };
 
   // ── Scrape ──
@@ -596,8 +730,10 @@ function ImportPageInner() {
                   form={form} setForm={setForm}
                   generated={pdfResult.generated}
                   registering={registering} registerError={registerError}
-                  generating={generating} generatedContent={generatedContent}
+                  checkingDuplicate={checkingDuplicate} showDuplicateWarning={showDuplicateWarning} duplicates={duplicates}
+                  multiUnit={pdfResult.multi_unit} multiUnitMode={multiUnitMode} onMultiUnitModeChange={setMultiUnitMode}
                   onRegister={handleRegister}
+                  onDismissDuplicate={() => { setShowDuplicateWarning(false); setDuplicates([]); }}
                   onReset={resetPdf}
                 />
               )}
@@ -648,8 +784,10 @@ function ImportPageInner() {
                   form={form} setForm={setForm}
                   generated={undefined}
                   registering={registering} registerError={registerError}
-                  generating={generating} generatedContent={generatedContent}
+                  checkingDuplicate={checkingDuplicate} showDuplicateWarning={showDuplicateWarning} duplicates={duplicates}
+                  multiUnit={undefined} multiUnitMode={multiUnitMode} onMultiUnitModeChange={setMultiUnitMode}
                   onRegister={handleRegister}
+                  onDismissDuplicate={() => { setShowDuplicateWarning(false); setDuplicates([]); }}
                   onReset={resetScrape}
                 />
               )}
@@ -718,8 +856,10 @@ function ImportPageInner() {
                   form={form} setForm={setForm}
                   generated={undefined}
                   registering={registering} registerError={registerError}
-                  generating={generating} generatedContent={generatedContent}
+                  checkingDuplicate={checkingDuplicate} showDuplicateWarning={showDuplicateWarning} duplicates={duplicates}
+                  multiUnit={undefined} multiUnitMode={multiUnitMode} onMultiUnitModeChange={setMultiUnitMode}
                   onRegister={handleRegister}
+                  onDismissDuplicate={() => { setShowDuplicateWarning(false); setDuplicates([]); }}
                   onReset={resetText}
                 />
               )}

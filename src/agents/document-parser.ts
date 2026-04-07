@@ -79,6 +79,18 @@ export interface ExtractedProperty {
   current_status?: string;
 }
 
+export interface MultiUnitInfo {
+  detected: boolean;
+  units: Array<{
+    name: string;           // "A号棟", "B号棟" 等
+    price?: number;
+    area_land_m2?: number;
+    area_build_m2?: number;
+    area_exclusive_m2?: number;
+    rooms?: string;
+  }>;
+}
+
 export interface ParseResult {
   success: boolean;
   source_type: SourceType;
@@ -91,6 +103,7 @@ export interface ParseResult {
   error?: string;
   agent: "DocumentParserAgent";
   generated?: GeneratedContent;  // AI自動生成コンテンツ
+  multi_unit?: MultiUnitInfo;   // 多棟検出情報
 }
 
 // ============================================================
@@ -186,19 +199,13 @@ export async function parseDocument(input: ParseInput): Promise<ParseResult> {
       timestamp: new Date().toISOString(),
     }) + "\n");
 
-    // AI コンテンツ自動生成（失敗してもパース結果は返す）
-    let generated: GeneratedContent | undefined;
-    try {
-      generated = await generatePropertyContent(parsed.extracted || {});
-    } catch (genError) {
-      process.stderr.write(JSON.stringify({
-        level: "warn",
-        agent: "DocumentParserAgent",
-        message: "generatePropertyContent failed",
-        error: genError instanceof Error ? genError.message : String(genError),
-        timestamp: new Date().toISOString(),
-      }) + "\n");
-    }
+    // AI コンテンツ自動生成はDRAFT登録時にはスキップ
+    // 担当者が物件詳細画面で「広告文を生成」ボタンを押したときに実行する
+
+    // 多棟検出情報
+    const multiUnit: MultiUnitInfo | undefined = parsed.multi_unit?.detected
+      ? { detected: true, units: parsed.multi_unit.units || [] }
+      : undefined;
 
     return {
       success: true,
@@ -210,7 +217,7 @@ export async function parseDocument(input: ParseInput): Promise<ParseResult> {
       low_confidence_fields: lowConfidenceFields,
       raw_text: parsed.raw_text || "",
       agent: "DocumentParserAgent",
-      generated,
+      multi_unit: multiUnit,
     };
 
   } catch (error) {
@@ -419,8 +426,31 @@ function buildExtractionPrompt(): string {
     "reins_number": "low"
   },
   "raw_text": "資料から読み取ったテキスト全文（売主会社名・電話番号を含む）",
-  "raw_notes": "図面下部に会社名あり。電話番号が2つ記載（本社・支店）"
+  "raw_notes": "図面下部に会社名あり。電話番号が2つ記載（本社・支店）",
+  "multi_unit": {
+    "detected": false,
+    "units": []
+  }
 }
+
+## 多棟検出（multi_unit）
+
+販売図面に複数の号棟（A号棟・B号棟、1号棟・2号棟、A棟・B棟など）の情報が含まれている場合：
+- "multi_unit.detected" を true にする
+- "multi_unit.units" に各号棟の情報を配列で格納する
+- 共通情報（所在地・最寄駅・構造・築年等）は extracted にそのまま記載
+- 棟ごとに異なる情報（価格・面積・間取り）は units の各要素に記載
+
+例:
+"multi_unit": {
+  "detected": true,
+  "units": [
+    { "name": "A号棟", "price": 5980, "area_land_m2": 95.2, "area_build_m2": 89.1, "rooms": "3LDK" },
+    { "name": "B号棟", "price": 6280, "area_land_m2": 102.5, "area_build_m2": 96.3, "rooms": "4LDK" }
+  ]
+}
+
+単一物件の場合は "multi_unit": { "detected": false, "units": [] } とする。
 
 ## 確信度の基準
 - high: はっきりと数値・文字が読み取れた
