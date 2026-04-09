@@ -1,85 +1,92 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { calcCommission } from "@/lib/commission";
 
-// GET /api/contracts
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status");
-    const property_id = searchParams.get("property_id");
-    const customer_id = searchParams.get("customer_id");
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const customerId = searchParams.get("customer_id");
+  const status = searchParams.get("status");
 
-    const where: Record<string, unknown> = {};
-    if (status) where.status = status;
-    if (property_id) where.property_id = property_id;
-    if (customer_id) where.customer_id = customer_id;
+  const where: Record<string, unknown> = {};
+  if (customerId) where.customer_id = customerId;
+  if (status) where.status = status;
 
-    const contracts = await prisma.contract.findMany({
-      where,
-      orderBy: { created_at: "desc" },
-      include: { customer: { select: { id: true, name: true } } },
-      take: 200,
-    });
+  const contracts = await prisma.contract.findMany({
+    where,
+    include: {
+      customer: { select: { id: true, name: true } },
+      property: { select: { id: true, city: true, town: true } },
+    },
+    orderBy: { created_at: "desc" },
+    take: 50,
+  });
 
-    // Attach property info
-    const propertyIds = [...new Set(contracts.map((c) => c.property_id))];
-    const properties =
-      propertyIds.length > 0
-        ? await prisma.property.findMany({
-            where: { id: { in: propertyIds } },
-            select: { id: true, city: true, address: true, property_type: true, price: true },
-          })
-        : [];
-    const propMap = Object.fromEntries(properties.map((p) => [p.id, p]));
+  // BigInt をシリアライズ
+  const serialized = contracts.map((c) => ({
+    ...c,
+    price:          c.price          !== null ? Number(c.price)          : null,
+    price_land:     c.price_land     !== null ? Number(c.price_land)     : null,
+    price_building: c.price_building !== null ? Number(c.price_building) : null,
+    price_tax:      c.price_tax      !== null ? Number(c.price_tax)      : null,
+    deposit:        c.deposit        !== null ? Number(c.deposit)        : null,
+  }));
 
-    const result = contracts.map((c) => ({
-      ...c,
-      property: propMap[c.property_id] ?? null,
-    }));
-
-    return NextResponse.json({ contracts: result, total: result.length });
-  } catch (error) {
-    console.error("GET /api/contracts error:", error);
-    return NextResponse.json({ error: "契約一覧の取得に失敗しました" }, { status: 500 });
-  }
+  return NextResponse.json({ contracts: serialized });
 }
 
-// POST /api/contracts
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await req.json();
 
-    if (!body.property_id || !body.contract_price) {
-      return NextResponse.json(
-        { error: "property_id と contract_price は必須です" },
-        { status: 400 }
-      );
+    if (!body.customer_id) {
+      return NextResponse.json({ error: "customer_id は必須です" }, { status: 400 });
     }
 
-    const price = Number(body.contract_price);
-    const type = body.commission_type ?? "both";
-    const commission = calcCommission(price, type as "buyer" | "seller" | "both");
+    const parseBigInt = (val: unknown) => {
+      if (val === null || val === undefined || val === "") return null;
+      const n = Number(String(val).replace(/,/g, ""));
+      return isNaN(n) ? null : BigInt(n);
+    };
 
     const contract = await prisma.contract.create({
       data: {
-        property_id: body.property_id,
-        customer_id: body.customer_id ?? null,
-        agent_id: body.agent_id ?? null,
-        status: body.status ?? "draft",
-        contract_price: price,
-        commission_type: type,
-        commission_amount: Math.round(commission),
-        commission_rate: body.commission_rate ?? null,
-        contract_date: body.contract_date ? new Date(body.contract_date) : null,
-        settlement_date: body.settlement_date ? new Date(body.settlement_date) : null,
-        notes: body.notes ?? null,
+        customer_id:         body.customer_id,
+        property_id:         body.property_id         || null,
+        contract_category:   body.contract_category,
+        property_type_doc:   body.property_type_doc,
+        price_type:          body.price_type          ?? "売買代金固定",
+        seller_name:         body.seller_name         || null,
+        seller_name_kana:    body.seller_name_kana    || null,
+        seller_address:      body.seller_address      || null,
+        seller_phone:        body.seller_phone        || null,
+        seller_company:      body.seller_company      || null,
+        buyer_name:          body.buyer_name          || null,
+        buyer_name_kana:     body.buyer_name_kana     || null,
+        buyer_address:       body.buyer_address       || null,
+        buyer_phone:         body.buyer_phone         || null,
+        property_address:    body.property_address    || null,
+        property_area_land:  body.property_area_land  || null,
+        property_area_build: body.property_area_build || null,
+        property_structure:  body.property_structure  || null,
+        property_built_year: body.property_built_year || null,
+        price:          parseBigInt(body.price),
+        price_land:     parseBigInt(body.price_land),
+        price_building: parseBigInt(body.price_building),
+        price_tax:      parseBigInt(body.price_tax),
+        deposit:        parseBigInt(body.deposit),
+        deposit_deadline: body.deposit_deadline ? new Date(body.deposit_deadline) : null,
+        delivery_date:    body.delivery_date    ? new Date(body.delivery_date)    : null,
+        contract_date:    body.contract_date    ? new Date(body.contract_date)    : null,
+        zoning:            body.zoning            || null,
+        building_coverage: body.building_coverage || null,
+        floor_area_ratio:  body.floor_area_ratio  || null,
+        takken_staff_id:   body.takken_staff_id   || null,
+        notes:             body.notes             || null,
       },
     });
 
-    return NextResponse.json({ contract }, { status: 201 });
-  } catch (error) {
-    console.error("POST /api/contracts error:", error);
-    return NextResponse.json({ error: "契約の登録に失敗しました" }, { status: 500 });
+    return NextResponse.json({ success: true, contract: { id: contract.id } });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

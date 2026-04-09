@@ -27,11 +27,13 @@
     "@prisma/client": "^5.0.0",
     "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",
+    "docxtemplater": "^3.68.3",
     "encoding-japanese": "^2.2.0",
     "googleapis": "^171.4.0",
     "next": "^14.2.0",
     "next-auth": "^4.24.13",
     "pdf-lib": "^1.17.1",
+    "pizzip": "^3.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "zod": "^3.23.0"

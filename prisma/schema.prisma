@@ -278,6 +278,7 @@ model Property {
   ad_confirmed_at         DateTime?
   ad_confirmed_by         String?
   ad_confirmation_file    String?
+  last_ad_check_date      DateTime?
 
   // 写真集計キャッシュ
   photo_count             Int       @default(0)
@@ -325,6 +326,7 @@ model Property {
   agent                 Staff?    @relation("PropertyAgent", fields: [agent_id], references: [id])
   successor_agent       Staff?    @relation("PropertySuccessor", fields: [successor_agent_id], references: [id])
   inquiries             Inquiry[]
+  contracts             Contract[]
   @@map("properties")
 }
 
@@ -830,6 +832,7 @@ model Staff {
   inquiries_assigned  Inquiry[] @relation("InquiryAgent")
   customers_assigned  Customer[] @relation("CustomerAgent")
   private_properties_as_agent PrivateProperty[] @relation("PrivatePropertyAgent")
+  contracts_as_takken  Contract[] @relation("ContractTakken")
 
   @@map("staffs")
 }
@@ -927,20 +930,81 @@ model PropertyTransfer {
 }
 
 model Contract {
-  id                String    @id @default(cuid())
-  property_id       String
-  customer_id       String?
-  customer          Customer? @relation(fields: [customer_id], references: [id])
-  agent_id          String?
-  status            String    @default("draft")
-  contract_price    Int
-  commission_type   String    @default("both")
-  commission_amount Int?
-  commission_rate   Float?
-  contract_date     DateTime?
-  settlement_date   DateTime?
-  notes             String?
-  created_at        DateTime  @default(now())
-  updated_at        DateTime  @updatedAt
+  id                  String    @id @default(cuid())
+
+  // 紐づけ（顧客は必須、物件は任意）
+  customer_id         String
+  customer            Customer  @relation(fields: [customer_id], references: [id])
+  property_id         String?
+  property            Property? @relation(fields: [property_id], references: [id])
+
+  // テンプレート選択
+  contract_category   String    // "一般仲介" | "消費者契約" | "売主宅建業者"
+  property_type_doc   String    // "土地" | "土地建物" | "区分所有_敷地権" | "区分所有_非敷地権" | "借地権付建物" | "土地建物_新築" | "借地権付建物_新築"
+  price_type          String    @default("売買代金固定") // "売買代金清算_測量" | "売買代金清算_確定測量" | "売買代金固定"
+
+  // 売主情報
+  seller_name         String?
+  seller_name_kana    String?
+  seller_address      String?
+  seller_phone        String?
+  seller_company      String?
+
+  // 買主情報（顧客から自動セット）
+  buyer_name          String?
+  buyer_name_kana     String?
+  buyer_address       String?
+  buyer_phone         String?
+
+  // 物件情報（登記記録）
+  property_address    String?
+  property_area_land  String?
+  property_area_build String?
+  property_structure  String?
+  property_built_year String?
+
+  // 取引金額
+  price               BigInt?
+  price_land          BigInt?
+  price_building      BigInt?
+  price_tax           BigInt?
+  deposit             BigInt?
+  deposit_deadline    DateTime?
+  delivery_date       DateTime?
+  contract_date       DateTime?
+
+  // 法令制限（重説用）
+  zoning              String?
+  building_coverage   String?
+  floor_area_ratio    String?
+
+  // 宅建士
+  takken_staff_id     String?
+  takken_staff        Staff?    @relation("ContractTakken", fields: [takken_staff_id], references: [id])
+
+  // AI解析結果（JSON保存）
+  ai_extracted_data   String?   @db.Text
+
+  // 添付書類
+  documents           ContractDocument[]
+
+  status              String    @default("DRAFT") // DRAFT | CONFIRMED | SIGNED
+  notes               String?   @db.Text
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
   @@map("contracts")
+}
+
+model ContractDocument {
+  id           String   @id @default(cuid())
+  contract_id  String
+  contract     Contract @relation(fields: [contract_id], references: [id])
+  doc_type     String   // "前契約書" | "役所資料" | "測量図" | "公図" | "登記簿" | "その他"
+  file_name    String
+  file_path    String
+  ai_extracted String?  @db.Text
+  created_at   DateTime @default(now())
+
+  @@map("contract_documents")
 }
