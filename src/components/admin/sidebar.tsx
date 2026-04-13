@@ -63,7 +63,7 @@ export default function Sidebar({ currentUser }: { currentUser?: CurrentUser }) 
       </div>
 
       <nav style={{ padding: "4px 0", flex: 1, overflowY: "auto" }}>
-        {NAV_GROUPS.map((group, gi) => (
+        {(NAV_GROUPS ?? []).map((group, gi) => (
           <div key={group.label}>
             {/* グループラベル */}
             <div style={{ padding: "16px 20px 4px" }}>

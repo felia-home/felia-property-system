@@ -112,7 +112,7 @@ export function WorkflowPanel({
             gap: 0,
           }}
         >
-          {STEPS.map((step, idx) => {
+          {(STEPS ?? []).map((step, idx) => {
             const done = !isTerminal && currentIdx > idx;
             const active = !isTerminal && currentIdx === idx;
             const future = !isTerminal && currentIdx < idx;
@@ -242,7 +242,7 @@ export function WorkflowPanel({
             {currentStep.icon} {currentStep.label} — やること
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {currentStep.tasks.map((task) => {
+            {(currentStep?.tasks ?? []).map((task) => {
               const done = getTaskDone(currentStep.key, task);
               return (
                 <div

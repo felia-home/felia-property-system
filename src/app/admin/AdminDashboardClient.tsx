@@ -415,7 +415,7 @@ function DashboardInner() {
         <div style={{ color: "#aaa", fontSize: 13, padding: 24 }}>読み込み中...</div>
       ) : (
         <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 12 }}>
-          {KANBAN_COLUMNS_GROUPED.map(col => {
+          {(KANBAN_COLUMNS_GROUPED ?? []).map(col => {
             const items = (col.statuses ?? []).flatMap(s => byStatus.get(s) ?? []);
             return (
               <div key={col.key} style={{ flexShrink: 0, width: 195, background: "#fff", borderRadius: 10, border: "1px solid #e0deda", overflow: "hidden" }}>

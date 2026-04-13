@@ -104,7 +104,7 @@ export function AdApprovalForm({
           承諾方法
         </label>
         <div style={{ display: "flex", gap: 8 }}>
-          {METHOD_OPTIONS.map((opt) => {
+          {(METHOD_OPTIONS ?? []).map((opt) => {
             const active = method === opt.value;
             return (
               <button
