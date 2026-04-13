@@ -21,9 +21,9 @@ type FormState = {
 };
 
 const POSITIONS = [
-  { value: "TOP", label: "トップバナー" },
-  { value: "MIDDLE", label: "中段バナー" },
-  { value: "BOTTOM", label: "下段バナー" },
+  { value: "TOP", label: "上段" },
+  { value: "MIDDLE", label: "中段" },
+  { value: "BOTTOM", label: "下段" },
 ];
 
 const EMPTY_FORM: FormState = {
@@ -35,189 +35,220 @@ export default function BannersPage() {
   const [editing, setEditing] = useState<Banner | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const load = () =>
-    fetch("/api/banners").then(r => r.json()).then(d => setBanners(d.banners ?? []));
+    fetch("/api/banners").then(r => r.json()).then((d: { banners?: Banner[] }) => setBanners(d.banners ?? []));
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const f = (k: keyof FormState, v: unknown) =>
-    setForm(p => ({ ...p, [k]: v }));
+  const f = (k: keyof FormState, v: unknown) => setForm(p => ({ ...p, [k]: v }));
 
-  const handleSave = async () => {
-    setLoading(true);
-    if (editing) {
-      await fetch(`/api/banners/${editing.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-    } else {
-      await fetch("/api/banners", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-    }
+  const openNew = (position = "TOP", slot = 1) => {
     setEditing(null);
-    setShowForm(false);
-    setForm(EMPTY_FORM);
-    setLoading(false);
-    load();
+    setForm({ ...EMPTY_FORM, position, slot });
+    setShowForm(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("削除してよいですか？")) return;
-    await fetch(`/api/banners/${id}`, { method: "DELETE" });
-    load();
-  };
-
-  const handleEdit = (banner: Banner) => {
-    setEditing(banner);
+  const openEdit = (b: Banner) => {
+    setEditing(b);
     setForm({
-      title: banner.title,
-      image_url: banner.image_url,
-      link_url: banner.link_url || "",
-      position: banner.position,
-      slot: banner.slot,
-      is_active: banner.is_active,
+      title: b.title,
+      image_url: b.image_url,
+      link_url: b.link_url ?? "",
+      position: b.position,
+      slot: b.slot,
+      is_active: b.is_active,
     });
     setShowForm(true);
   };
 
-  const grouped = POSITIONS.map(pos => ({
-    ...pos,
-    items: banners.filter(b => b.position === pos.value).sort((a, b) => a.slot - b.slot),
-  }));
+  const handleSave = async () => {
+    setSaving(true);
+    const url = editing ? `/api/banners/${editing.id}` : "/api/banners";
+    const method = editing ? "PATCH" : "POST";
+    await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    setSaving(false);
+    setShowForm(false);
+    setEditing(null);
+    setForm(EMPTY_FORM);
+    load();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("削除しますか？")) return;
+    await fetch(`/api/banners/${id}`, { method: "DELETE" });
+    load();
+  };
+
+  const toggleActive = async (b: Banner) => {
+    await fetch(`/api/banners/${b.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...b, is_active: !b.is_active }),
+    });
+    load();
+  };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-6 max-w-4xl">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">バナー管理</h1>
-          <p className="text-sm text-gray-500 mt-1">HPトップページのバナーを管理します（2カラム2行）</p>
+          <p className="text-sm text-gray-500 mt-1">HPトップページのバナーを管理します（2カラム）</p>
         </div>
-        <button
-          onClick={() => { setEditing(null); setForm(EMPTY_FORM); setShowForm(true); }}
-          className="bg-[#c9a96e] text-white px-5 py-2.5 rounded-xl font-bold hover:bg-[#b8935a]"
-        >
-          ＋ バナーを追加
+        <button onClick={() => openNew()}
+          className="flex items-center gap-2 bg-[#1a3a2a] text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-[#2d5a3e] transition-colors">
+          <span className="text-lg leading-none">+</span> バナーを追加
         </button>
       </div>
 
       {/* フォーム */}
       {showForm && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
-          <h2 className="font-bold text-gray-700 mb-4">{editing ? "バナーを編集" : "新しいバナー"}</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1.5">管理用タイトル *</label>
-              <input type="text" value={form.title} onChange={e => f("title", e.target.value)}
-                placeholder="例: 無料査定バナー2024年版"
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]" />
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 mb-6 shadow-sm">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-bold text-gray-800 text-lg">{editing ? "バナーを編集" : "新しいバナー"}</h2>
+            <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          </div>
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1.5">管理用タイトル <span className="text-red-400">*</span></label>
+                <input type="text" value={form.title} onChange={e => f("title", e.target.value)}
+                  placeholder="例: 無料査定バナー2024"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]/30 focus:border-[#1a3a2a]" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1.5">リンク先URL</label>
+                <input type="text" value={form.link_url} onChange={e => f("link_url", e.target.value)}
+                  placeholder="/assessment"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]/30 focus:border-[#1a3a2a]" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1.5">位置</label>
+                  <select value={form.position} onChange={e => f("position", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]/30">
+                    {POSITIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1.5">スロット</label>
+                  <select value={form.slot} onChange={e => f("slot", Number(e.target.value))}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]/30">
+                    {[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}番目</option>)}
+                  </select>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer mt-2">
+                <div onClick={() => f("is_active", !form.is_active)}
+                  className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${form.is_active ? "bg-[#1a3a2a]" : "bg-gray-200"}`}>
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.is_active ? "translate-x-6" : "translate-x-1"}`} />
+                </div>
+                <span className="text-sm text-gray-700">HP上に表示する</span>
+              </label>
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1.5">画像URL *</label>
+              <label className="block text-xs font-bold text-gray-500 mb-1.5">画像URL <span className="text-red-400">*</span></label>
               <input type="url" value={form.image_url} onChange={e => f("image_url", e.target.value)}
                 placeholder="https://..."
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]" />
-              {form.image_url && (
-                <img src={form.image_url} alt="" className="mt-2 h-20 object-cover rounded-lg"
-                  onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-              )}
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1.5">リンク先URL</label>
-              <input type="text" value={form.link_url} onChange={e => f("link_url", e.target.value)}
-                placeholder="/contact または https://..."
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]" />
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1.5">位置</label>
-                <select value={form.position} onChange={e => f("position", e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]">
-                  {POSITIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1.5">スロット（1〜4）</label>
-                <select value={form.slot} onChange={e => f("slot", Number(e.target.value))}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]">
-                  {[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}番目</option>)}
-                </select>
-              </div>
-              <div className="flex items-end">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={form.is_active} onChange={e => f("is_active", e.target.checked)} className="w-4 h-4 accent-[#1a3a2a]" />
-                  <span className="text-sm font-bold text-gray-700">表示する</span>
-                </label>
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]/30 focus:border-[#1a3a2a] mb-3" />
+              <div className="border border-gray-200 rounded-xl overflow-hidden aspect-video bg-gray-50 flex items-center justify-center">
+                {form.image_url ? (
+                  <img src={form.image_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="text-center text-gray-400">
+                    <div className="text-3xl mb-1">🖼</div>
+                    <div className="text-xs">画像URLを入力</div>
+                  </div>
+                )}
               </div>
             </div>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => { setShowForm(false); setEditing(null); setForm(EMPTY_FORM); }}
-                className="border border-gray-200 text-gray-600 px-6 py-2.5 rounded-xl hover:bg-gray-50">
-                キャンセル
-              </button>
-              <button onClick={handleSave} disabled={loading || !form.title || !form.image_url}
-                className="bg-[#1a3a2a] text-white px-6 py-2.5 rounded-xl font-bold hover:bg-[#2d5a3e] disabled:opacity-50">
-                {loading ? "保存中..." : "保存"}
-              </button>
-            </div>
+          </div>
+          <div className="flex gap-3 mt-5 pt-5 border-t border-gray-100 justify-end">
+            <button onClick={() => { setShowForm(false); setEditing(null); setForm(EMPTY_FORM); }}
+              className="px-5 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm hover:bg-gray-50">
+              キャンセル
+            </button>
+            <button onClick={handleSave} disabled={saving || !form.title || !form.image_url}
+              className="bg-[#1a3a2a] text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-[#2d5a3e] disabled:opacity-50 transition-colors">
+              {saving ? "保存中..." : "保存する"}
+            </button>
           </div>
         </div>
       )}
 
-      {/* グループ別バナー一覧 */}
-      {grouped.map(group => (
-        <div key={group.value} className="mb-8">
-          <h2 className="font-bold text-gray-700 mb-3 flex items-center gap-2">
-            <span className="w-2 h-4 bg-[#c9a96e] rounded"></span>
-            {group.label}
-            <span className="text-xs text-gray-400">（{group.items.length}件）</span>
-          </h2>
-          {group.items.length === 0 ? (
-            <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl p-6 text-center text-gray-400 text-sm">
-              バナーなし
+      {/* スロット表示 */}
+      {POSITIONS.map(pos => {
+        const posItems = banners.filter(b => b.position === pos.value).sort((a, b) => a.slot - b.slot);
+        const allSlots = [1, 2, 3, 4].map(slot => ({
+          slot,
+          banner: posItems.find(b => b.slot === slot) ?? null,
+        }));
+
+        return (
+          <div key={pos.value} className="mb-8">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-1 h-5 bg-[#c9a96e] rounded-full"></div>
+              <h2 className="font-bold text-gray-700">{pos.label}バナー</h2>
+              <span className="text-xs text-gray-400">（{posItems.length}/4スロット使用中）</span>
             </div>
-          ) : (
             <div className="grid grid-cols-2 gap-3">
-              {group.items.map(banner => (
-                <div key={banner.id} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                  {banner.image_url ? (
-                    <img src={banner.image_url} alt={banner.title} className="w-full h-28 object-cover" />
+              {allSlots.map(({ slot, banner }) => (
+                <div key={slot} className={`rounded-2xl border-2 overflow-hidden transition-all ${
+                  banner ? "border-gray-100 bg-white" : "border-dashed border-gray-200 bg-gray-50"
+                }`}>
+                  {banner ? (
+                    <>
+                      <div className="relative aspect-video overflow-hidden">
+                        {banner.image_url ? (
+                          <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-sm">画像なし</div>
+                        )}
+                        <div className="absolute top-2 left-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full">
+                          スロット {slot}
+                        </div>
+                        <div className={`absolute top-2 right-2 text-xs px-2 py-0.5 rounded-full font-bold ${
+                          banner.is_active ? "bg-green-500 text-white" : "bg-gray-400 text-white"
+                        }`}>
+                          {banner.is_active ? "表示中" : "非表示"}
+                        </div>
+                      </div>
+                      <div className="p-3">
+                        <div className="font-bold text-gray-800 text-sm mb-0.5 truncate">{banner.title}</div>
+                        {banner.link_url && <div className="text-xs text-blue-400 truncate">{banner.link_url}</div>}
+                        <div className="flex gap-2 mt-3 items-center">
+                          <div onClick={() => toggleActive(banner)}
+                            className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer flex-shrink-0 ${banner.is_active ? "bg-[#1a3a2a]" : "bg-gray-200"}`}>
+                            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${banner.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
+                          </div>
+                          <button onClick={() => openEdit(banner)}
+                            className="flex-1 text-xs py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-center">
+                            編集
+                          </button>
+                          <button onClick={() => handleDelete(banner.id)}
+                            className="flex-1 text-xs py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-center">
+                            削除
+                          </button>
+                        </div>
+                      </div>
+                    </>
                   ) : (
-                    <div className="w-full h-28 bg-gray-100 flex items-center justify-center text-gray-400 text-sm">画像なし</div>
+                    <div className="flex flex-col items-center justify-center py-8 gap-3">
+                      <div className="text-gray-300 text-2xl">+</div>
+                      <div className="text-xs text-gray-400">スロット {slot}（空き）</div>
+                      <button onClick={() => openNew(pos.value, slot)}
+                        className="text-xs px-4 py-1.5 border border-gray-300 text-gray-500 rounded-lg hover:bg-white hover:text-gray-700 transition-colors">
+                        バナーを設定
+                      </button>
+                    </div>
                   )}
-                  <div className="p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-gray-800 line-clamp-1">{banner.title}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ml-2 flex-shrink-0 ${banner.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                        {banner.is_active ? "表示中" : "非表示"}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-400 mb-3">
-                      スロット {banner.slot}
-                      {banner.link_url && <span className="ml-2 text-blue-400">{banner.link_url}</span>}
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => handleEdit(banner)}
-                        className="flex-1 text-xs py-1.5 bg-[#1a3a2a]/10 text-[#1a3a2a] rounded-lg hover:bg-[#1a3a2a]/20 text-center">
-                        編集
-                      </button>
-                      <button onClick={() => handleDelete(banner.id)}
-                        className="flex-1 text-xs py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-center">
-                        削除
-                      </button>
-                    </div>
-                  </div>
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

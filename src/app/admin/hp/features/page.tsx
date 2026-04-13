@@ -29,192 +29,227 @@ export default function FeaturesPage() {
   const [editing, setEditing] = useState<Feature | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState<string>("");
 
   const load = () =>
-    fetch("/api/features").then(r => r.json()).then(d => setFeatures(d.features ?? []));
+    fetch("/api/features").then(r => r.json()).then((d: { features?: Feature[] }) => setFeatures(d.features ?? []));
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const f = (k: keyof FormState, v: unknown) =>
+  const f = (k: keyof FormState, v: unknown) => {
     setForm(p => ({ ...p, [k]: v }));
-
-  const handleSave = async () => {
-    setLoading(true);
-    if (editing) {
-      await fetch(`/api/features/${editing.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-    } else {
-      await fetch("/api/features", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-    }
-    setEditing(null);
-    setShowForm(false);
-    setForm(EMPTY_FORM);
-    setLoading(false);
-    load();
+    if (k === "image_url") setPreview(String(v));
   };
 
-  const handleEdit = (feature: Feature) => {
-    setEditing(feature);
-    setForm({
-      title: feature.title,
-      description: feature.description || "",
-      image_url: feature.image_url || "",
-      link_url: feature.link_url || "",
-      is_active: feature.is_active,
-      sort_order: feature.sort_order,
-    });
+  const openNew = () => {
+    setEditing(null);
+    setForm({ ...EMPTY_FORM, sort_order: features.length });
+    setPreview("");
     setShowForm(true);
   };
 
+  const openEdit = (feat: Feature) => {
+    setEditing(feat);
+    setForm({
+      title: feat.title,
+      description: feat.description ?? "",
+      image_url: feat.image_url ?? "",
+      link_url: feat.link_url ?? "",
+      is_active: feat.is_active,
+      sort_order: feat.sort_order,
+    });
+    setPreview(feat.image_url ?? "");
+    setShowForm(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    const url = editing ? `/api/features/${editing.id}` : "/api/features";
+    const method = editing ? "PATCH" : "POST";
+    await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    setSaving(false);
+    setShowForm(false);
+    setEditing(null);
+    setForm(EMPTY_FORM);
+    load();
+  };
+
+  const toggleActive = async (feat: Feature) => {
+    await fetch(`/api/features/${feat.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...feat, is_active: !feat.is_active }),
+    });
+    load();
+  };
+
   const handleDelete = async (id: string) => {
-    if (!confirm("削除してよいですか？")) return;
+    if (!confirm("削除しますか？")) return;
     await fetch(`/api/features/${id}`, { method: "DELETE" });
     load();
   };
 
-  const toggleActive = async (feature: Feature) => {
-    await fetch(`/api/features/${feature.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...feature, is_active: !feature.is_active }),
-    });
-    load();
-  };
-
-  const handleCancel = () => {
-    setEditing(null);
-    setShowForm(false);
-    setForm(EMPTY_FORM);
-  };
-
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-6 max-w-4xl">
+      {/* ヘッダー */}
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">特集管理</h1>
           <p className="text-sm text-gray-500 mt-1">HPトップの特集セクション（3列表示）を管理します</p>
         </div>
-        <button
-          onClick={() => { setEditing(null); setForm({ ...EMPTY_FORM, sort_order: features.length }); setShowForm(true); }}
-          className="bg-[#c9a96e] text-white px-5 py-2.5 rounded-xl font-bold hover:bg-[#b8935a] transition-colors"
-        >
-          ＋ 特集を追加
+        <button onClick={openNew}
+          className="flex items-center gap-2 bg-[#1a3a2a] text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-[#2d5a3e] transition-colors">
+          <span className="text-lg leading-none">+</span> 特集を追加
         </button>
       </div>
 
-      {/* フォーム */}
+      {/* 追加・編集フォーム */}
       {showForm && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
-          <h2 className="font-bold text-gray-700 mb-4">{editing ? "特集を編集" : "新しい特集を追加"}</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1.5">タイトル *</label>
-              <input type="text" value={form.title} onChange={e => f("title", e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 mb-1.5">説明文</label>
-              <textarea value={form.description} onChange={e => f("description", e.target.value)} rows={2}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a] resize-none" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 mb-6 shadow-sm">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-bold text-gray-800 text-lg">{editing ? "特集を編集" : "新しい特集"}</h2>
+            <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          </div>
+          <div className="grid grid-cols-2 gap-6">
+            {/* 左カラム */}
+            <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1.5">バナー画像URL</label>
-                <input type="url" value={form.image_url} onChange={e => f("image_url", e.target.value)}
-                  placeholder="https://..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]" />
+                <label className="block text-xs font-bold text-gray-500 mb-1.5">タイトル <span className="text-red-400">*</span></label>
+                <input type="text" value={form.title} onChange={e => f("title", e.target.value)}
+                  placeholder="例: 城南エリア特集"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]/30 focus:border-[#1a3a2a]" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1.5">説明文</label>
+                <textarea value={form.description} onChange={e => f("description", e.target.value)} rows={3}
+                  placeholder="特集の説明（HP上に表示されます）"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]/30 focus:border-[#1a3a2a] resize-none" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 mb-1.5">リンク先URL</label>
-                <input type="url" value={form.link_url} onChange={e => f("link_url", e.target.value)}
-                  placeholder="/properties?feature=..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]" />
+                <input type="text" value={form.link_url} onChange={e => f("link_url", e.target.value)}
+                  placeholder="/properties?area=johnan"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]/30 focus:border-[#1a3a2a]" />
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-gray-500 mb-1.5">表示順</label>
+                  <input type="number" value={form.sort_order} onChange={e => f("sort_order", Number(e.target.value))}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]/30 focus:border-[#1a3a2a]" />
+                </div>
+                <div className="flex items-end pb-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <div
+                      onClick={() => f("is_active", !form.is_active)}
+                      className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${form.is_active ? "bg-[#1a3a2a]" : "bg-gray-200"}`}>
+                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.is_active ? "translate-x-6" : "translate-x-1"}`} />
+                    </div>
+                    <span className="text-sm text-gray-700">HP上に表示</span>
+                  </label>
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1.5">表示順</label>
-                <input type="number" value={form.sort_order} onChange={e => f("sort_order", Number(e.target.value))}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]" />
-              </div>
-              <div className="flex items-end">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={form.is_active} onChange={e => f("is_active", e.target.checked)} className="w-4 h-4 accent-[#1a3a2a]" />
-                  <span className="text-sm font-bold text-gray-700">HP上に表示する</span>
-                </label>
+
+            {/* 右カラム：画像プレビュー */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 mb-1.5">バナー画像URL</label>
+              <input type="url" value={form.image_url} onChange={e => f("image_url", e.target.value)}
+                placeholder="https://..."
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a3a2a]/30 focus:border-[#1a3a2a] mb-3" />
+              <div className="border border-gray-200 rounded-xl overflow-hidden aspect-video bg-gray-50 flex items-center justify-center">
+                {preview ? (
+                  <img src={preview} alt="" className="w-full h-full object-cover"
+                    onError={() => setPreview("")} />
+                ) : (
+                  <div className="text-center text-gray-400">
+                    <div className="text-3xl mb-2">🖼</div>
+                    <div className="text-xs">URLを入力するとプレビューが表示されます</div>
+                  </div>
+                )}
               </div>
             </div>
-            <div className="flex gap-3">
-              <button onClick={handleSave} disabled={loading || !form.title}
-                className="bg-[#1a3a2a] text-white px-6 py-2.5 rounded-xl font-bold hover:bg-[#2d5a3e] transition-colors disabled:opacity-50">
-                {loading ? "保存中..." : "保存"}
-              </button>
-              <button onClick={handleCancel}
-                className="border border-gray-200 text-gray-600 px-6 py-2.5 rounded-xl hover:bg-gray-50">
-                キャンセル
-              </button>
-            </div>
+          </div>
+
+          <div className="flex gap-3 mt-5 pt-5 border-t border-gray-100">
+            <button onClick={() => { setShowForm(false); setEditing(null); setForm(EMPTY_FORM); }}
+              className="px-5 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm hover:bg-gray-50">
+              キャンセル
+            </button>
+            <button onClick={handleSave} disabled={saving || !form.title}
+              className="flex-1 bg-[#1a3a2a] text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-[#2d5a3e] disabled:opacity-50 transition-colors">
+              {saving ? "保存中..." : editing ? "変更を保存" : "特集を追加"}
+            </button>
           </div>
         </div>
       )}
 
-      {/* 特集一覧 */}
-      <div className="space-y-3">
-        {features.map(feature => (
-          <div key={feature.id} className="bg-white rounded-2xl border border-gray-100 p-5 flex items-center gap-4">
-            {feature.image_url ? (
-              <img src={feature.image_url} alt={feature.title}
-                className="w-24 h-16 object-cover rounded-lg flex-shrink-0" />
-            ) : (
-              <div className="w-24 h-16 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-gray-400 text-xs">画像なし</span>
+      {/* 特集リスト */}
+      {features.length === 0 && !showForm ? (
+        <div className="text-center py-20 bg-white border border-gray-100 rounded-2xl">
+          <div className="text-5xl mb-4">🗂</div>
+          <p className="text-gray-500 mb-4">特集がまだありません</p>
+          <button onClick={openNew} className="bg-[#1a3a2a] text-white px-6 py-2.5 rounded-xl text-sm font-bold">
+            最初の特集を作成する
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+          {(features ?? []).map((feat, i) => (
+            <div key={feat.id}
+              className={`flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors ${i < features.length - 1 ? "border-b border-gray-50" : ""}`}>
+              {/* ドラッグハンドル */}
+              <div className="text-gray-300 cursor-grab text-lg select-none flex-shrink-0">⠿</div>
+
+              {/* サムネイル */}
+              <div className="w-16 h-11 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
+                {feat.image_url ? (
+                  <img src={feat.image_url} alt={feat.title} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs">なし</div>
+                )}
               </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-bold text-gray-800">{feature.title}</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${feature.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                  {feature.is_active ? "表示中" : "非表示"}
-                </span>
+
+              {/* 情報 */}
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-gray-800 text-sm truncate">{feat.title}</div>
+                <div className="text-xs text-gray-400 mt-0.5 truncate">
+                  {feat.link_url ?? "リンクなし"}
+                  {feat.description && ` · ${feat.description.slice(0, 30)}...`}
+                </div>
               </div>
-              {feature.description && (
-                <p className="text-xs text-gray-500 line-clamp-1">{feature.description}</p>
-              )}
-              {feature.link_url && (
-                <p className="text-xs text-blue-400 mt-0.5">{feature.link_url}</p>
-              )}
+
+              {/* 表示順 */}
+              <div className="text-xs text-gray-400 flex-shrink-0 w-8 text-center">{feat.sort_order}</div>
+
+              {/* バッジ */}
+              <div className={`flex-shrink-0 text-xs px-2.5 py-1 rounded-full font-bold ${
+                feat.is_active ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"
+              }`}>
+                {feat.is_active ? "公開中" : "非表示"}
+              </div>
+
+              {/* トグルスイッチ */}
+              <div
+                onClick={() => toggleActive(feat)}
+                className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer flex-shrink-0 ${feat.is_active ? "bg-[#1a3a2a]" : "bg-gray-200"}`}>
+                <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${feat.is_active ? "translate-x-5" : "translate-x-0.5"}`} />
+              </div>
+
+              {/* アクション */}
+              <div className="flex gap-1.5 flex-shrink-0">
+                <button onClick={() => openEdit(feat)}
+                  className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
+                  編集
+                </button>
+                <button onClick={() => handleDelete(feat.id)}
+                  className="px-3 py-1.5 text-xs bg-red-50 text-red-600 rounded-lg hover:bg-red-100">
+                  削除
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button onClick={() => toggleActive(feature)}
-                className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
-                {feature.is_active ? "非表示にする" : "表示する"}
-              </button>
-              <button onClick={() => handleEdit(feature)}
-                className="text-xs px-3 py-1.5 bg-[#1a3a2a]/10 text-[#1a3a2a] rounded-lg hover:bg-[#1a3a2a]/20">
-                編集
-              </button>
-              <button onClick={() => handleDelete(feature.id)}
-                className="text-xs px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100">
-                削除
-              </button>
-            </div>
-          </div>
-        ))}
-        {features.length === 0 && (
-          <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-            <div className="text-4xl mb-3">🗂️</div>
-            <p className="text-gray-500">特集がまだありません</p>
-          </div>
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
