@@ -24,11 +24,11 @@ export function TaskCard({
   icon,
   title,
   subtitle,
-  count,
-  urgent,
+  count = 0,
+  urgent = false,
   color,
   bg,
-  properties,
+  properties = [],
   href,
 }: TaskCardProps) {
   const hasItems = count > 0;
@@ -123,7 +123,7 @@ export function TaskCard({
           </div>
         ) : (
           <>
-            {properties.slice(0, 3).map((p) => (
+            {(properties ?? []).slice(0, 3).map((p) => (
               <a
                 key={p.id}
                 href={`/admin/properties/${p.id}`}

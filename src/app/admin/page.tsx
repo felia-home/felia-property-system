@@ -1,8 +1,38 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Component, type ReactNode } from "react";
 import Link from "next/link";
-import { PROPERTY_STATUS, KANBAN_COLUMNS_GROUPED, getStatusDef } from "@/lib/workflow-status";
+import { KANBAN_COLUMNS_GROUPED, getStatusDef } from "@/lib/workflow-status";
 import { TaskCard, type TaskCardProperty } from "@/components/admin/TaskCard";
+
+// ── Error Boundary ────────────────────────────────────────────────────────────
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: string | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(err: unknown) {
+    return { error: err instanceof Error ? `${err.message}\n${err.stack ?? ""}` : String(err) };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 32, fontFamily: "monospace" }}>
+          <div style={{ background: "#fdeaea", border: "1px solid #f99", borderRadius: 8, padding: 20, marginBottom: 16 }}>
+            <strong style={{ color: "#8c1f1f" }}>レンダリングエラー</strong>
+            <pre style={{ marginTop: 8, fontSize: 11, whiteSpace: "pre-wrap", color: "#5a1a1a" }}>{this.state.error}</pre>
+          </div>
+          <button onClick={() => window.location.reload()} style={{ padding: "8px 20px", background: "#234f35", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>
+            ページを再読み込み
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -48,7 +78,15 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch("/api/properties?take=300")
       .then(r => r.json())
-      .then(d => setProperties(Array.isArray(d?.properties) ? d.properties : []))
+      .then(d => {
+        const props = Array.isArray(d?.properties) ? d.properties : [];
+        // Normalize nullable array fields that Prisma may return as null for old rows
+        setProperties(props.map((p: PropertySummary) => ({
+          ...p,
+          pending_tasks: Array.isArray(p.pending_tasks) ? p.pending_tasks : [],
+          _count: p._count ?? { images: 0 },
+        })));
+      })
       .catch(() => {})
       .finally(() => setLoadingProps(false));
 
@@ -154,6 +192,7 @@ export default function DashboardPage() {
   });
 
   return (
+    <ErrorBoundary>
     <div style={{ padding: 28, maxWidth: 1400 }}>
       <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
         <div>
@@ -179,7 +218,7 @@ export default function DashboardPage() {
       )}
 
       {/* License alerts */}
-      {licenseAlerts.map(a => (
+      {(licenseAlerts ?? []).map(a => (
         <Link key={a.company} href="/admin/settings" style={{ textDecoration: "none", display: "block", marginBottom: 8 }}>
           <div style={{ background: a.daysLeft <= 30 ? "#fde8e8" : "#fff8e1", border: `1px solid ${a.daysLeft <= 30 ? "#fcc" : "#ffe082"}`, padding: "10px 16px", borderRadius: 10, display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ fontSize: 16 }}>{a.daysLeft <= 30 ? "🚨" : "⚠️"}</span>
@@ -198,7 +237,7 @@ export default function DashboardPage() {
           <div style={{ fontSize: 13, fontWeight: 600, color: "#664d03", marginBottom: 6 }}>
             ⚠️ 宅建士証の更新期限が近いスタッフがいます（{takkenAlerts.length}名）
           </div>
-          {takkenAlerts.map(a => (
+          {(takkenAlerts ?? []).map(a => (
             <div key={a.name} style={{ fontSize: 12, color: "#664d03" }}>
               {a.name} — あと <strong>{a.daysLeft}日</strong>
             </div>
@@ -686,5 +725,6 @@ export default function DashboardPage() {
 
       {/* Workflow Kanban — only in 全体 tab */}
     </div>
+    </ErrorBoundary>
   );
 }
