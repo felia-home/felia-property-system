@@ -103,9 +103,9 @@ export default function DashboardPage() {
   const adPendingCount = (byStatus.get("AD_PENDING") ?? []).length + (byStatus.get("AD_SENT") ?? []).length;
   const soldAlertCount = (byStatus.get("SOLD_ALERT") ?? []).length;
   const thisMonth = new Date(); thisMonth.setDate(1); thisMonth.setHours(0, 0, 0, 0);
-  const soldThisMonth = properties.filter(p => p.status === "SOLD" && p.created_at > thisMonth.toISOString()).length;
+  const soldThisMonth = (properties ?? []).filter(p => p.status === "SOLD" && p.created_at > thisMonth.toISOString()).length;
 
-  const noPhotoProps = properties.filter(p =>
+  const noPhotoProps = (properties ?? []).filter(p =>
     !["DRAFT", "SOLD", "CLOSED", "AD_NG"].includes(p.status) &&
     (p.photo_count ?? p._count?.images ?? 0) === 0
   );
@@ -113,7 +113,7 @@ export default function DashboardPage() {
     const days = daysSince(p.ad_confirmation_sent_at);
     return days !== null && days >= 3;
   });
-  const lowPhotoProps = properties.filter(p =>
+  const lowPhotoProps = (properties ?? []).filter(p =>
     !["DRAFT", "SOLD", "CLOSED", "AD_NG", "AD_PENDING"].includes(p.status) &&
     (p.photo_count ?? p._count?.images ?? 0) > 0 &&
     (p.photo_count ?? p._count?.images ?? 0) < 5
@@ -121,7 +121,7 @@ export default function DashboardPage() {
 
   const hasCritical = adPendingCount > 0 || noPhotoProps.length > 0;
   const hasWarning = adSentOverdue.length > 0 || lowPhotoProps.length > 0;
-  const actionRequired = properties.filter(p => (p.pending_tasks?.length ?? 0) > 0 && !["SOLD", "CLOSED"].includes(p.status));
+  const actionRequired = (properties ?? []).filter(p => ((p.pending_tasks ?? []).length ?? 0) > 0 && !["SOLD", "CLOSED"].includes(p.status));
 
   // Role tabs
   const [roleTab, setRoleTab] = useState<"all" | "sales" | "backoffice">("all");
@@ -130,15 +130,15 @@ export default function DashboardPage() {
   const salesAlerts = [
     ...(byStatus.get("SOLD_ALERT") ?? []),
   ];
-  const salesActionRequired = actionRequired.filter(p =>
+  const salesActionRequired = (actionRequired ?? []).filter(p =>
     ["DRAFT", "SOLD_ALERT", "PUBLISHED"].includes(p.status)
   );
 
   // 内勤向け: ad confirmation, photos, publishing
   const backofficeTasks = [
-    ...adSentOverdue,
-    ...noPhotoProps,
-    ...lowPhotoProps.filter(p => !noPhotoProps.includes(p)),
+    ...(adSentOverdue ?? []),
+    ...(noPhotoProps ?? []),
+    ...(lowPhotoProps ?? []).filter(p => !(noPhotoProps ?? []).includes(p)),
   ];
 
   // 掲載中で写真不足の物件（STEP4用）
@@ -502,7 +502,7 @@ export default function DashboardPage() {
                             {TYPE_LABELS[p.property_type] ?? ""} {p.price.toLocaleString()}万
                           </div>
                           <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
-                            {col.statuses.length > 1 && (
+                            {(col.statuses ?? []).length > 1 && (
                               <span style={{ fontSize: 9, background: statusDef.bg, color: statusDef.color, padding: "1px 5px", borderRadius: 4, fontWeight: 600 }}>{statusDef.icon} {statusDef.label}</span>
                             )}
                             {photoCount === 0 && !["DRAFT", "AD_PENDING", "AD_SENT"].includes(p.status) && (
@@ -515,7 +515,7 @@ export default function DashboardPage() {
                               <span title={`広告確認書を送付してから${sentDays}日経過しています`} style={{ fontSize: 9, background: "#fff0e0", color: "#e65100", padding: "1px 5px", borderRadius: 4, fontWeight: 600 }}>⚠️{sentDays}日</span>
                             )}
                             {(p.pending_tasks?.length ?? 0) > 0 && (
-                              <span title={`未完了タスク: ${p.pending_tasks.join(", ")}`} style={{ fontSize: 9, color: "#8c1f1f" }}>❌{p.pending_tasks.length}</span>
+                              <span title={`未完了タスク: ${(p.pending_tasks ?? []).join(", ")}`} style={{ fontSize: 9, color: "#8c1f1f" }}>❌{p.pending_tasks?.length ?? 0}</span>
                             )}
                           </div>
                         </div>
@@ -523,7 +523,7 @@ export default function DashboardPage() {
                     );
                   })}
                   {items.length > 8 && (
-                    <Link href={`/admin/properties?status=${col.statuses[0]}`} style={{ fontSize: 10, color: "#888", textAlign: "center", textDecoration: "none", padding: "4px 0" }}>
+                    <Link href={`/admin/properties?status=${(col.statuses ?? [])[0] ?? ""}`} style={{ fontSize: 10, color: "#888", textAlign: "center", textDecoration: "none", padding: "4px 0" }}>
                       …他{items.length - 8}件
                     </Link>
                   )}
