@@ -36,6 +36,15 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
+    label: "HP管理",
+    items: [
+      { href: "/admin/hp",           label: "HP管理トップ",   icon: "🌐" },
+      { href: "/admin/hp/features",  label: "特集管理",       icon: "🗂" },
+      { href: "/admin/hp/news",      label: "お知らせ管理",   icon: "📰" },
+      { href: "/admin/hp/banners",   label: "バナー管理",     icon: "🖼" },
+    ],
+  },
+  {
     label: "設定・管理",
     items: [
       { href: "/admin/staff",                label: "スタッフ管理",       icon: "👤", feature: "staff.view" },

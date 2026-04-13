@@ -442,6 +442,128 @@ function AiCheckResultCard({ result }: { result: Record<string, unknown> }) {
   );
 }
 
+// ── HP Flag Panel ─────────────────────────────────────────────────────────────
+
+function HpFlagPanel({
+  property,
+  onReload,
+}: {
+  property: Record<string, unknown>;
+  onReload: () => Promise<void>;
+}) {
+  const [saving, setSaving] = useState(false);
+  const id = String(property.id);
+
+  const patch = async (data: Record<string, unknown>) => {
+    setSaving(true);
+    await fetch(`/api/properties/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    await onReload();
+    setSaving(false);
+  };
+
+  const isFeliaSel = !!property.is_felia_selection;
+  const isOpenHouse = !!property.is_open_house;
+  const openHouseStart = property.open_house_start ? String(property.open_house_start).slice(0, 16) : "";
+  const openHouseEnd = property.open_house_end ? String(property.open_house_end).slice(0, 16) : "";
+
+  return (
+    <div>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1b18", marginBottom: 4 }}>🌐 HP表示設定</div>
+        <div style={{ fontSize: 12, color: "#706e68" }}>HPのトップページに表示する特別フラグを設定します</div>
+      </div>
+
+      {/* 厳選物件フラグ */}
+      <div style={{ background: "#fffde7", border: "1px solid #fff176", borderRadius: 12, padding: 18, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1b18", marginBottom: 4 }}>⭐ Felia Selection（厳選物件）</div>
+            <div style={{ fontSize: 12, color: "#706e68" }}>HPトップの「厳選物件情報」セクションに表示されます</div>
+          </div>
+          <button
+            disabled={saving}
+            onClick={() => patch({ is_felia_selection: !isFeliaSel })}
+            style={{
+              padding: "8px 18px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+              border: isFeliaSel ? "none" : "2px solid #f9a825",
+              background: isFeliaSel ? "#f9a825" : "transparent",
+              color: isFeliaSel ? "#fff" : "#f57f17",
+              cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit",
+              flexShrink: 0, marginLeft: 16,
+            }}
+          >
+            {isFeliaSel ? "✅ 設定中" : "設定する"}
+          </button>
+        </div>
+      </div>
+
+      {/* 現地販売会フラグ */}
+      <div style={{ background: "#fff3e0", border: "1px solid #ffcc80", borderRadius: 12, padding: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: isOpenHouse ? 16 : 0 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1b18", marginBottom: 4 }}>🏠 現地販売会</div>
+            <div style={{ fontSize: 12, color: "#706e68" }}>HPトップの「Open House」セクションに表示されます</div>
+          </div>
+          <button
+            disabled={saving}
+            onClick={() => patch({ is_open_house: !isOpenHouse })}
+            style={{
+              padding: "8px 18px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+              border: isOpenHouse ? "none" : "2px solid #ef6c00",
+              background: isOpenHouse ? "#ef6c00" : "transparent",
+              color: isOpenHouse ? "#fff" : "#e65100",
+              cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit",
+              flexShrink: 0, marginLeft: 16,
+            }}
+          >
+            {isOpenHouse ? "✅ 設定中" : "設定する"}
+          </button>
+        </div>
+        {isOpenHouse && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: "#706e68", display: "block", marginBottom: 6 }}>開始日時</label>
+              <input
+                type="datetime-local"
+                defaultValue={openHouseStart}
+                onChange={async e => {
+                  await fetch(`/api/properties/${id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ open_house_start: e.target.value }),
+                  });
+                  await onReload();
+                }}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #e0deda", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: "#706e68", display: "block", marginBottom: 6 }}>終了日時</label>
+              <input
+                type="datetime-local"
+                defaultValue={openHouseEnd}
+                onChange={async e => {
+                  await fetch(`/api/properties/${id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ open_house_end: e.target.value }),
+                  });
+                  await onReload();
+                }}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #e0deda", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Completion Meter ──────────────────────────────────────────────────────────
 
 function CompletionMeter({
@@ -527,7 +649,7 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
   const [property, setProperty] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
-  const [mainTab, setMainTab] = useState<"info" | "photos" | "ad_confirm" | "workflow" | "copy">("workflow");
+  const [mainTab, setMainTab] = useState<"info" | "photos" | "ad_confirm" | "workflow" | "copy" | "hp">("workflow");
   const [form, setForm] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -760,6 +882,7 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
           ["info", "物件情報"],
           ["photos", "写真管理"],
           ["copy", "広告文"],
+          ["hp", "HP設定"],
         ] as const).map(([t, label]) => {
           const hasCopy = !!(property.catch_copy);
           return (
@@ -799,6 +922,9 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
             lng={property.longitude as number | null}
             propertyType={String(property.property_type ?? "")}
           />
+        )}
+        {mainTab === "hp" && (
+          <HpFlagPanel property={property} onReload={loadProperty} />
         )}
         {mainTab === "copy" && (
           <div>

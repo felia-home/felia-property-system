@@ -58,6 +58,7 @@ const UPDATABLE_FIELDS = [
   "days_on_market","inquiry_count","pending_tasks",
   "published_at",
   "selling_points",
+  "is_felia_selection", "is_open_house", "open_house_start", "open_house_end",
 ];
 
 export async function GET(

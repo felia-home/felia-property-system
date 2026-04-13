@@ -315,6 +315,12 @@ model Property {
   ad_approval_method    String?   // EMAIL | PHONE | SELF
   ad_approval_date      DateTime? // 承諾取得日
 
+  // HP表示フラグ
+  is_felia_selection    Boolean   @default(false)  // 厳選物件フラグ
+  is_open_house         Boolean   @default(false)  // 現地販売会フラグ
+  open_house_start      DateTime?                  // 現地販売会開始日
+  open_house_end        DateTime?                  // 現地販売会終了日
+
   is_deleted            Boolean   @default(false)
   deleted_at            DateTime?
   created_at            DateTime  @default(now())
@@ -994,6 +1000,50 @@ model Contract {
   updated_at          DateTime  @updatedAt
 
   @@map("contracts")
+}
+
+// ===== HP連携コンテンツ管理 =====
+
+// 特集管理
+model Feature {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?  @db.Text
+  image_url    String?
+  link_url     String?
+  is_active    Boolean  @default(true)
+  sort_order   Int      @default(0)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  @@map("features")
+}
+
+// お知らせ管理
+model News {
+  id           String   @id @default(cuid())
+  title        String
+  content      String   @db.Text
+  category     String   @default("NEWS") // NEWS | PROPERTY | EVENT
+  is_published Boolean  @default(false)
+  published_at DateTime?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  @@map("news")
+}
+
+// バナー管理
+model Banner {
+  id           String   @id @default(cuid())
+  title        String
+  image_url    String
+  link_url     String?
+  position     String   @default("TOP") // TOP | MIDDLE | BOTTOM
+  slot         Int      @default(1)     // 1-4（2カラム2行）
+  is_active    Boolean  @default(true)
+  sort_order   Int      @default(0)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  @@map("banners")
 }
 
 model ContractDocument {
