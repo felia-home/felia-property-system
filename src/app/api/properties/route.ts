@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
         // 所在地
         prefecture:   String(b.prefecture ?? "東京都"),
         city:         String(b.city ?? ""),
+        town:         b.town         ? String(b.town)         : null,
         address:      String(b.address ?? ""),
         address_chiban: b.address_chiban ? String(b.address_chiban) : null,
         postal_code:  b.postal_code  ? String(b.postal_code)  : null,
@@ -168,6 +169,7 @@ export async function POST(request: NextRequest) {
         seller_fax:              b.seller_fax              ? String(b.seller_fax)              : null,
         seller_transaction_type: b.seller_transaction_type ? String(b.seller_transaction_type) : null,
         seller_brokerage_type:   b.seller_brokerage_type   ? String(b.seller_brokerage_type)   : null,
+        ad_transfer_consent:     b.ad_transfer_consent     ? String(b.ad_transfer_consent)     : null,
 
         // 設備
         eq_autolock:        bool(b.eq_autolock ?? b.eq_auto_lock),

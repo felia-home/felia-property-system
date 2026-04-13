@@ -445,6 +445,14 @@ function ImportPageInner() {
       for (const [k, v] of Object.entries(data.extracted ?? {})) {
         initial[k] = v !== null && v !== undefined ? String(v) : "";
       }
+      // AI生成コンテンツもformに含めて保存対象にする
+      const gen = (data as ParseResult).generated;
+      if (gen) {
+        if (gen.title)              initial.title              = gen.title;
+        if (gen.catch_copy)         initial.catch_copy         = gen.catch_copy;
+        if (gen.description_hp)     initial.description_hp     = gen.description_hp;
+        if (gen.description_portal) initial.description_portal = gen.description_portal;
+      }
       setForm(initial);
     } catch { setParseError("通信エラーが発生しました"); }
     finally { setParsing(false); }
@@ -469,6 +477,13 @@ function ImportPageInner() {
       for (const [k, v] of Object.entries(data.extracted ?? {})) {
         initial[k] = v !== null && v !== undefined ? String(v) : "";
       }
+      const gen = data.generated as GeneratedContent | undefined;
+      if (gen) {
+        if (gen.title)              initial.title              = gen.title;
+        if (gen.catch_copy)         initial.catch_copy         = gen.catch_copy;
+        if (gen.description_hp)     initial.description_hp     = gen.description_hp;
+        if (gen.description_portal) initial.description_portal = gen.description_portal;
+      }
       setForm(initial);
     } catch { setExtractError("通信エラーが発生しました"); }
     finally { setExtracting(false); }
@@ -485,6 +500,11 @@ function ImportPageInner() {
       payload[field.key] = field.type === "number" ? Number(val) : val;
     }
     if (form.ad_transfer_consent) payload.ad_transfer_consent = form.ad_transfer_consent;
+    // AI生成コンテンツ（handleParse/handleExtract/handleScrapeでformに追加済み）
+    if (form.title)              payload.title              = form.title;
+    if (form.catch_copy)         payload.catch_copy         = form.catch_copy;
+    if (form.description_hp)     payload.description_hp     = form.description_hp;
+    if (form.description_portal) payload.description_portal = form.description_portal;
     return payload;
   };
 
@@ -585,6 +605,13 @@ function ImportPageInner() {
       const initial: Record<string, string> = {};
       for (const [k, v] of Object.entries(data.extracted ?? {})) {
         initial[k] = v !== null && v !== undefined ? String(v) : "";
+      }
+      const gen = data.generated as GeneratedContent | undefined;
+      if (gen) {
+        if (gen.title)              initial.title              = gen.title;
+        if (gen.catch_copy)         initial.catch_copy         = gen.catch_copy;
+        if (gen.description_hp)     initial.description_hp     = gen.description_hp;
+        if (gen.description_portal) initial.description_portal = gen.description_portal;
       }
       setForm(initial);
     } catch { setScrapeError("通信エラーが発生しました"); }
