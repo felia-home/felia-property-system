@@ -76,7 +76,7 @@ export default function Sidebar({ currentUser }: { currentUser?: CurrentUser }) 
             </div>
 
             {/* グループ内アイテム */}
-            {group.items.map((item) => {
+            {(group.items ?? []).map((item) => {
               const active = pathname === item.href;
               return (
                 <Link key={item.href} href={item.href} style={{

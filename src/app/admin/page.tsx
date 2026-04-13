@@ -48,7 +48,7 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch("/api/properties?take=300")
       .then(r => r.json())
-      .then(d => setProperties(d.properties ?? []))
+      .then(d => setProperties(Array.isArray(d?.properties) ? d.properties : []))
       .catch(() => {})
       .finally(() => setLoadingProps(false));
 
@@ -476,7 +476,7 @@ export default function DashboardPage() {
       ) : (
         <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 12 }}>
           {KANBAN_COLUMNS_GROUPED.map(col => {
-            const items = col.statuses.flatMap(s => byStatus.get(s) ?? []);
+            const items = (col.statuses ?? []).flatMap(s => byStatus.get(s) ?? []);
             return (
               <div key={col.key} style={{ flexShrink: 0, width: 195, background: "#fff", borderRadius: 10, border: "1px solid #e0deda", overflow: "hidden" }}>
                 <div style={{ background: col.bg, padding: "9px 12px", borderBottom: "1px solid #e0deda", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -551,7 +551,7 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...salesAlerts, ...salesActionRequired.filter(p => !salesAlerts.includes(p))].slice(0, 15).map(p => {
+                  {[...(salesAlerts ?? []), ...(salesActionRequired ?? []).filter(p => !(salesAlerts ?? []).includes(p))].slice(0, 15).map(p => {
                     const def = getStatusDef(p.status);
                     return (
                       <tr key={p.id} style={{ borderBottom: "1px solid #f2f1ed" }}>
@@ -598,7 +598,7 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {backofficeTasks.slice(0, 15).map(p => {
+                  {(backofficeTasks ?? []).slice(0, 15).map(p => {
                     const def = getStatusDef(p.status);
                     const photoCount = p.photo_count ?? p._count?.images ?? 0;
                     const sentDays = daysSince(p.ad_confirmation_sent_at);
@@ -649,7 +649,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {actionRequired.slice(0, 10).map(p => {
+                {(actionRequired ?? []).slice(0, 10).map(p => {
                   const def = getStatusDef(p.status);
                   return (
                     <tr key={p.id} style={{ borderBottom: "1px solid #f2f1ed" }}>
