@@ -662,6 +662,8 @@ model Customer {
   // ===== HP会員 =====
   is_member              Boolean   @default(false)
   member_registered_at   DateTime?
+  member_id              String?   @unique
+  member                 Member?   @relation(fields: [member_id], references: [id])
 
   // ===== システム =====
   is_deleted             Boolean   @default(false)
@@ -895,6 +897,8 @@ model Member {
   updated_at      DateTime  @updatedAt
 
   inquiries       MemberInquiry[]
+  profile         MemberProfile?
+  customer        Customer?
 
   @@map("members")
 }
@@ -1057,4 +1061,39 @@ model ContractDocument {
   created_at   DateTime @default(now())
 
   @@map("contract_documents")
+}
+
+model MemberProfile {
+  id                  String    @id @default(cuid())
+  member_id           String    @unique
+  member              Member    @relation(fields: [member_id], references: [id], onDelete: Cascade)
+
+  property_types      String[]
+  desired_areas       String[]
+  desired_lines       String[]
+  budget_max          Int?
+  desired_area_m2_min Decimal?  @db.Decimal(8, 2)
+  desired_layout      String[]
+  purchase_timing     String?
+
+  current_residence   String?
+  current_rent        Int?
+  lease_expiry        String?
+  has_property_to_sell String?
+  family_structure    String?
+  children_ages       String?
+
+  down_payment        Int?
+  annual_income_range String?
+  loan_preapproval    String?
+
+  purchase_motivation String?
+  priority_points     String[]
+  other_agents        String?
+  remarks             String?   @db.Text
+
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  @@map("member_profiles")
 }

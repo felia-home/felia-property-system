@@ -31,6 +31,25 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // customers テーブルへ自動連携
+    try {
+      await prisma.customer.create({
+        data: {
+          name: member.name,
+          email: member.email,
+          tel: member.phone ?? null,
+          source: "HP_MEMBER",
+          status: "NEW",
+          member_id: member.id,
+          is_member: true,
+          member_registered_at: new Date(),
+        },
+      });
+    } catch (e) {
+      // customer作成失敗はログのみ（会員登録は成功扱い）
+      console.error("customer auto-create failed:", e);
+    }
+
     return NextResponse.json({
       success: true,
       member: { id: member.id, email: member.email, name: member.name },

@@ -20,7 +20,7 @@ const STATUS_BADGE: Record<string, React.CSSProperties> = {
 };
 const SOURCE_LABELS: Record<string, string> = {
   SUUMO: "SUUMO", ATHOME: "athome", YAHOO: "Yahoo不動産",
-  HOMES: "HOME'S", HP: "自社HP", TEL: "電話", WALK_IN: "来店",
+  HOMES: "HOME'S", HP: "自社HP", HP_MEMBER: "HP会員登録", TEL: "電話", WALK_IN: "来店",
   REFERRAL: "紹介", OTHER: "その他",
 };
 const PRIORITY_STYLE: Record<string, React.CSSProperties> = {
@@ -369,7 +369,14 @@ export default function CustomersPage() {
                     )}
                   </td>
                   <td style={{ padding: "10px 12px" }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{c.name} 様</div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>
+                      {c.name} 様
+                      {c.source === "HP_MEMBER" && (
+                        <span style={{ fontSize: 10, background: "#e3f2fd", color: "#1565c0", padding: "1px 7px", borderRadius: 99, fontWeight: 700, marginLeft: 6 }}>
+                          HP会員
+                        </span>
+                      )}
+                    </div>
                     {c.name_kana && <div style={{ fontSize: 10, color: "#706e68" }}>{c.name_kana}</div>}
                     {family && <div style={{ fontSize: 11, color: "#3a6a8a", marginTop: 2 }}>{family}</div>}
                   </td>

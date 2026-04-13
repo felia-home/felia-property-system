@@ -36,6 +36,7 @@ export async function GET(
       include: includeRelations
         ? {
             contracts: true,
+            member: { include: { profile: true } },
             family_members: { orderBy: { created_at: "asc" } },
             inquiries: {
               orderBy: { received_at: "desc" },

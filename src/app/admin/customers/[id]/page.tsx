@@ -19,7 +19,7 @@ const STATUS_BADGE: Record<string, React.CSSProperties> = {
 };
 const SOURCE_LABELS: Record<string, string> = {
   SUUMO: "SUUMO", ATHOME: "athome", YAHOO: "Yahoo不動産",
-  HOMES: "HOME'S", HP: "自社HP", TEL: "電話", WALK_IN: "来店",
+  HOMES: "HOME'S", HP: "自社HP", HP_MEMBER: "HP会員登録", TEL: "電話", WALK_IN: "来店",
   REFERRAL: "紹介", OTHER: "その他",
 };
 const TYPE_LABELS: Record<string, string> = {
@@ -80,6 +80,21 @@ interface Customer {
   contact_frequency: string | null; do_not_contact: boolean; unsubscribed: boolean;
   internal_memo: string | null; tags: string[];
   is_member: boolean; member_registered_at: string | null;
+  member_id: string | null;
+  member: {
+    id: string; email: string; name: string; phone: string | null;
+    profile: {
+      property_types: string[]; desired_areas: string[]; desired_lines: string[];
+      budget_max: number | null; desired_area_m2_min: number | null;
+      desired_layout: string[]; purchase_timing: string | null;
+      current_residence: string | null; current_rent: number | null;
+      lease_expiry: string | null; has_property_to_sell: string | null;
+      family_structure: string | null; children_ages: string | null;
+      down_payment: number | null; annual_income_range: string | null;
+      loan_preapproval: string | null; purchase_motivation: string | null;
+      priority_points: string[]; other_agents: string | null; remarks: string | null;
+    } | null;
+  } | null;
   created_at: string;
   family_members: FamilyMember[];
   activities: ActivityItem[];
@@ -444,6 +459,52 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
               />
             </div>
           </div>
+
+          {/* HP会員プロフィールセクション */}
+          {customer.member?.profile && (
+            <div style={{ gridColumn: "1/-1", ...card }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ background: "#e3f2fd", color: "#1565c0", fontSize: 11, padding: "2px 10px", borderRadius: 99, fontWeight: 700 }}>HP会員</span>
+                購入希望条件（会員登録時の入力情報）
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                {[
+                  { label: "物件種別", value: customer.member.profile.property_types?.join("・") },
+                  { label: "希望エリア", value: customer.member.profile.desired_areas?.join("・") },
+                  { label: "希望路線", value: customer.member.profile.desired_lines?.join("・") },
+                  { label: "予算上限", value: customer.member.profile.budget_max ? `${customer.member.profile.budget_max.toLocaleString()}万円` : null },
+                  { label: "希望面積（最小）", value: customer.member.profile.desired_area_m2_min ? `${customer.member.profile.desired_area_m2_min}㎡以上` : null },
+                  { label: "希望間取り", value: customer.member.profile.desired_layout?.join("・") },
+                  { label: "購入希望時期", value: customer.member.profile.purchase_timing },
+                  { label: "現在の住居", value: customer.member.profile.current_residence },
+                  { label: "現在の賃料", value: customer.member.profile.current_rent ? `${customer.member.profile.current_rent.toLocaleString()}円/月` : null },
+                  { label: "賃貸満期", value: customer.member.profile.lease_expiry },
+                  { label: "売却予定", value: customer.member.profile.has_property_to_sell },
+                  { label: "家族構成", value: customer.member.profile.family_structure },
+                  { label: "子供の年齢", value: customer.member.profile.children_ages },
+                  { label: "頭金", value: customer.member.profile.down_payment ? `${customer.member.profile.down_payment.toLocaleString()}万円` : null },
+                  { label: "年収帯", value: customer.member.profile.annual_income_range },
+                  { label: "ローン審査", value: customer.member.profile.loan_preapproval },
+                  { label: "購入動機", value: customer.member.profile.purchase_motivation },
+                  { label: "重視ポイント", value: customer.member.profile.priority_points?.join("・") },
+                  { label: "他社検討", value: customer.member.profile.other_agents },
+                ].filter(item => item.value).map((item, i) => (
+                  <div key={i} style={{ background: "#f7f9ff", borderRadius: 8, padding: "10px 14px" }}>
+                    <div style={{ fontSize: 10, color: "#706e68", marginBottom: 3 }}>{item.label}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1c1b18" }}>{item.value}</div>
+                  </div>
+                ))}
+              </div>
+              {customer.member.profile.remarks && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #f2f1ed" }}>
+                  <div style={{ fontSize: 10, color: "#706e68", marginBottom: 4 }}>備考・要望</div>
+                  <p style={{ fontSize: 13, color: "#3a2a1a", lineHeight: 1.6, whiteSpace: "pre-wrap", margin: 0 }}>
+                    {customer.member.profile.remarks}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           <div style={{ gridColumn: "1/-1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <SaveBtn />
