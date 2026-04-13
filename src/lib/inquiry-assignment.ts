@@ -24,7 +24,7 @@ export async function assignInquiry(
   const staffList = await prisma.staff.findMany({
     where: {
       is_active: true,
-      permission: { in: ["ADMIN", "MANAGER", "SENIOR", "AGENT"] },
+      permission: { in: ["ADMIN", "SENIOR_MANAGER", "MANAGER", "SENIOR_AGENT", "AGENT", "SENIOR"] },
     },
     include: {
       _count: {

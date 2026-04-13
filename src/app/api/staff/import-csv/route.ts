@@ -7,8 +7,8 @@ const PERMISSION_MAP: Record<string, string> = {
   "正社員": "AGENT",
   "契約社員": "AGENT",
   "嘱託社員": "AGENT",
-  "パート": "OFFICE",
-  "アルバイト": "OFFICE",
+  "パート": "BACKOFFICE",
+  "アルバイト": "BACKOFFICE",
 };
 
 function parseCSVLine(line: string): string[] {

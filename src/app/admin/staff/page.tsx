@@ -21,7 +21,7 @@ interface StaffMember {
   _count?: { properties_as_agent: number };
 }
 
-const PERMISSION_KEYS = ["ADMIN", "MANAGER", "SENIOR", "AGENT", "OFFICE"] as const;
+const PERMISSION_KEYS = ["ADMIN", "SENIOR_MANAGER", "MANAGER", "BACKOFFICE", "SENIOR_AGENT", "AGENT"] as const;
 
 export default function StaffListPage() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
