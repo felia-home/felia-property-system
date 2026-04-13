@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { PROPERTY_STATUS, KANBAN_COLUMNS, getStatusDef } from "@/lib/workflow-status";
+import { PROPERTY_STATUS, KANBAN_COLUMNS_GROUPED, getStatusDef } from "@/lib/workflow-status";
 import { TaskCard, type TaskCardProperty } from "@/components/admin/TaskCard";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -23,6 +23,7 @@ interface PropertySummary {
   pending_tasks: string[];
   ad_confirmation_sent_at: string | null;
   published_at: string | null;
+  last_ad_check_date: string | null;
   _count: { images: number };
   created_at: string;
 }
@@ -43,7 +44,6 @@ export default function DashboardPage() {
   const [licenseAlerts, setLicenseAlerts] = useState<{ company: string; expiry: Date; daysLeft: number }[]>([]);
   const [takkenAlerts, setTakkenAlerts] = useState<{ name: string; daysLeft: number }[]>([]);
   const [newInquiries, setNewInquiries] = useState(0);
-  const [followUpCount, setFollowUpCount] = useState(0);
 
   useEffect(() => {
     fetch("/api/properties?take=300")
@@ -72,11 +72,6 @@ export default function DashboardPage() {
       .then((d: { statusCounts?: Record<string, number> }) => {
         setNewInquiries(d.statusCounts?.NEW ?? 0);
       })
-      .catch(() => {});
-
-    fetch("/api/customers/follow-up")
-      .then(r => r.json())
-      .then((d: { count?: number }) => setFollowUpCount(d.count ?? 0))
       .catch(() => {});
 
     // Takken expiry check
@@ -129,23 +124,34 @@ export default function DashboardPage() {
   const actionRequired = properties.filter(p => (p.pending_tasks?.length ?? 0) > 0 && !["SOLD", "CLOSED"].includes(p.status));
 
   // Role tabs
-  const [roleTab, setRoleTab] = useState<"all" | "sales" | "admin">("all");
+  const [roleTab, setRoleTab] = useState<"all" | "sales" | "backoffice">("all");
 
-  // 営業向け: ad_request, sold_alert, action-required
+  // 営業向け: draft, sold_alert, action-required
   const salesAlerts = [
-    ...(byStatus.get("AD_REQUEST") ?? []),
     ...(byStatus.get("SOLD_ALERT") ?? []),
   ];
   const salesActionRequired = actionRequired.filter(p =>
-    ["DRAFT", "AD_REQUEST", "SOLD_ALERT", "PUBLISHED"].includes(p.status)
+    ["DRAFT", "SOLD_ALERT", "PUBLISHED"].includes(p.status)
   );
 
-  // 内勤向け: ad confirmation needed, low photos, overdue
-  const adminTasks = [
+  // 内勤向け: ad confirmation, photos, publishing
+  const backofficeTasks = [
     ...adSentOverdue,
     ...noPhotoProps,
     ...lowPhotoProps.filter(p => !noPhotoProps.includes(p)),
   ];
+
+  // 掲載中で写真不足の物件（STEP4用）
+  const publishedPhotoAlert = (byStatus.get("PUBLISHED") ?? []).filter(p => {
+    const pc = p.photo_count ?? p._count?.images ?? 0;
+    return pc === 0 || pc < 5;
+  });
+
+  // 広告確認期限超過（STEP5: 30日以上未チェック）
+  const adCheckOverdue = (byStatus.get("PUBLISHED") ?? []).filter(p => {
+    const days = daysSince(p.last_ad_check_date);
+    return days === null || days >= 30;
+  });
 
   return (
     <div style={{ padding: 28, maxWidth: 1400 }}>
@@ -156,7 +162,7 @@ export default function DashboardPage() {
         </div>
         {/* Role tabs */}
         <div style={{ display: "flex", gap: 4 }}>
-          {([["all", "全体"], ["sales", "営業向け"], ["admin", "内勤向け"]] as const).map(([t, label]) => (
+          {([["all", "全体"], ["sales", "営業向け"], ["backoffice", "内勤向け"]] as const).map(([t, label]) => (
             <button key={t} onClick={() => setRoleTab(t)}
               style={{ padding: "6px 16px", borderRadius: 8, fontSize: 12, fontWeight: roleTab === t ? 700 : 400, border: "1px solid " + (roleTab === t ? "#234f35" : "#e0deda"), background: roleTab === t ? "#234f35" : "#fff", color: roleTab === t ? "#fff" : "#706e68", cursor: "pointer", fontFamily: "inherit" }}>
               {label}
@@ -164,13 +170,6 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
-
-      {followUpCount > 0 && (
-        <div style={{ background: "#fff3e0", border: "1px solid #ffb74d", borderRadius: 10, padding: "12px 18px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 14, color: "#e65100" }}>🤖 <strong>{followUpCount}名</strong>の顧客が7日以上未連絡です</span>
-          <a href="/admin/customers/follow-up" style={{ fontSize: 13, color: "#e65100", fontWeight: 600, textDecoration: "none" }}>AI追客を実行する →</a>
-        </div>
-      )}
 
       {newInquiries > 0 && (
         <div style={{ background: "#ffebee", border: "1px solid #ef9a9a", borderRadius: 10, padding: "12px 18px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -330,110 +329,143 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* あなたのタスク — Workflow Step Cards */}
+      {/* あなたのタスク — 6ステップ ワークフロー */}
       {!loadingProps && (
         <div style={{ marginBottom: 24 }}>
           <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <h2 style={{ fontSize: 14, fontWeight: 600, color: "#3a2a1a" }}>あなたのタスク</h2>
-            <span style={{ fontSize: 11, color: "#aaa" }}>入稿ワークフロー別 対応件数</span>
+            <span style={{ fontSize: 11, color: "#aaa" }}>業務フロー別 対応件数</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
-            {/* STEP1: 下書き入力待ち */}
-            <TaskCard
-              step={1}
-              icon="✏️"
-              title="情報入力"
-              subtitle="下書き → 広告確認申請"
-              count={(byStatus.get("DRAFT") ?? []).length}
-              urgent={false}
-              color="#757575"
-              bg="#f5f5f5"
-              properties={(byStatus.get("DRAFT") ?? []).slice(0, 5).map<TaskCardProperty>(p => ({
-                id: p.id,
-                label: `${p.city}${p.town ?? ""}`,
-                sub: `${p.price.toLocaleString()}万円`,
-              }))}
-              href="/admin/properties?status=DRAFT"
-            />
-            {/* STEP2: 広告確認 */}
-            <TaskCard
-              step={2}
-              icon="📨"
-              title="広告確認"
-              subtitle="元付業者から承諾を取得"
-              count={(byStatus.get("AD_PENDING") ?? []).length + (byStatus.get("AD_SENT") ?? []).length}
-              urgent
-              color="#e65100"
-              bg="#fff3e0"
-              properties={[
-                ...(byStatus.get("AD_PENDING") ?? []),
-                ...(byStatus.get("AD_SENT") ?? []),
-              ].slice(0, 5).map<TaskCardProperty>(p => ({
-                id: p.id,
-                label: `${p.city}${p.town ?? ""}`,
-                sub: p.status === "AD_SENT" ? "確認書送付済み" : "送付待ち",
-              }))}
-              href="/admin/properties?status=AD_PENDING"
-            />
-            {/* STEP3: 写真撮影 */}
-            <TaskCard
-              step={3}
-              icon="📷"
-              title="写真・原稿"
-              subtitle="AD_OK後に撮影・登録"
-              count={noPhotoProps.length + lowPhotoProps.length}
-              urgent={noPhotoProps.length > 0}
-              color="#6a1b9a"
-              bg="#f3e5f5"
-              properties={[...noPhotoProps, ...lowPhotoProps].slice(0, 5).map<TaskCardProperty>(p => ({
-                id: p.id,
-                label: `${p.city}${p.town ?? ""}`,
-                sub: (p.photo_count ?? p._count?.images ?? 0) === 0 ? "写真なし" : `写真${p.photo_count ?? p._count?.images ?? 0}枚`,
-              }))}
-              href="/admin/properties"
-            />
-            {/* STEP4: 掲載準備 */}
-            <TaskCard
-              step={4}
-              icon="🔧"
-              title="掲載準備"
-              subtitle="写真確認 → 掲載設定"
-              count={(byStatus.get("PHOTO_NEEDED") ?? []).length + (byStatus.get("PUBLISHING") ?? []).length}
-              urgent={false}
-              color="#1565c0"
-              bg="#e3f2fd"
-              properties={[
-                ...(byStatus.get("PHOTO_NEEDED") ?? []),
-                ...(byStatus.get("PUBLISHING") ?? []),
-              ].slice(0, 5).map<TaskCardProperty>(p => ({
-                id: p.id,
-                label: `${p.city}${p.town ?? ""}`,
-                sub: p.status === "PUBLISHING" ? "掲載準備中" : "写真待ち",
-              }))}
-              href="/admin/properties?status=PHOTO_NEEDED"
-            />
-            {/* STEP5: 成約確認 */}
-            <TaskCard
-              step={5}
-              icon="🔔"
-              title="成約確認"
-              subtitle="成約アラート → 確認"
-              count={(byStatus.get("SOLD_ALERT") ?? []).length}
-              urgent={(byStatus.get("SOLD_ALERT") ?? []).length > 0}
-              color="#b71c1c"
-              bg="#fce4ec"
-              properties={(byStatus.get("SOLD_ALERT") ?? []).slice(0, 5).map<TaskCardProperty>(p => ({
-                id: p.id,
-                label: `${p.city}${p.town ?? ""}`,
-                sub: `${p.price.toLocaleString()}万円`,
-              }))}
-              href="/admin/properties?status=SOLD_ALERT"
-            />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+            {/* STEP1: 情報入力 [営業] */}
+            {(roleTab === "all" || roleTab === "sales") && (
+              <TaskCard
+                step={1}
+                icon="✏️"
+                title="情報入力"
+                subtitle="下書き → 広告確認申請"
+                count={(byStatus.get("DRAFT") ?? []).length}
+                urgent={false}
+                color="#757575"
+                bg="#f5f5f5"
+                properties={(byStatus.get("DRAFT") ?? []).slice(0, 5).map<TaskCardProperty>(p => ({
+                  id: p.id,
+                  label: `${p.city}${p.town ?? ""}`,
+                  sub: `${p.price.toLocaleString()}万円`,
+                }))}
+                href="/admin/properties?status=DRAFT"
+              />
+            )}
+            {/* STEP2: 広告確認 [内勤] */}
+            {(roleTab === "all" || roleTab === "backoffice") && (
+              <TaskCard
+                step={2}
+                icon="📨"
+                title="広告確認"
+                subtitle="元付業者から承諾を取得"
+                count={(byStatus.get("AD_PENDING") ?? []).length + (byStatus.get("AD_SENT") ?? []).length}
+                urgent
+                color="#e65100"
+                bg="#fff3e0"
+                properties={[
+                  ...(byStatus.get("AD_PENDING") ?? []),
+                  ...(byStatus.get("AD_SENT") ?? []),
+                ].slice(0, 5).map<TaskCardProperty>(p => ({
+                  id: p.id,
+                  label: `${p.city}${p.town ?? ""}`,
+                  sub: p.status === "AD_SENT" ? `送付済み${(() => { const d = daysSince(p.ad_confirmation_sent_at); return d !== null ? `（${d}日経過）` : ""; })()}` : "送付待ち",
+                }))}
+                href="/admin/properties?status=AD_PENDING"
+              />
+            )}
+            {/* STEP3: 掲載準備 [内勤] */}
+            {(roleTab === "all" || roleTab === "backoffice") && (
+              <TaskCard
+                step={3}
+                icon="🔧"
+                title="掲載準備"
+                subtitle="広告OK → 写真・原稿 → 掲載"
+                count={(byStatus.get("AD_OK") ?? []).length + (byStatus.get("PHOTO_NEEDED") ?? []).length + (byStatus.get("PUBLISHING") ?? []).length}
+                urgent={(byStatus.get("AD_OK") ?? []).length > 0}
+                color="#1565c0"
+                bg="#e3f2fd"
+                properties={[
+                  ...(byStatus.get("AD_OK") ?? []),
+                  ...(byStatus.get("PHOTO_NEEDED") ?? []),
+                  ...(byStatus.get("PUBLISHING") ?? []),
+                ].slice(0, 5).map<TaskCardProperty>(p => ({
+                  id: p.id,
+                  label: `${p.city}${p.town ?? ""}`,
+                  sub: p.status === "AD_OK" ? "広告OK・準備待ち" : p.status === "PHOTO_NEEDED" ? "写真待ち" : "掲載設定中",
+                }))}
+                href="/admin/properties?status=AD_OK"
+              />
+            )}
+            {/* STEP4: 掲載中管理 [内勤] */}
+            {(roleTab === "all" || roleTab === "backoffice") && (
+              <TaskCard
+                step={4}
+                icon="📷"
+                title="掲載中管理"
+                subtitle="掲載中物件の写真・品質管理"
+                count={publishedPhotoAlert.length}
+                urgent={publishedPhotoAlert.some(p => (p.photo_count ?? p._count?.images ?? 0) === 0)}
+                color="#6a1b9a"
+                bg="#f3e5f5"
+                properties={publishedPhotoAlert.slice(0, 5).map<TaskCardProperty>(p => ({
+                  id: p.id,
+                  label: `${p.city}${p.town ?? ""}`,
+                  sub: (p.photo_count ?? p._count?.images ?? 0) === 0 ? "写真なし" : `写真${p.photo_count ?? p._count?.images ?? 0}枚（5枚必要）`,
+                }))}
+                href="/admin/properties?status=PUBLISHED"
+              />
+            )}
+            {/* STEP5: 定期広告確認 [営業] */}
+            {(roleTab === "all" || roleTab === "sales") && (
+              <TaskCard
+                step={5}
+                icon="🔍"
+                title="物件確認"
+                subtitle="30日超 未チェック物件"
+                count={adCheckOverdue.length}
+                urgent={adCheckOverdue.length > 0}
+                color="#4527a0"
+                bg="#ede7f6"
+                properties={adCheckOverdue.slice(0, 5).map<TaskCardProperty>(p => {
+                  const days = daysSince(p.last_ad_check_date);
+                  return {
+                    id: p.id,
+                    label: `${p.city}${p.town ?? ""}`,
+                    sub: days === null ? "未チェック" : `${days}日経過`,
+                  };
+                })}
+                href="/admin/properties?status=PUBLISHED"
+              />
+            )}
+            {/* STEP6: 物件終了 [営業] */}
+            {(roleTab === "all" || roleTab === "sales") && (
+              <TaskCard
+                step={6}
+                icon="🔔"
+                title="物件終了"
+                subtitle="成約アラート → 掲載終了"
+                count={(byStatus.get("SOLD_ALERT") ?? []).length}
+                urgent={(byStatus.get("SOLD_ALERT") ?? []).length > 0}
+                color="#b71c1c"
+                bg="#fce4ec"
+                properties={(byStatus.get("SOLD_ALERT") ?? []).slice(0, 5).map<TaskCardProperty>(p => ({
+                  id: p.id,
+                  label: `${p.city}${p.town ?? ""}`,
+                  sub: `${p.price.toLocaleString()}万円`,
+                }))}
+                href="/admin/properties?status=SOLD_ALERT"
+              />
+            )}
           </div>
         </div>
       )}
 
-      {/* Workflow Kanban */}
+      {/* ワークフロー状況 — 7グループ カンバン */}
       <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={{ fontSize: 14, fontWeight: 600, color: "#3a2a1a" }}>ワークフロー状況</h2>
         <Link href="/admin/properties" style={{ fontSize: 12, color: "#706e68", textDecoration: "none" }}>全物件一覧 →</Link>
@@ -443,14 +475,13 @@ export default function DashboardPage() {
         <div style={{ color: "#aaa", fontSize: 13, padding: 24 }}>読み込み中...</div>
       ) : (
         <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 12 }}>
-          {KANBAN_COLUMNS.map(statusKey => {
-            const def = PROPERTY_STATUS[statusKey];
-            const items = byStatus.get(statusKey) ?? [];
+          {KANBAN_COLUMNS_GROUPED.map(col => {
+            const items = col.statuses.flatMap(s => byStatus.get(s) ?? []);
             return (
-              <div key={statusKey} style={{ flexShrink: 0, width: 195, background: "#fff", borderRadius: 10, border: "1px solid #e0deda", overflow: "hidden" }}>
-                <div style={{ background: def.bg, padding: "9px 12px", borderBottom: "1px solid #e0deda", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: def.color }}>{def.icon} {def.label}</span>
-                  <span style={{ fontSize: 11, background: def.color, color: "#fff", borderRadius: 99, padding: "1px 7px", fontWeight: 700 }}>{items.length}</span>
+              <div key={col.key} style={{ flexShrink: 0, width: 195, background: "#fff", borderRadius: 10, border: "1px solid #e0deda", overflow: "hidden" }}>
+                <div style={{ background: col.bg, padding: "9px 12px", borderBottom: "1px solid #e0deda", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: col.color }}>{col.icon} {col.label}</span>
+                  <span style={{ fontSize: 11, background: col.color, color: "#fff", borderRadius: 99, padding: "1px 7px", fontWeight: 700 }}>{items.length}</span>
                 </div>
                 <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 6, maxHeight: 440, overflowY: "auto" }}>
                   {items.length === 0 && (
@@ -459,7 +490,8 @@ export default function DashboardPage() {
                   {items.slice(0, 8).map(p => {
                     const photoCount = p.photo_count ?? p._count?.images ?? 0;
                     const sentDays = daysSince(p.ad_confirmation_sent_at);
-                    const isOverdue = statusKey === "AD_SENT" && sentDays !== null && sentDays >= 3;
+                    const isOverdue = p.status === "AD_SENT" && sentDays !== null && sentDays >= 3;
+                    const statusDef = getStatusDef(p.status);
                     return (
                       <Link key={p.id} href={`/admin/properties/${p.id}`} style={{ textDecoration: "none" }}>
                         <div style={{ background: isOverdue ? "#fff8f0" : "#fafaf8", borderRadius: 8, padding: "8px 10px", border: `1px solid ${isOverdue ? "#f9a825" : "#ede9e4"}` }}>
@@ -470,7 +502,10 @@ export default function DashboardPage() {
                             {TYPE_LABELS[p.property_type] ?? ""} {p.price.toLocaleString()}万
                           </div>
                           <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
-                            {photoCount === 0 && !["DRAFT", "AD_PENDING", "AD_SENT"].includes(statusKey) && (
+                            {col.statuses.length > 1 && (
+                              <span style={{ fontSize: 9, background: statusDef.bg, color: statusDef.color, padding: "1px 5px", borderRadius: 4, fontWeight: 600 }}>{statusDef.icon} {statusDef.label}</span>
+                            )}
+                            {photoCount === 0 && !["DRAFT", "AD_PENDING", "AD_SENT"].includes(p.status) && (
                               <span title="写真が登録されていません" style={{ fontSize: 9, background: "#fdeaea", color: "#8c1f1f", padding: "1px 5px", borderRadius: 4, fontWeight: 600 }}>📷なし</span>
                             )}
                             {photoCount > 0 && (
@@ -488,7 +523,7 @@ export default function DashboardPage() {
                     );
                   })}
                   {items.length > 8 && (
-                    <Link href={`/admin/properties?status=${statusKey}`} style={{ fontSize: 10, color: "#888", textAlign: "center", textDecoration: "none", padding: "4px 0" }}>
+                    <Link href={`/admin/properties?status=${col.statuses[0]}`} style={{ fontSize: 10, color: "#888", textAlign: "center", textDecoration: "none", padding: "4px 0" }}>
                       …他{items.length - 8}件
                     </Link>
                   )}
@@ -547,10 +582,10 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {!loadingProps && roleTab === "admin" && (
+      {!loadingProps && roleTab === "backoffice" && (
         <div style={{ marginTop: 24 }}>
           <h2 style={{ fontSize: 14, fontWeight: 600, color: "#3a2a1a", marginBottom: 12 }}>内勤向け — 書類・写真・掲載管理</h2>
-          {adminTasks.length === 0 ? (
+          {backofficeTasks.length === 0 ? (
             <div style={{ background: "#e8f5e9", borderRadius: 10, padding: "16px 20px", fontSize: 13, color: "#1b5e20" }}>✅ 現在、内勤対応が必要な物件はありません。</div>
           ) : (
             <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", overflow: "hidden" }}>
@@ -563,7 +598,7 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {adminTasks.slice(0, 15).map(p => {
+                  {backofficeTasks.slice(0, 15).map(p => {
                     const def = getStatusDef(p.status);
                     const photoCount = p.photo_count ?? p._count?.images ?? 0;
                     const sentDays = daysSince(p.ad_confirmation_sent_at);
