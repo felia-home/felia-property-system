@@ -95,9 +95,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 担当者への通知
-    const notifyTo = process.env.ADMIN_NOTIFY_EMAIL;
-    if (notifyTemplate && notifyTo) {
+    // 担当者への通知（担当スタッフのメールへ、未設定はフォールバック）
+    const FALLBACK_NOTIFY = "contact@felia-home.co.jp";
+    let notifyTo = FALLBACK_NOTIFY;
+    if (token && customerId) {
+      const customer = await prisma.customer.findUnique({
+        where: { id: customerId },
+        select: { assigned_to: true },
+      });
+      if (customer?.assigned_to) {
+        const staff = await prisma.staff.findUnique({
+          where: { id: customer.assigned_to },
+          select: { email_work: true },
+        });
+        if (staff?.email_work) {
+          notifyTo = staff.email_work;
+        }
+      }
+    }
+    if (notifyTemplate) {
       try {
         const subject = renderTemplate(notifyTemplate.subject, { customer_name: name });
         const html = renderTemplate(notifyTemplate.body_html, {
