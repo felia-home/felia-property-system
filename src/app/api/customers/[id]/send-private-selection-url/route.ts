@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { sendEmail, renderTemplate } from "@/lib/email";
 import { randomBytes } from "crypto";
 
 // POST /api/customers/[id]/send-private-selection-url
@@ -63,16 +64,45 @@ export async function POST(
     const hpBaseUrl = process.env.HP_BASE_URL ?? "https://index.felia-home.co.jp";
     const privateUrl = `${hpBaseUrl}/private-selection?token=${token}`;
 
-    // TODO: メール送信（サービス確定後に実装）
-    // to: customer.email
-    // subject: 【フェリアホーム】会員限定・非公開物件のご案内
-    // 本文に privateUrl を含める
-    console.log("[DEBUG] 非公開物件URL発行:", customer.email, privateUrl);
+    const staffName =
+      customer.assigned_staff?.name ?? session.user?.name ?? "フェリアホーム担当";
+    const staffPhone =
+      customer.assigned_staff?.tel_mobile ??
+      customer.assigned_staff?.tel_work ??
+      "";
+
+    // メールテンプレートから送信
+    const template = await prisma.emailTemplate.findUnique({
+      where: { template_key: "private_selection_url" },
+    });
+
+    if (template) {
+      const expiresDateStr = expiresAt.toLocaleDateString("ja-JP", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+
+      const subject = renderTemplate(template.subject, {
+        customer_name: customer.name,
+      });
+      const html = renderTemplate(template.body_html, {
+        customer_name: customer.name,
+        staff_name: staffName,
+        staff_phone: staffPhone,
+        url: privateUrl,
+        expires_date: expiresDateStr,
+      });
+
+      await sendEmail({ to: customer.email, subject, html });
+    } else {
+      // テンプレートが取得できない場合もログのみで続行
+      console.warn("[send-private-selection-url] テンプレート未取得 - メール未送信");
+    }
 
     return NextResponse.json({
       success: true,
       expiresAt: expiresAt.toISOString(),
-      privateUrl, // 開発確認用・メール送信実装後は削除を検討
     });
   } catch (error) {
     console.error("トークン発行エラー:", error);

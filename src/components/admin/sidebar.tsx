@@ -55,6 +55,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { href: "/admin/import",               label: "データインポート",   icon: "📥", feature: "import.execute" },
       { href: "/admin/competitor",           label: "競合モニタリング",   icon: "📊", feature: "competitor.view" },
       { href: "/admin/private-properties",   label: "未公開物件DB",       icon: "🔒" },
+      { href: "/admin/settings/email-templates", label: "メールテンプレート", icon: "✉",  feature: "settings.view" },
     ],
   },
 ];

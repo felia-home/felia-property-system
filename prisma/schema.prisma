@@ -1114,3 +1114,16 @@ model PrivateSelectionToken {
 
   @@map("private_selection_tokens")
 }
+
+model EmailTemplate {
+  id           String   @id @default(uuid())
+  template_key String   @unique
+  name         String
+  subject      String
+  body_html    String   @db.Text
+  description  String?
+  updated_at   DateTime @updatedAt
+  created_at   DateTime @default(now())
+
+  @@map("email_templates")
+}
