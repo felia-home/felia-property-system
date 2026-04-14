@@ -42,11 +42,10 @@ export default function StaffListPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const { data: session } = useSession();
-  const canDelete = ["ADMIN", "SENIOR_MANAGER"].includes(session?.user?.permission ?? "");
-  // デバッグ用（確認後に削除）
-  console.log("[STAFF PAGE] session.user:", session?.user);
-  console.log("[STAFF PAGE] permission:", session?.user?.permission);
-  console.log("[STAFF PAGE] canDelete:", canDelete);
+  const [canDelete, setCanDelete] = useState(false);
+  useEffect(() => {
+    setCanDelete(["ADMIN", "SENIOR_MANAGER"].includes(session?.user?.permission ?? ""));
+  }, [session]);
 
   const load = async () => {
     setLoading(true);
