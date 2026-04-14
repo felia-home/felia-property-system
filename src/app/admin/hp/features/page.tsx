@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import ImageUploader from "@/components/admin/ImageUploader";
 
 type Feature = {
   id: string;
@@ -116,18 +117,19 @@ export default function FeaturesPage() {
             <div>
               <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#666", marginBottom: "6px" }}>バナー画像URL</label>
               <input type="url" value={form.image_url} onChange={e => f("image_url", e.target.value)}
-                placeholder="https://..."
-                style={{ width: "100%", padding: "10px 12px", border: "1px solid #e0e0e0", borderRadius: "10px", fontSize: "14px", outline: "none", marginBottom: "10px", boxSizing: "border-box", fontFamily: "inherit" }} />
-              <div style={{ border: "1px solid #e8e8e8", borderRadius: "12px", overflow: "hidden", aspectRatio: "16/9", background: "#f8f8f8", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {form.image_url ? (
+                placeholder="https://... または下からアップロード"
+                style={{ width: "100%", padding: "10px 12px", border: "1px solid #e0e0e0", borderRadius: "10px", fontSize: "14px", outline: "none", marginBottom: "8px", boxSizing: "border-box", fontFamily: "inherit" }} />
+              <ImageUploader
+                folder="features"
+                currentUrl={form.image_url || undefined}
+                label="ローカルから画像を選択"
+                onUpload={url => f("image_url", url)}
+              />
+              {form.image_url && (
+                <div style={{ marginTop: 10, border: "1px solid #e8e8e8", borderRadius: "12px", overflow: "hidden", aspectRatio: "16/9", background: "#f8f8f8", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <img src={form.image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-                ) : (
-                  <div style={{ textAlign: "center", color: "#bbb" }}>
-                    <div style={{ fontSize: "32px" }}>🖼</div>
-                    <div style={{ fontSize: "12px", marginTop: "4px" }}>URLを入力するとプレビュー表示</div>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
           <div style={{ display: "flex", gap: "10px", marginTop: "20px", paddingTop: "20px", borderTop: "1px solid #f0f0f0", justifyContent: "flex-end" }}>
