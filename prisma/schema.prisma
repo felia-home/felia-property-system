@@ -1127,3 +1127,18 @@ model EmailTemplate {
 
   @@map("email_templates")
 }
+
+// ヒーローバナー管理
+model HeroBanner {
+  id          String   @id @default(uuid())
+  title       String?
+  image_url   String
+  link_url    String?
+  link_target String   @default("_self")
+  sort_order  Int      @default(0)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("hero_banners")
+}
