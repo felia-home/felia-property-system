@@ -175,29 +175,48 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
   const [actNext, setActNext] = useState("");
   const [addingAct, setAddingAct] = useState(false);
 
-  const loadCustomer = useCallback(() => {
-    return fetch(`/api/customers/${params.id}?includeRelations=true`)
-      .then(r => r.json())
-      .then(d => {
-        if (!d.customer) return;
-        setCustomer(d.customer as Customer);
-        setForm(d.customer as Customer);
-      })
-      .catch(() => setError("顧客情報の取得に失敗しました"));
+  const loadCustomer = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/customers/${params.id}?includeRelations=true`);
+      const d = await r.json();
+      if (!r.ok || !d.customer) {
+        setError(d.error ?? "顧客情報の取得に失敗しました");
+        return;
+      }
+      setCustomer(d.customer as Customer);
+      setForm(d.customer as Customer);
+    } catch {
+      setError("顧客情報の取得に失敗しました");
+    }
   }, [params.id]);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      loadCustomer(),
-      fetch("/api/staff?active=true").then(r => r.json())
-        .then((d: { staff?: { id: string; name: string }[] }) => setAllStaff(d.staff ?? []))
-        .catch(() => {}),
-      fetch(`/api/customers/${params.id}/send-private-selection-url`)
+    const run = async () => {
+      // 顧客データ取得（必須）
+      await loadCustomer();
+
+      // スタッフ一覧・tokenInfo は独立して取得（失敗しても顧客表示に影響しない）
+      fetch("/api/staff?active=true")
         .then(r => r.json())
-        .then((d: { exists?: boolean; expiresAt?: string }) => setTokenInfo(d.exists ? { exists: true, expiresAt: d.expiresAt } : { exists: false }))
-        .catch(() => setTokenInfo({ exists: false })),
-    ]).finally(() => setLoading(false));
+        .then((d: { staff?: { id: string; name: string }[] }) => setAllStaff(d.staff ?? []))
+        .catch(() => {});
+
+      try {
+        const tokenRes = await fetch(`/api/customers/${params.id}/send-private-selection-url`);
+        if (tokenRes.ok) {
+          const d = await tokenRes.json() as { exists?: boolean; expiresAt?: string };
+          setTokenInfo(d.exists ? { exists: true, expiresAt: d.expiresAt } : { exists: false });
+        } else {
+          setTokenInfo({ exists: false });
+        }
+      } catch {
+        setTokenInfo({ exists: false });
+      }
+
+      setLoading(false);
+    };
+    run();
   }, [loadCustomer, params.id]);
 
   const setF = <K extends keyof Customer>(k: K, v: Customer[K]) =>

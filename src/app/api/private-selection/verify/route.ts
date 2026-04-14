@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/private-selection/verify?token=<token>
 // HPフロント側からトークンを検証するエンドポイント
 export async function GET(request: NextRequest) {
