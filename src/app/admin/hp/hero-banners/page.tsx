@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import ImageUploader from "@/components/admin/ImageUploader";
 
 interface HeroBanner {
   id: string;
@@ -308,18 +309,14 @@ export default function HeroBannersPage() {
                 value={form.image_url}
                 onChange={e => setF("image_url", e.target.value)}
                 placeholder="https://example.com/banner.jpg"
-                style={inputSt}
+                style={{ ...inputSt, marginBottom: 8 }}
               />
-              {form.image_url && (
-                <div style={{ marginTop: 8, borderRadius: 8, overflow: "hidden", maxHeight: 120, background: "#f5f5f5" }}>
-                  <img
-                    src={form.image_url}
-                    alt="プレビュー"
-                    style={{ width: "100%", objectFit: "cover", maxHeight: 120 }}
-                    onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-                  />
-                </div>
-              )}
+              <ImageUploader
+                folder="hero-banners"
+                currentUrl={form.image_url || undefined}
+                label="ローカルから画像を選択"
+                onUpload={url => setF("image_url", url)}
+              />
             </div>
 
             <div style={{ marginBottom: 16 }}>
