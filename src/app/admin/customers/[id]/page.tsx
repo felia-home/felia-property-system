@@ -151,6 +151,11 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
   const [allStaff, setAllStaff] = useState<{ id: string; name: string }[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
 
+  // Private selection URL
+  const [tokenInfo, setTokenInfo] = useState<{ exists: boolean; expiresAt?: string } | null>(null);
+  const [tokenSending, setTokenSending] = useState(false);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+
   // Follow-up message
   const [generatingFollowUp, setGeneratingFollowUp] = useState(false);
   const [followUpMsg, setFollowUpMsg] = useState<{ subject: string; body: string; reason: string } | null>(null);
@@ -188,11 +193,38 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
       fetch("/api/staff?active=true").then(r => r.json())
         .then((d: { staff?: { id: string; name: string }[] }) => setAllStaff(d.staff ?? []))
         .catch(() => {}),
+      fetch(`/api/customers/${params.id}/send-private-selection-url`)
+        .then(r => r.json())
+        .then((d: { exists?: boolean; expiresAt?: string }) => setTokenInfo(d.exists ? { exists: true, expiresAt: d.expiresAt } : { exists: false }))
+        .catch(() => setTokenInfo({ exists: false })),
     ]).finally(() => setLoading(false));
-  }, [loadCustomer]);
+  }, [loadCustomer, params.id]);
 
   const setF = <K extends keyof Customer>(k: K, v: Customer[K]) =>
     setForm(f => ({ ...f, [k]: v }));
+
+  const handleSendPrivateUrl = async () => {
+    if (!customer) return;
+    const label = tokenInfo?.exists ? "再送付" : "送付";
+    if (!confirm(`${customer.name}様に非公開物件URLを${label}します。よろしいですか？`)) return;
+    setTokenSending(true);
+    setTokenError(null);
+    try {
+      const res = await fetch(`/api/customers/${params.id}/send-private-selection-url`, {
+        method: "POST",
+      });
+      const data = await res.json() as { success?: boolean; expiresAt?: string; error?: string };
+      if (!res.ok) {
+        setTokenError(data.error ?? "送付に失敗しました");
+        return;
+      }
+      setTokenInfo({ exists: true, expiresAt: data.expiresAt ?? "" });
+    } catch {
+      setTokenError("通信エラーが発生しました");
+    } finally {
+      setTokenSending(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true); setError("");
@@ -458,6 +490,42 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
                 placeholder="VIP・要注意など"
               />
             </div>
+          </div>
+
+          {/* 非公開物件URLの送付 */}
+          <div style={{ gridColumn: "1/-1", background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 20, marginBottom: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>プライベートセレクション</div>
+            <p style={{ fontSize: 12, color: "#706e68", margin: "0 0 12px" }}>
+              非公開物件を閲覧できる専用URLをお客様のメールアドレス宛に送付します。有効期限は30日間です。
+            </p>
+            <button
+              onClick={handleSendPrivateUrl}
+              disabled={tokenSending || !customer.email}
+              style={{
+                padding: "9px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                background: tokenSending ? "#aaa" : !customer.email ? "#ccc" : "#5BAD52",
+                color: "#fff", border: "none",
+                cursor: tokenSending || !customer.email ? "not-allowed" : "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              {tokenSending
+                ? "処理中..."
+                : tokenInfo?.exists
+                ? "非公開物件URLを再送付する"
+                : "非公開物件URLを送付する"}
+            </button>
+            {!customer.email && (
+              <p style={{ marginTop: 8, fontSize: 12, color: "#888" }}>※ メールアドレスが未登録のため送付できません</p>
+            )}
+            {tokenInfo?.exists && tokenInfo.expiresAt && (
+              <p style={{ marginTop: 6, fontSize: 12, color: "#5BAD52" }}>
+                ✓ 送付済み（有効期限：{new Date(tokenInfo.expiresAt).toLocaleDateString("ja-JP")}まで）
+              </p>
+            )}
+            {tokenError && (
+              <p style={{ marginTop: 6, fontSize: 12, color: "#c62828" }}>⚠ {tokenError}</p>
+            )}
           </div>
 
           {/* HP会員プロフィールセクション */}

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import PermissionBadge from "@/components/admin/PermissionBadge";
 import { PERMISSIONS, Permission } from "@/lib/permissions";
 
@@ -37,6 +38,15 @@ export default function StaffListPage() {
   const csvInputRef = useRef<HTMLInputElement>(null);
   const [generatingCodes, setGeneratingCodes] = useState(false);
   const [codeGenResult, setCodeGenResult] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<StaffMember | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const { data: session } = useSession();
+  const canDelete = ["ADMIN", "SENIOR_MANAGER"].includes(session?.user?.permission ?? "");
+  // デバッグ用（確認後に削除）
+  console.log("[STAFF PAGE] session.user:", session?.user);
+  console.log("[STAFF PAGE] permission:", session?.user?.permission);
+  console.log("[STAFF PAGE] canDelete:", canDelete);
 
   const load = async () => {
     setLoading(true);
@@ -62,6 +72,26 @@ export default function StaffListPage() {
   }, []);
 
   useEffect(() => { load(); }, [permFilter, storeFilter, activeFilter, search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleDeleteStaff = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/staff/${deleteTarget.id}`, { method: "DELETE" });
+      const data = await res.json() as { success?: boolean; error?: string };
+      if (!res.ok) {
+        setDeleteError(data.error ?? "削除に失敗しました");
+        return;
+      }
+      setDeleteTarget(null);
+      load();
+    } catch {
+      setDeleteError("通信エラーが発生しました");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleCsvImport = async (file?: File) => {
     if (!file) return;
@@ -235,14 +265,56 @@ export default function StaffListPage() {
                 <div style={{ fontSize: 12, color: "#888" }}>担当物件: <strong style={{ color: "#1c1b18" }}>{s._count.properties_as_agent}</strong>件</div>
               )}
 
-              <Link href={`/admin/staff/${s.id}`}
-                style={{ marginTop: "auto", fontSize: 12, color: "#8c1f1f", textDecoration: "none", fontWeight: 600, paddingTop: 8, borderTop: "1px solid #f2f1ed" }}>
-                詳細を見る →
-              </Link>
+              <div style={{ marginTop: "auto", display: "flex", gap: 6, paddingTop: 8, borderTop: "1px solid #f2f1ed" }}>
+                <Link href={`/admin/staff/${s.id}`}
+                  style={{ flex: 1, fontSize: 12, color: "#8c1f1f", textDecoration: "none", fontWeight: 600 }}>
+                  詳細を見る →
+                </Link>
+                {canDelete && (
+                  <button
+                    onClick={() => { setDeleteTarget(s); setDeleteError(null); }}
+                    style={{ fontSize: 11, color: "#c0392b", background: "#fff5f5", border: "1px solid #fce4e4", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                    削除
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
       )}
+      {/* 削除確認モーダル */}
+      {deleteTarget && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 32, width: 420, position: "relative" }}>
+            <button onClick={() => { setDeleteTarget(null); setDeleteError(null); }}
+              style={{ position: "absolute", top: 14, right: 16, background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#706e68", lineHeight: 1 }}>×</button>
+            <div style={{ fontSize: 28, marginBottom: 12 }}>⚠️</div>
+            <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 8, color: "#1c1b18" }}>スタッフを削除しますか？</h2>
+            <p style={{ fontSize: 13, color: "#706e68", marginBottom: 4 }}>
+              <strong>{deleteTarget.name}</strong> を退職済みにします。
+            </p>
+            <p style={{ fontSize: 12, color: "#aaa", marginBottom: 20 }}>
+              この操作は論理削除です（データは保持されます）。担当物件がある場合は削除できません。
+            </p>
+            {deleteError && (
+              <div style={{ background: "#fdeaea", border: "1px solid #ffcdd2", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#c62828" }}>
+                ❌ {deleteError}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => { setDeleteTarget(null); setDeleteError(null); }}
+                style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #e0deda", background: "#fff", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
+                キャンセル
+              </button>
+              <button onClick={handleDeleteStaff} disabled={isDeleting}
+                style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", background: "#c0392b", color: "#fff", cursor: isDeleting ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit", opacity: isDeleting ? 0.6 : 1 }}>
+                {isDeleting ? "削除中..." : "削除する"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showImportModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div style={{ background: "#fff", borderRadius: 16, padding: 32, width: 480, position: "relative" }}>

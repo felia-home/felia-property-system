@@ -68,10 +68,9 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        const u = user as typeof user & { staffId: string; permission: string; storeId: string | null };
-        token.staffId = u.staffId;
-        token.permission = u.permission;
-        token.storeId = u.storeId;
+        token.staffId = user.staffId;
+        token.permission = user.permission;
+        token.storeId = user.storeId;
       }
       return token;
     },

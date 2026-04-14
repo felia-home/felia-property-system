@@ -555,6 +555,7 @@ model Inquiry {
 
   // メモ
   internal_memo     String?
+  token             String?   // プライベートセレクション経由の場合のトークン
   created_at        DateTime  @default(now())
   updated_at        DateTime  @updatedAt
 
@@ -677,6 +678,7 @@ model Customer {
   activities             CustomerActivity[]
   contracts              Contract[]
   assigned_staff         Staff?    @relation("CustomerAgent", fields: [assigned_to], references: [id])
+  privateSelectionTokens PrivateSelectionToken[]
 
   @@map("customers")
 }
@@ -1096,4 +1098,19 @@ model MemberProfile {
   updated_at          DateTime  @updatedAt
 
   @@map("member_profiles")
+}
+
+// プライベートセレクション マジックリンク
+model PrivateSelectionToken {
+  id          String    @id @default(uuid())
+  token       String    @unique
+  customer_id String
+  email       String
+  expires_at  DateTime
+  used_at     DateTime?
+  created_at  DateTime  @default(now())
+
+  customer    Customer  @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+
+  @@map("private_selection_tokens")
 }

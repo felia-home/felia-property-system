@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export async function GET(
   request: NextRequest,
@@ -116,15 +118,34 @@ export async function PATCH(
 
 // DELETE /api/staff/[id]
 // 論理削除（is_active=false + retirement_date=now）
-// 呼び出し元でADMIN権限チェックを行う想定
+// ADMIN / SENIOR_MANAGER のみ実行可能
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+    }
+    const permission = session.user?.permission as string | undefined;
+    if (!["ADMIN", "SENIOR_MANAGER"].includes(permission ?? "")) {
+      return NextResponse.json({ error: "削除権限がありません" }, { status: 403 });
+    }
+
     const existing = await prisma.staff.findUnique({ where: { id: params.id } });
     if (!existing) {
       return NextResponse.json({ error: "スタッフが見つかりません" }, { status: 404 });
+    }
+
+    const propertyCount = await prisma.property.count({
+      where: { agent_id: params.id, is_deleted: false },
+    });
+    if (propertyCount > 0) {
+      return NextResponse.json(
+        { error: `このスタッフには担当物件が${propertyCount}件あります。担当者を変更してから削除してください。` },
+        { status: 400 }
+      );
     }
 
     await prisma.staff.update({

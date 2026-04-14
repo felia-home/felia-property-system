@@ -11,6 +11,13 @@ declare module "next-auth" {
       storeId: string | null;
     };
   }
+
+  interface User {
+    id: string;
+    staffId: string;
+    permission: string;
+    storeId: string | null;
+  }
 }
 
 declare module "next-auth/jwt" {
