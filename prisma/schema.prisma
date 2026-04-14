@@ -1043,6 +1043,7 @@ model Banner {
   title        String
   image_url    String
   link_url     String?
+  link_target  String   @default("_self") // "_self" | "_blank"
   position     String   @default("TOP") // TOP | MIDDLE | BOTTOM
   slot         Int      @default(1)     // 1-4（2カラム2行）
   is_active    Boolean  @default(true)
