@@ -84,6 +84,16 @@ export const PROPERTY_STATUS = {
     next: ["PUBLISHED"],
   },
 
+  // === 一時停止 ===
+  SUSPENDED: {
+    label: "一時停止",
+    color: "#78909c",
+    bg: "#eceff1",
+    icon: "⏸️",
+    description: "掲載を一時停止中",
+    next: ["PUBLISHED", "CLOSED"],
+  },
+
   // === 終了フェーズ ===
   SOLD_ALERT: {
     label: "成約アラート",
@@ -133,10 +143,30 @@ export function getStatusDef(status: string) {
 // Active statuses (not terminal)
 export const ACTIVE_STATUSES: PropertyStatus[] = [
   "DRAFT", "AD_PENDING", "AD_SENT", "AD_OK", "PHOTO_NEEDED",
-  "PUBLISHING", "PUBLISHED", "CONTENT_CHECK", "SOLD_ALERT",
+  "PUBLISHING", "PUBLISHED", "CONTENT_CHECK", "SOLD_ALERT", "SUSPENDED",
 ];
 
-// Kanban columns to display on dashboard
+// Kanban column groups for dashboard
+export interface KanbanColumnDef {
+  key: string;
+  label: string;
+  icon: string;
+  color: string;
+  bg: string;
+  statuses: PropertyStatus[];
+}
+
+export const KANBAN_COLUMNS_GROUPED: KanbanColumnDef[] = [
+  { key: "draft",      label: "下書き",     icon: "✏️", color: "#9e9e9e", bg: "#f5f5f5",  statuses: ["DRAFT"] },
+  { key: "ad_check",   label: "広告確認中", icon: "📨", color: "#e65100", bg: "#fff3e0",  statuses: ["AD_PENDING", "AD_SENT"] },
+  { key: "prep",       label: "掲載準備",   icon: "🔧", color: "#1565c0", bg: "#e3f2fd",  statuses: ["AD_OK", "PHOTO_NEEDED", "PUBLISHING"] },
+  { key: "published",  label: "掲載中",     icon: "🟢", color: "#1b5e20", bg: "#e8f5e9",  statuses: ["PUBLISHED"] },
+  { key: "check",      label: "要確認",     icon: "🔍", color: "#4527a0", bg: "#ede7f6",  statuses: ["CONTENT_CHECK", "SOLD_ALERT"] },
+  { key: "suspended",  label: "一時停止",   icon: "⏸️", color: "#78909c", bg: "#eceff1",  statuses: ["SUSPENDED"] },
+  { key: "done",       label: "終了",       icon: "🔒", color: "#616161", bg: "#f5f5f5",  statuses: ["SOLD", "CLOSED", "AD_NG"] },
+];
+
+// Legacy flat columns (kept for compatibility)
 export const KANBAN_COLUMNS: PropertyStatus[] = [
   "DRAFT", "AD_PENDING", "AD_SENT", "PHOTO_NEEDED", "PUBLISHING", "PUBLISHED", "SOLD_ALERT",
 ];
