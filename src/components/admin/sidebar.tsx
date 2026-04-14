@@ -42,7 +42,8 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { href: "/admin/hp/features",  label: "特集管理",       icon: "🗂" },
       { href: "/admin/hp/news",      label: "お知らせ管理",   icon: "📰" },
       { href: "/admin/hp/banners",        label: "バナー管理",         icon: "🖼" },
-      { href: "/admin/hp/hero-banners",   label: "ヒーローバナー管理", icon: "🎞" },
+      { href: "/admin/hp/hero-banners",    label: "ヒーローバナー管理",   icon: "🎞" },
+      { href: "/admin/hp/search-banners", label: "検索上部バナー管理",   icon: "🔍" },
     ],
   },
   {
