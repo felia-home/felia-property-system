@@ -51,7 +51,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "設定・管理",
     items: [
       { href: "/admin/staff",                label: "スタッフ管理",       icon: "👤", feature: "staff.view" },
-      { href: "/admin/settings",             label: "会社・店舗設定",     icon: "⚙",  feature: "settings.view" },
+      { href: "/admin/settings/company",     label: "会社・店舗設定",     icon: "⚙",  feature: "settings.view" },
       { href: "/admin/sales",                label: "売上管理",           icon: "¥",  feature: "sales.view_all" },
       { href: "/admin/mansions",             label: "マンションマスタ",   icon: "🏢" },
       { href: "/admin/environment-images",   label: "周辺環境写真",       icon: "🌳" },

@@ -1160,6 +1160,26 @@ model AreaSetting {
   @@map("area_settings")
 }
 
+// 会社情報設定
+model CompanySetting {
+  id          String   @id @default(uuid())
+  name        String
+  postal_code String?
+  address     String?
+  phone       String?
+  fax         String?
+  email       String?
+  hours       String?
+  holiday     String?
+  license     String?
+  lat         Float?
+  lng         Float?
+  updated_at  DateTime @updatedAt
+  created_at  DateTime @default(now())
+
+  @@map("company_settings")
+}
+
 // ヒーローバナー管理
 model HeroBanner {
   id          String   @id @default(uuid())
