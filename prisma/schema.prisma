@@ -1144,6 +1144,22 @@ model SearchBanner {
   @@map("search_banners")
 }
 
+// エリア管理
+model AreaSetting {
+  id          String   @id @default(uuid())
+  area_name   String
+  area_type   String   @default("ward") // "ward" | "city"
+  image_url   String?
+  description String?
+  link_url    String?
+  is_active   Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("area_settings")
+}
+
 // ヒーローバナー管理
 model HeroBanner {
   id          String   @id @default(uuid())
