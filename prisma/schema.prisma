@@ -843,6 +843,7 @@ model Staff {
   customers_assigned  Customer[] @relation("CustomerAgent")
   private_properties_as_agent PrivateProperty[] @relation("PrivatePropertyAgent")
   contracts_as_takken  Contract[] @relation("ContractTakken")
+  testimonials         Testimonial[]
 
   @@map("staffs")
 }
@@ -1178,6 +1179,64 @@ model CompanySetting {
   created_at  DateTime @default(now())
 
   @@map("company_settings")
+}
+
+// 売却実績
+model SaleResult {
+  id            String   @id @default(uuid())
+  year_month    String
+  area          String
+  property_type String
+  comment       String?
+  image_url_1   String?
+  image_url_2   String?
+  image_url_3   String?
+  is_active     Boolean  @default(true)
+  sort_order    Int      @default(0)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@map("sale_results")
+}
+
+// お客様の声
+model Testimonial {
+  id              String   @id @default(uuid())
+  name            String
+  email           String?
+  display_name    String
+  image_url       String?
+  title           String
+  trigger_text    String?
+  decision_text   String?
+  impression_text String?
+  advice_text     String?
+  final_text      String?
+  staff_id        String?
+  status          String   @default("PENDING")
+  sort_order      Int      @default(0)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  staff           Staff?   @relation(fields: [staff_id], references: [id], onDelete: SetNull)
+
+  @@map("testimonials")
+}
+
+// WEBチラシ
+model WebFlyer {
+  id               String   @id @default(uuid())
+  name             String
+  distribute_month String
+  front_image_url  String?
+  back_image_url   String?
+  pdf_url          String?
+  is_active        Boolean  @default(true)
+  sort_order       Int      @default(0)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@map("web_flyers")
 }
 
 // ヒーローバナー管理
