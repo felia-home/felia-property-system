@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { r2Client, R2_BUCKET_NAME, R2_PUBLIC_URL } from "@/lib/r2";
 import { randomBytes } from "crypto";
+import { resizeAndConvertToWebP } from "@/lib/image-resize";
 
 const ALLOWED_TYPES = [
   "image/jpeg",
@@ -47,17 +48,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
-    const uniqueName = `${randomBytes(16).toString("hex")}.${ext}`;
+    const originalBuffer = Buffer.from(await file.arrayBuffer());
+
+    // GIF以外はリサイズ・WebP変換
+    let uploadBuffer: Buffer;
+    let uploadExt: string;
+    let uploadMime: string;
+
+    if (file.type === "image/gif") {
+      // GIFはそのまま（アニメーション維持）
+      uploadBuffer = originalBuffer;
+      uploadExt = "gif";
+      uploadMime = "image/gif";
+    } else {
+      const { buffer, ext } = await resizeAndConvertToWebP(originalBuffer, folder);
+      uploadBuffer = buffer;
+      uploadExt = ext;
+      uploadMime = "image/webp";
+    }
+
+    const uniqueName = `${randomBytes(16).toString("hex")}.${uploadExt}`;
     const key = `${folder}/${uniqueName}`;
 
-    const buffer = Buffer.from(await file.arrayBuffer());
     await r2Client.send(
       new PutObjectCommand({
         Bucket: R2_BUCKET_NAME,
         Key: key,
-        Body: buffer,
-        ContentType: file.type,
+        Body: uploadBuffer,
+        ContentType: uploadMime,
         CacheControl: "public, max-age=31536000",
       })
     );
