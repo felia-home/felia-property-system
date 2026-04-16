@@ -18,6 +18,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { href: "/admin",                  label: "ダッシュボード",   icon: "▦" },
       { href: "/admin/properties",       label: "物件一覧",         icon: "⌂" },
+      { href: "/admin/properties/check", label: "物件確認",         icon: "📋" },
       { href: "/admin/approvals",        label: "広告確認待ち",     icon: "✓" },
       { href: "/admin/sold",             label: "成約アラート",     icon: "!" },
     ],
