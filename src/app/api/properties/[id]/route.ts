@@ -40,7 +40,7 @@ const STRING_FIELDS = new Set([
   "road_side","road_type","road_direction","road_contact","rebuild_allowed",
   "management_type","management_company",
   "delivery_timing","delivery_status","reins_number","reins_status","delivery_condition",
-  "seller_company","seller_contact","seller_agent","seller_fax","seller_transaction_type","seller_brokerage_type",
+  "seller_company","seller_phone","seller_contact","seller_agent","seller_fax","seller_transaction_type","seller_brokerage_type",
   "suumo_id","athome_id","yahoo_id","homes_id",
   "agent_id","store_id","property_number","internal_memo","source",
   "ad_confirmation_method","ad_confirmed_by","ad_confirmation_file",

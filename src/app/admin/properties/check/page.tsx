@@ -25,27 +25,37 @@ const TYPE_LABELS: Record<string, string> = {
   NEW_MANSION: "新築マンション", LAND: "土地",
 };
 
+// DBのcheck_interval_daysに頼らず掲載状況から動的計算
+function getIntervalDays(p: CheckProperty): number {
+  const hasPortal = p.published_suumo || p.published_athome ||
+    p.published_yahoo || p.published_homes;
+  return hasPortal ? 7 : 14;
+}
+
 function getPriority(p: CheckProperty): number {
+  const interval = getIntervalDays(p);
   if (!p.last_checked_at) return 2;
   const days = Math.floor((Date.now() - new Date(p.last_checked_at).getTime()) / 86_400_000);
-  if (days >= p.check_interval_days) return 0;
-  if (days >= p.check_interval_days - 2) return 1;
+  if (days >= interval) return 0;
+  if (days >= interval - 2) return 1;
   return 3;
 }
 
 function getRowStyle(p: CheckProperty): React.CSSProperties {
+  const interval = getIntervalDays(p);
   if (!p.last_checked_at) return { backgroundColor: "#fffbeb", borderLeft: "4px solid #f59e0b" };
   const days = Math.floor((Date.now() - new Date(p.last_checked_at).getTime()) / 86_400_000);
-  if (days >= p.check_interval_days) return { backgroundColor: "#fef2f2", borderLeft: "4px solid #dc2626" };
-  if (days >= p.check_interval_days - 2) return { backgroundColor: "#fff7ed", borderLeft: "4px solid #f97316" };
+  if (days >= interval) return { backgroundColor: "#fef2f2", borderLeft: "4px solid #dc2626" };
+  if (days >= interval - 2) return { backgroundColor: "#fff7ed", borderLeft: "4px solid #f97316" };
   return { backgroundColor: "#fff", borderLeft: "4px solid #e5e7eb" };
 }
 
 function getStatusText(p: CheckProperty): { text: string; color: string } {
+  const interval = getIntervalDays(p);
   if (!p.last_checked_at) return { text: "📋 未確認", color: "#d97706" };
   const days = Math.floor((Date.now() - new Date(p.last_checked_at).getTime()) / 86_400_000);
-  const remaining = p.check_interval_days - days;
-  if (days >= p.check_interval_days) return { text: `⚠️ ${days - p.check_interval_days + 1}日超過`, color: "#dc2626" };
+  const remaining = interval - days;
+  if (days >= interval) return { text: `⚠️ ${days - interval + 1}日超過`, color: "#dc2626" };
   if (remaining <= 2) return { text: `⏰ 残り${remaining}日`, color: "#f97316" };
   return { text: `✓ 残り${remaining}日`, color: "#5BAD52" };
 }
@@ -72,6 +82,15 @@ export default function PropertyCheckPage() {
       .catch(() => setLoading(false));
   }, []);
 
+  // 価格inputの初期値を現在価格で設定
+  useEffect(() => {
+    const initialPrices: Record<string, string> = {};
+    properties.forEach(p => {
+      initialPrices[p.id] = p.price != null ? String(p.price) : "";
+    });
+    setPriceInputs(initialPrices);
+  }, [properties]);
+
   const handleCheck = async (property: CheckProperty) => {
     setChecking(prev => ({ ...prev, [property.id]: true }));
     const newPriceStr = priceInputs[property.id];
@@ -84,12 +103,15 @@ export default function PropertyCheckPage() {
       });
       if (res.ok) {
         setDone(prev => ({ ...prev, [property.id]: true }));
+        const updatedPrice = newPrice ?? property.price;
         setProperties(prev => prev.map(p =>
           p.id === property.id
-            ? { ...p, last_checked_at: new Date().toISOString(), price: newPrice ?? p.price }
+            ? { ...p, last_checked_at: new Date().toISOString(), price: updatedPrice }
             : p
         ));
-        setPriceInputs(prev => ({ ...prev, [property.id]: "" }));
+        if (newPrice != null) {
+          setPriceInputs(prev => ({ ...prev, [property.id]: String(updatedPrice ?? "") }));
+        }
       } else {
         alert("確認の保存に失敗しました");
       }
@@ -100,6 +122,7 @@ export default function PropertyCheckPage() {
     }
   };
 
+  // priority 0=超過, 1=まもなく, 2=未確認 → 要確認
   const overdueCount = properties.filter(p => getPriority(p) <= 2).length;
 
   if (loading) return <div style={{ padding: 40, textAlign: "center", color: "#706e68", fontSize: 13 }}>読み込み中...</div>;
@@ -179,11 +202,13 @@ export default function PropertyCheckPage() {
                     <p style={{ fontSize: 13, fontWeight: 600, color: "#374151", margin: 0 }}>
                       {property.seller_company || "—"}
                     </p>
-                    {property.seller_phone && (
+                    {property.seller_phone ? (
                       <a href={`tel:${property.seller_phone}`}
-                        style={{ fontSize: 13, color: "#3b82f6", textDecoration: "none" }}>
+                        style={{ fontSize: 13, color: "#3b82f6", textDecoration: "none", display: "block" }}>
                         📞 {property.seller_phone}
                       </a>
+                    ) : (
+                      <span style={{ fontSize: 12, color: "#9ca3af" }}>電話番号未登録</span>
                     )}
                   </div>
 
@@ -208,7 +233,6 @@ export default function PropertyCheckPage() {
                         type="number"
                         value={priceInputs[property.id] ?? ""}
                         onChange={e => setPriceInputs(prev => ({ ...prev, [property.id]: e.target.value }))}
-                        placeholder={String(property.price ?? "")}
                         style={{
                           width: 110, padding: "6px 10px",
                           border: "1px solid #d1d5db", borderRadius: 6,
