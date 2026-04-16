@@ -464,6 +464,8 @@ function HpFlagPanel({
     setSaving(false);
   };
 
+  const isPublishedHp = !!property.published_hp;
+  const isPublishedMembers = !!property.published_members;
   const isFeliaSel = !!property.is_felia_selection;
   const isOpenHouse = !!property.is_open_house;
   const openHouseStart = property.open_house_start ? String(property.open_house_start).slice(0, 16) : "";
@@ -473,7 +475,67 @@ function HpFlagPanel({
     <div>
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1b18", marginBottom: 4 }}>🌐 HP表示設定</div>
-        <div style={{ fontSize: 12, color: "#706e68" }}>HPのトップページに表示する特別フラグを設定します</div>
+        <div style={{ fontSize: 12, color: "#706e68" }}>HPへの公開設定とトップページに表示する特別フラグを設定します</div>
+      </div>
+
+      {/* HP公開設定 */}
+      <div style={{
+        background: isPublishedHp ? "#f0fdf4" : "#f9fafb",
+        border: `2px solid ${isPublishedHp ? "#5BAD52" : "#e5e7eb"}`,
+        borderRadius: 12, padding: 18, marginBottom: 14,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1b18", marginBottom: 4 }}>🌐 HP公開</div>
+            <div style={{ fontSize: 12, color: "#706e68" }}>
+              {isPublishedHp ? "HPに掲載中です" : "HPに未掲載です。公開すると一般ユーザーに表示されます。"}
+            </div>
+          </div>
+          <button
+            disabled={saving}
+            onClick={() => patch({ published_hp: !isPublishedHp })}
+            style={{
+              padding: "8px 18px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+              border: "none",
+              background: saving ? "#aaa" : isPublishedHp ? "#dc2626" : "#5BAD52",
+              color: "#fff",
+              cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit",
+              flexShrink: 0, marginLeft: 16,
+            }}
+          >
+            {isPublishedHp ? "非公開にする" : "HPに公開する"}
+          </button>
+        </div>
+      </div>
+
+      {/* 会員限定公開 */}
+      <div style={{
+        background: isPublishedMembers ? "#eff6ff" : "#f9fafb",
+        border: `2px solid ${isPublishedMembers ? "#3b82f6" : "#e5e7eb"}`,
+        borderRadius: 12, padding: 18, marginBottom: 14,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1b18", marginBottom: 4 }}>🔒 会員限定公開</div>
+            <div style={{ fontSize: 12, color: "#706e68" }}>
+              {isPublishedMembers ? "会員限定ページに掲載中です" : "会員限定ページに未掲載です"}
+            </div>
+          </div>
+          <button
+            disabled={saving}
+            onClick={() => patch({ published_members: !isPublishedMembers })}
+            style={{
+              padding: "8px 18px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+              border: "none",
+              background: saving ? "#aaa" : isPublishedMembers ? "#dc2626" : "#3b82f6",
+              color: "#fff",
+              cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit",
+              flexShrink: 0, marginLeft: 16,
+            }}
+          >
+            {isPublishedMembers ? "非公開にする" : "会員限定で公開"}
+          </button>
+        </div>
       </div>
 
       {/* 厳選物件フラグ */}
