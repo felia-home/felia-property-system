@@ -588,9 +588,19 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
                 )}
               </div>
               <div style={{ flex: 1, ...row }}>
-                <label style={lbl}>写真URL</label>
-                <input style={inp} value={form.photo_url ?? ""} onChange={e => setF("photo_url", e.target.value || null)} placeholder="https://..." />
-                <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>S3やCDNのURLを直接入力してください</div>
+                <label style={lbl}>プロフィール画像</label>
+                <input
+                  style={{ ...inp, marginBottom: 8 }}
+                  value={form.photo_url ?? ""}
+                  onChange={e => setF("photo_url", e.target.value || null)}
+                  placeholder="https://... または下からアップロード"
+                />
+                <ImageUploader
+                  folder="staff"
+                  currentUrl={form.photo_url ?? ""}
+                  label="ローカルから画像を選択"
+                  onUpload={(url) => setF("photo_url", url)}
+                />
               </div>
             </div>
           </div>
