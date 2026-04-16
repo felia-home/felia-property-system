@@ -373,8 +373,8 @@ export default function PropertiesPage() {
                     {/* Action */}
                     <td style={{ padding: "12px 14px" }}>
                       <a href={`/admin/properties/${p.id}`}
-                        style={{ fontSize: 12, color: pendingCount > 0 ? "#8c1f1f" : "#234f35", textDecoration: "none", fontWeight: 600 }}>
-                        {pendingCount > 0 ? "対応" : "詳細"}
+                        style={{ fontSize: 12, color: completion.required.length > 0 ? "#8c1f1f" : "#234f35", textDecoration: "none", fontWeight: 600 }}>
+                        {completion.required.length > 0 ? "対応" : "詳細"}
                       </a>
                     </td>
                   </tr>
