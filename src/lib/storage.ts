@@ -1,6 +1,6 @@
 /**
  * Storage helper — ファイルアップロード
- * S3_BUCKET_NAME が設定されていれば S3、なければ public/uploads/ にローカル保存
+ * R2_ACCESS_KEY_ID が設定されていれば Cloudflare R2、なければ public/uploads/ にローカル保存
  */
 
 import * as fs from "fs";
@@ -61,34 +61,32 @@ function getMimeType(filename: string): string {
 }
 
 // ============================================================
-// S3 アップロード（AWS_ACCESS_KEY_ID が設定されている場合）
+// R2 アップロード（R2_ACCESS_KEY_ID が設定されている場合）
 // ============================================================
 
-async function saveS3File(
+async function saveR2File(
   buffer: Buffer,
   originalName: string,
   subdir: string
 ): Promise<UploadResult> {
-  // Dynamic import to avoid breaking builds when AWS SDK not installed
-  const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  const { r2Client, R2_BUCKET_NAME, R2_PUBLIC_URL } = await import("@/lib/r2");
 
-  const bucket = process.env.S3_BUCKET_NAME!;
-  const region = process.env.AWS_REGION ?? "ap-northeast-1";
   const filename = sanitizeFilename(originalName);
   const key = `uploads/${subdir}/${filename}`;
   const mimeType = getMimeType(filename);
 
-  const s3 = new S3Client({ region });
-  await s3.send(
+  await r2Client.send(
     new PutObjectCommand({
-      Bucket: bucket,
+      Bucket: R2_BUCKET_NAME,
       Key: key,
       Body: buffer,
       ContentType: mimeType,
     })
   );
 
-  const url = `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+  const base = R2_PUBLIC_URL.replace(/\/$/, "");
+  const url = `${base}/${key}`;
   return { url, filename, file_size: buffer.length, mime_type: mimeType };
 }
 
@@ -101,12 +99,12 @@ export async function uploadFile(
   originalName: string,
   subdir: "properties" | "mansions" | "environment" = "properties"
 ): Promise<UploadResult> {
-  const useS3 =
-    !!process.env.S3_BUCKET_NAME &&
-    !!process.env.AWS_ACCESS_KEY_ID;
+  const useR2 =
+    !!process.env.R2_ACCESS_KEY_ID &&
+    !!process.env.R2_ACCOUNT_ID;
 
-  if (useS3) {
-    return saveS3File(buffer, originalName, subdir);
+  if (useR2) {
+    return saveR2File(buffer, originalName, subdir);
   }
   return saveLocalFile(buffer, originalName, subdir);
 }
