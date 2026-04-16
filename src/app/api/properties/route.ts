@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
         seller_fax:              b.seller_fax              ? String(b.seller_fax)              : null,
         seller_transaction_type: b.seller_transaction_type ? String(b.seller_transaction_type) : null,
         seller_brokerage_type:   b.seller_brokerage_type   ? String(b.seller_brokerage_type)   : null,
-        ad_transfer_consent:     b.ad_transfer_consent     ? String(b.ad_transfer_consent)     : null,
+        ad_transfer_consent:     b.ad_transfer_consent     ? String(b.ad_transfer_consent)     : "あり",
 
         // 設備
         eq_autolock:        bool(b.eq_autolock ?? b.eq_auto_lock),
