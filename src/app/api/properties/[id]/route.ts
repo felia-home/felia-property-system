@@ -15,6 +15,16 @@ const toBool = (v: unknown): boolean =>
 const toDateTime = (v: unknown): Date | null =>
   v == null || v === "" ? null : new Date(String(v));
 
+const toStringArray = (v: unknown): string[] | null => {
+  if (v == null) return null;
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v === "string") {
+    if (v.trim() === "") return [];
+    return v.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return null;
+};
+
 // ── フィールド分類 ────────────────────────────────────────────────────────────
 
 const STRING_FIELDS = new Set([
@@ -100,9 +110,14 @@ const DATETIME_FIELDS = new Set([
   "open_house_start","open_house_end",
 ]);
 
-// Json / String[] — そのまま渡す
-const PASSTHROUGH_FIELDS = new Set([
-  "use_zones","roads","last_check_result","pending_tasks","selling_points",
+// String[] 型フィールド（カンマ区切り文字列 or 配列を受け付ける）
+const STRING_ARRAY_FIELDS = new Set([
+  "pending_tasks","selling_points",
+]);
+
+// Json 型フィールド — そのまま渡す
+const JSON_FIELDS = new Set([
+  "use_zones","roads","last_check_result",
 ]);
 
 // ── GET ──────────────────────────────────────────────────────────────────────
@@ -142,7 +157,9 @@ export async function PATCH(
         data[key] = toBool(val);
       } else if (DATETIME_FIELDS.has(key)) {
         data[key] = toDateTime(val);
-      } else if (PASSTHROUGH_FIELDS.has(key)) {
+      } else if (STRING_ARRAY_FIELDS.has(key)) {
+        data[key] = toStringArray(val);
+      } else if (JSON_FIELDS.has(key)) {
         data[key] = val;
       }
       // 未知フィールドは無視（セキュリティ上のallowlist）
