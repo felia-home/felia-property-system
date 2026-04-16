@@ -14,10 +14,11 @@ async function updatePhotoStats(propertyId: string) {
   const property = await prisma.property.findUnique({ where: { id: propertyId } });
   if (!property) return;
 
-  const hasExterior = images.some(i => i.room_type === "外観");
-  const hasFloorPlan = images.some(i => i.room_type === "間取り図");
-  const hasInterior = images.some(i =>
-    ["リビング", "キッチン", "洋室", "和室", "主寝室", "バスルーム"].includes(i.room_type ?? "")
+  // room_type はAIが返す enum キー（EXTERIOR, FLOOR_PLAN, LIVING 等）で保存される
+  const hasExterior  = images.some(i => i.room_type === "EXTERIOR");
+  const hasFloorPlan = images.some(i => i.room_type === "FLOOR_PLAN");
+  const hasInterior  = images.some(i =>
+    ["LIVING", "KITCHEN", "BEDROOM", "BATHROOM", "TOILET", "ENTRANCE", "BALCONY"].includes(i.room_type ?? "")
   );
 
   // Auto-transition PHOTO_NEEDED → PUBLISHING when requirements are met

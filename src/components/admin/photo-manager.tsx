@@ -247,6 +247,7 @@ export default function PhotoManager({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCaption, setEditCaption] = useState("");
+  const [editRoomType, setEditRoomType] = useState<string>("");
   const [mansionName, setMansionName] = useState("");
   const [mansionSelected, setMansionSelected] = useState<MansionSuggestion | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -364,14 +365,20 @@ export default function PhotoManager({
     setImages((prev) => prev.filter((img) => img.id !== imgId));
   };
 
-  // ---- Caption save ----
+  // ---- Caption + room_type save ----
   const saveCaption = async (imgId: string) => {
+    const body: Record<string, string> = { caption: editCaption };
+    if (editRoomType) body.room_type = editRoomType;
     await fetch(`/api/properties/${propertyId}/images/${imgId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ caption: editCaption }),
+      body: JSON.stringify(body),
     });
-    setImages((prev) => prev.map((img) => img.id === imgId ? { ...img, caption: editCaption } : img));
+    setImages((prev) => prev.map((img) =>
+      img.id === imgId
+        ? { ...img, caption: editCaption, room_type: editRoomType || img.room_type }
+        : img
+    ));
     setEditingId(null);
   };
 
@@ -607,6 +614,16 @@ export default function PhotoManager({
               {/* User caption edit */}
               {editingId === img.id ? (
                 <div style={{ marginTop: 6 }}>
+                  <select
+                    value={editRoomType}
+                    onChange={(e) => setEditRoomType(e.target.value)}
+                    style={{ width: "100%", fontSize: 11, padding: "4px 6px", border: "1px solid #e0deda", borderRadius: 5, fontFamily: "inherit", boxSizing: "border-box", marginBottom: 4 }}
+                  >
+                    <option value="">タグ未設定</option>
+                    {Object.entries(ROOM_TYPE_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
                   <input
                     value={editCaption}
                     onChange={(e) => setEditCaption(e.target.value)}
@@ -636,7 +653,7 @@ export default function PhotoManager({
                   メインに設定
                 </button>
               )}
-              <button onClick={() => { setEditingId(img.id); setEditCaption(img.caption ?? ""); }}
+              <button onClick={() => { setEditingId(img.id); setEditCaption(img.caption ?? ""); setEditRoomType(img.room_type ?? ""); }}
                 style={btnStyle("#f7f6f2", "#706e68", "11px")}>
                 編集
               </button>
