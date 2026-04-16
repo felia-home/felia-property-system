@@ -169,6 +169,23 @@ export async function PATCH(
       return NextResponse.json({ error: "更新するフィールドがありません" }, { status: 400 });
     }
 
+    // published_hp の変更に連動してワークフローステータスを自動更新
+    // 終端ステータス（SOLD / CLOSED）は上書きしない
+    if ("published_hp" in body) {
+      const current = await prisma.property.findUnique({
+        where: { id: params.id },
+        select: { status: true },
+      });
+      const terminal = ["SOLD", "CLOSED"];
+      if (current && !terminal.includes(current.status)) {
+        if (toBool(body.published_hp)) {
+          data.status = "PUBLISHING";
+        } else {
+          data.status = "AD_OK";
+        }
+      }
+    }
+
     const property = await prisma.property.update({ where: { id: params.id }, data });
     return NextResponse.json({ property });
   } catch (error) {
