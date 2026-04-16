@@ -44,6 +44,8 @@ export default function BranchesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [modalMsg, setModalMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -55,7 +57,7 @@ export default function BranchesPage() {
 
   useEffect(() => { void load(); }, []);
 
-  const openAdd = () => { setEditing(null); setForm(EMPTY); setModalMsg(null); setShowModal(true); };
+  const openAdd = () => { setEditing(null); setForm(EMPTY); setModalMsg(null); setGeocodeError(null); setShowModal(true); };
   const openEdit = (item: Branch) => {
     setEditing(item);
     setForm({
@@ -71,7 +73,30 @@ export default function BranchesPage() {
       sort_order: item.sort_order,
     });
     setModalMsg(null);
+    setGeocodeError(null);
     setShowModal(true);
+  };
+
+  const handleBranchGeocode = async () => {
+    if (!form.address) {
+      setGeocodeError("住所を入力してください");
+      return;
+    }
+    setGeocoding(true);
+    setGeocodeError(null);
+    try {
+      const res = await fetch(`/api/admin/geocode?address=${encodeURIComponent(form.address)}`);
+      const data = await res.json() as { lat?: number; lng?: number };
+      if (data.lat && data.lng) {
+        setForm(f => ({ ...f, lat: data.lat!.toString(), lng: data.lng!.toString() }));
+      } else {
+        setGeocodeError("住所から緯度経度を取得できませんでした");
+      }
+    } catch {
+      setGeocodeError("取得に失敗しました");
+    } finally {
+      setGeocoding(false);
+    }
   };
 
   const handleSave = async () => {
@@ -251,6 +276,32 @@ export default function BranchesPage() {
                 <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>住所 *</label>
                 <input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
                   placeholder="東京都渋谷区幡ヶ谷2-1-4" style={inputSt} />
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={handleBranchGeocode}
+                    disabled={geocoding}
+                    style={{
+                      padding: "8px 16px",
+                      background: geocoding ? "#9ca3af" : "#3b82f6",
+                      color: "#fff", border: "none", borderRadius: 6,
+                      cursor: geocoding ? "not-allowed" : "pointer",
+                      fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap",
+                    }}
+                  >
+                    {geocoding ? "取得中..." : "📍 住所から緯度経度を取得"}
+                  </button>
+                  {form.lat && form.lng && (
+                    <span style={{ fontSize: 12, color: "#5BAD52" }}>
+                      ✓ {parseFloat(form.lat).toFixed(4)}, {parseFloat(form.lng).toFixed(4)}
+                    </span>
+                  )}
+                </div>
+                {geocodeError && (
+                  <p style={{ fontSize: 12, color: "#dc2626", marginTop: 4, margin: "4px 0 0" }}>
+                    {geocodeError}
+                  </p>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>電話番号</label>

@@ -45,6 +45,8 @@ export default function CompanySettingsPage() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [canEdit, setCanEdit] = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
 
   useEffect(() => {
     setCanEdit(["ADMIN", "SENIOR_MANAGER"].includes(
@@ -76,6 +78,28 @@ export default function CompanySettingsPage() {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  const handleGeocode = async () => {
+    if (!form.address) {
+      setGeocodeError("住所を入力してください");
+      return;
+    }
+    setGeocoding(true);
+    setGeocodeError(null);
+    try {
+      const res = await fetch(`/api/admin/geocode?address=${encodeURIComponent(form.address)}`);
+      const data = await res.json() as { lat?: number; lng?: number };
+      if (data.lat && data.lng) {
+        setForm(f => ({ ...f, lat: data.lat!.toString(), lng: data.lng!.toString() }));
+      } else {
+        setGeocodeError("住所から緯度経度を取得できませんでした。住所を確認してください。");
+      }
+    } catch {
+      setGeocodeError("取得に失敗しました");
+    } finally {
+      setGeocoding(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -166,6 +190,36 @@ export default function CompanySettingsPage() {
                     color: "#111827",
                   }}
                 />
+              )}
+              {key === "address" && (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
+                    <button
+                      type="button"
+                      onClick={handleGeocode}
+                      disabled={geocoding || !canEdit}
+                      style={{
+                        padding: "8px 16px",
+                        background: geocoding ? "#9ca3af" : "#3b82f6",
+                        color: "#fff", border: "none", borderRadius: 6,
+                        cursor: geocoding || !canEdit ? "not-allowed" : "pointer",
+                        fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap",
+                      }}
+                    >
+                      {geocoding ? "取得中..." : "📍 住所から緯度経度を取得"}
+                    </button>
+                    {form.lat && form.lng && (
+                      <span style={{ fontSize: 12, color: "#5BAD52" }}>
+                        ✓ {parseFloat(form.lat).toFixed(4)}, {parseFloat(form.lng).toFixed(4)}
+                      </span>
+                    )}
+                  </div>
+                  {geocodeError && (
+                    <p style={{ fontSize: 12, color: "#dc2626", marginTop: 4, margin: "4px 0 0" }}>
+                      {geocodeError}
+                    </p>
+                  )}
+                </>
               )}
             </div>
           ))}
