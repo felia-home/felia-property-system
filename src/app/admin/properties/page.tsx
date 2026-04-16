@@ -25,13 +25,18 @@ interface Property {
   station_walk1: number | null;
   price: number;
   rooms: string | null;
+  area_land_m2: number | null;
   area_build_m2: number | null;
+  area_exclusive_m2: number | null;
   property_number: string | null;
   photo_count: number;
   photo_has_exterior: boolean;
   photo_has_floor_plan: boolean;
   ad_confirmed_at: string | null;
+  title: string | null;
   catch_copy: string | null;
+  description_hp: string | null;
+  use_zone: string | null;
   pending_tasks: string[];
   published_at: string | null;
   created_at: string;
@@ -286,11 +291,16 @@ export default function PropertiesPage() {
                   city: p.city,
                   station_name1: p.station_name1,
                   price: p.price,
+                  area_land_m2: p.area_land_m2,
                   area_build_m2: p.area_build_m2,
+                  area_exclusive_m2: p.area_exclusive_m2,
                   photo_count: photoCount,
                   photo_has_exterior: p.photo_has_exterior,
                   photo_has_floor_plan: p.photo_has_floor_plan,
+                  title: p.title,
                   catch_copy: p.catch_copy,
+                  description_hp: p.description_hp,
+                  use_zone: p.use_zone,
                 });
                 const completionPct = completion.score;
                 const cc = completionColor(completionPct);
