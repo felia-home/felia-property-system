@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import PermissionBadge from "@/components/admin/PermissionBadge";
 import { PERMISSIONS, Permission } from "@/lib/permissions";
+import ImageUploader from "@/components/admin/ImageUploader";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,12 @@ interface StaffFull {
   photo_url: string | null;
   bio: string | null;
   catchphrase: string | null;
+  qualification: string | null;
+  favorite_word: string | null;
+  hobby: string | null;
+  memorable_client: string | null;
+  sub_image_url_1: string | null;
+  sub_image_url_2: string | null;
   published_hp: boolean;
   hp_order: number;
   staff_code: string | null;
@@ -629,6 +636,45 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
               <div style={row}>
                 <label style={lbl}>表示順序</label>
                 <input style={inp} type="number" value={form.hp_order ?? 0} onChange={e => setF("hp_order", Number(e.target.value))} />
+              </div>
+            </div>
+          </div>
+
+          {/* HP追加情報 */}
+          <div style={section}>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 16, color: "#3a2a1a" }}>HP掲載追加情報</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={row}>
+                <label style={lbl}>資格（テキスト）</label>
+                <input style={inp} value={form.qualification ?? ""} onChange={e => setF("qualification", e.target.value || null)} placeholder="宅地建物取引士" />
+              </div>
+              <div style={row}>
+                <label style={lbl}>好きな言葉</label>
+                <input style={inp} value={form.favorite_word ?? ""} onChange={e => setF("favorite_word", e.target.value || null)} placeholder="例：努力・謙虚" />
+              </div>
+              <div style={row}>
+                <label style={lbl}>趣味</label>
+                <input style={inp} value={form.hobby ?? ""} onChange={e => setF("hobby", e.target.value || null)} placeholder="例：フットサル・読書" />
+              </div>
+              <div style={row}>
+                <label style={lbl}>印象に残っているお客様・エピソード</label>
+                <textarea value={form.memorable_client ?? ""} onChange={e => setF("memorable_client", e.target.value || null)} rows={4} style={{ ...inp, resize: "vertical" }} placeholder="印象に残っているお客様や仕事のエピソードを入力..." />
+              </div>
+              <div style={row}>
+                <label style={lbl}>サブ画像1</label>
+                <ImageUploader folder="staff" currentUrl={form.sub_image_url_1 ?? undefined} label="サブ画像1をアップロード" onUpload={url => setF("sub_image_url_1", url)} />
+                {form.sub_image_url_1 && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={form.sub_image_url_1} alt="サブ画像1" style={{ marginTop: 8, height: 80, borderRadius: 4, objectFit: "cover" }} />
+                )}
+              </div>
+              <div style={row}>
+                <label style={lbl}>サブ画像2</label>
+                <ImageUploader folder="staff" currentUrl={form.sub_image_url_2 ?? undefined} label="サブ画像2をアップロード" onUpload={url => setF("sub_image_url_2", url)} />
+                {form.sub_image_url_2 && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={form.sub_image_url_2} alt="サブ画像2" style={{ marginTop: 8, height: 80, borderRadius: 4, objectFit: "cover" }} />
+                )}
               </div>
             </div>
           </div>

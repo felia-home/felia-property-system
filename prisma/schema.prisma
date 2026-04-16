@@ -811,6 +811,12 @@ model Staff {
   photo_url         String?
   bio               String?
   catchphrase       String?
+  qualification     String?
+  favorite_word     String?
+  hobby             String?
+  memorable_client  String?
+  sub_image_url_1   String?
+  sub_image_url_2   String?
   published_hp      Boolean   @default(false)
   hp_order          Int       @default(0)
 

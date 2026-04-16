@@ -69,6 +69,8 @@ export async function PUT(
       "employment_type", "hire_date", "trial_end_date", "department", "annual_salary",
       "monthly_target", "career_history",
       "photo_url", "bio", "catchphrase", "published_hp", "hp_order",
+      "qualification", "favorite_word", "hobby", "memorable_client",
+      "sub_image_url_1", "sub_image_url_2",
       "takken_number", "takken_prefecture", "takken_expires_at",
     ];
 
