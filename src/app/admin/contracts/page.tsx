@@ -11,21 +11,13 @@ const STATUS_BADGE: Record<string, React.CSSProperties> = {
   completed: { background: "#234f35", color: "#fff" },
   cancelled: { background: "#fdeaea", color: "#8c1f1f" },
 };
-const TYPE_LABELS: Record<string, string> = {
-  NEW_HOUSE: "新築戸建", USED_HOUSE: "中古戸建", MANSION: "マンション",
-  NEW_MANSION: "新築マンション", LAND: "土地",
-};
 
 interface ContractItem {
-  id: string; property_id: string; status: string;
+  id: string; status: string;
   contract_price: number; commission_type: string; commission_amount: number | null;
   agent_id: string | null; contract_date: string | null;
   customer: { id: string; name: string } | null;
-  property: { id: string; city: string; address: string; property_type: string; price: number } | null;
-}
-
-interface PropertyOption {
-  id: string; city: string; address: string; property_type: string; price: number;
+  property_address: string | null;
 }
 
 interface CustomerOption {
@@ -33,7 +25,7 @@ interface CustomerOption {
 }
 
 const INITIAL_FORM = {
-  property_id: "", customer_id: "", agent_id: "",
+  customer_id: "", agent_id: "",
   status: "draft", contract_price: "", commission_type: "both",
   contract_date: "", settlement_date: "", notes: "",
 };
@@ -47,7 +39,6 @@ export default function ContractsPage() {
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [properties, setProperties] = useState<PropertyOption[]>([]);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
 
   const fetchContracts = useCallback(() => {
@@ -64,9 +55,6 @@ export default function ContractsPage() {
   useEffect(() => { fetchContracts(); }, [fetchContracts]);
 
   const fetchOptions = () => {
-    fetch("/api/properties?status=APPROVED")
-      .then((r) => r.json())
-      .then((d) => setProperties(d.properties ?? []));
     fetch("/api/customers")
       .then((r) => r.json())
       .then((d) => setCustomers(d.customers ?? []));
@@ -81,8 +69,8 @@ export default function ContractsPage() {
     : 0;
 
   const handleCreate = async () => {
-    if (!form.property_id || !form.contract_price) {
-      setError("物件と契約価格は必須です");
+    if (!form.contract_price) {
+      setError("契約価格は必須です");
       return;
     }
     setSaving(true);
@@ -93,6 +81,7 @@ export default function ContractsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          property_id: null,
           contract_price: Number(form.contract_price),
           customer_id: form.customer_id || null,
           agent_id: form.agent_id || null,
@@ -121,29 +110,23 @@ export default function ContractsPage() {
           <h1 style={{ fontSize: 20, fontWeight: 500 }}>契約管理</h1>
           <p style={{ fontSize: 12, color: "#706e68", marginTop: 4 }}>売買契約・仲介手数料の管理</p>
         </div>
-        <button onClick={handleOpenForm} style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
-          + 新規契約登録
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <a href="/admin/contracts/new" style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#c9a96e", color: "#fff", border: "none", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+            📄 契約書を作成
+          </a>
+          <button onClick={handleOpenForm} style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+            + 簡易登録
+          </button>
+        </div>
       </div>
 
       {error && <div style={{ background: "#fdeaea", color: "#8c1f1f", padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>{error}</div>}
 
-      {/* New contract form */}
+      {/* Quick registration form */}
       {showForm && (
         <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 24, marginBottom: 20 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 500, marginBottom: 16 }}>新規契約登録</h2>
+          <h2 style={{ fontSize: 14, fontWeight: 500, marginBottom: 16 }}>簡易契約登録</h2>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
-            <div>
-              <label style={{ fontSize: 11, color: "#706e68", display: "block", marginBottom: 4 }}>物件 *</label>
-              <select value={form.property_id} onChange={(e) => setF("property_id", e.target.value)} style={inputSt}>
-                <option value="">選択してください</option>
-                {properties.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {TYPE_LABELS[p.property_type] ?? p.property_type}｜{p.city}{p.address}（{p.price.toLocaleString()}万円）
-                  </option>
-                ))}
-              </select>
-            </div>
             <div>
               <label style={{ fontSize: 11, color: "#706e68", display: "block", marginBottom: 4 }}>顧客</label>
               <select value={form.customer_id} onChange={(e) => setF("customer_id", e.target.value)} style={inputSt}>
@@ -174,20 +157,20 @@ export default function ContractsPage() {
               </div>
             </div>
             <div>
-              <label style={{ fontSize: 11, color: "#706e68", display: "block", marginBottom: 4 }}>契約日</label>
-              <input type="date" value={form.contract_date} onChange={(e) => setF("contract_date", e.target.value)} style={inputSt} />
-            </div>
-            <div>
-              <label style={{ fontSize: 11, color: "#706e68", display: "block", marginBottom: 4 }}>決済日</label>
-              <input type="date" value={form.settlement_date} onChange={(e) => setF("settlement_date", e.target.value)} style={inputSt} />
-            </div>
-            <div>
               <label style={{ fontSize: 11, color: "#706e68", display: "block", marginBottom: 4 }}>ステータス</label>
               <select value={form.status} onChange={(e) => setF("status", e.target.value)} style={inputSt}>
                 <option value="draft">作成中</option>
                 <option value="signed">署名済み</option>
                 <option value="completed">完了</option>
               </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: "#706e68", display: "block", marginBottom: 4 }}>契約日</label>
+              <input type="date" value={form.contract_date} onChange={(e) => setF("contract_date", e.target.value)} style={inputSt} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: "#706e68", display: "block", marginBottom: 4 }}>決済日</label>
+              <input type="date" value={form.settlement_date} onChange={(e) => setF("settlement_date", e.target.value)} style={inputSt} />
             </div>
           </div>
           <div style={{ marginBottom: 16 }}>
@@ -216,25 +199,18 @@ export default function ContractsPage() {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#f7f6f2" }}>
-              {["物件", "顧客", "契約価格", "仲介手数料", "ステータス", "契約日"].map((h) => (
+              {["顧客", "契約価格", "仲介手数料", "ステータス", "契約日"].map((h) => (
                 <th key={h} style={{ textAlign: "left", fontSize: 10, fontWeight: 500, color: "#706e68", letterSpacing: ".07em", textTransform: "uppercase", padding: "10px 16px", borderBottom: "1px solid #e0deda" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>読み込み中...</td></tr>
+              <tr><td colSpan={5} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>読み込み中...</td></tr>
             ) : contracts.length === 0 ? (
-              <tr><td colSpan={6} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>契約データがありません</td></tr>
+              <tr><td colSpan={5} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>契約データがありません</td></tr>
             ) : contracts.map((c) => (
               <tr key={c.id} style={{ borderBottom: "1px solid #f3f2ef" }}>
-                <td style={{ padding: "12px 16px" }}>
-                  {c.property ? (
-                    <>
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{TYPE_LABELS[c.property.property_type] ?? c.property.property_type}｜{c.property.city}{c.property.address}</div>
-                    </>
-                  ) : <span style={{ fontSize: 12, color: "#706e68" }}>—</span>}
-                </td>
                 <td style={{ padding: "12px 16px", fontSize: 13 }}>{c.customer?.name ?? "—"}</td>
                 <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 500 }}>{c.contract_price.toLocaleString()}万円</td>
                 <td style={{ padding: "12px 16px", fontSize: 13, color: "#234f35", fontWeight: 500 }}>
