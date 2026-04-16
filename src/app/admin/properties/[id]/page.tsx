@@ -6,7 +6,7 @@ import {
 } from "@/components/admin/property-form-tabs";
 import PhotoManager from "@/components/admin/photo-manager";
 import { getWorkflowStep, WORKFLOW, WORKFLOW_KANBAN_COLUMNS, type WorkflowStatus } from "@/lib/workflow";
-import { generateChecklist, calculateCompletionScore } from "@/lib/property-checklist";
+import { calcPropertyCompletion, type PropertyForCompletion } from "@/lib/property-completion";
 
 // ── Workflow Progress Bar ────────────────────────────────────────────────────
 
@@ -154,24 +154,23 @@ function ActionPanel({ property, onStatusChange, onOpenTab }: ActionPanelProps) 
 
   // ── DRAFT ──
   if (status === "DRAFT") {
-    const requiredOk = property.price && Number(property.price) > 0
-      && property.city && property.station_name1 && property.property_type;
+    const { canPublish, required: missingRequired } = calcPropertyCompletion(property as PropertyForCompletion);
     return (
       <div>
         <div style={panelStyle}>
           <span style={labelStyle}>次のアクション — 広告確認を申請する</span>
           <p style={{ fontSize: 13, color: "#706e68", marginBottom: 14, lineHeight: 1.6 }}>
             元付業者への広告確認を開始します。<br />
-            申請前に価格・所在地・最寄駅が入力されていることを確認してください。
+            申請前に価格・所在地・最寄駅・面積が入力されていることを確認してください。
           </p>
-          {!requiredOk && (
+          {!canPublish && (
             <div style={{ background: "#fff8e1", border: "1px solid #ffe082", borderRadius: 8, padding: "9px 12px", fontSize: 12, color: "#8a5200", marginBottom: 12 }}>
-              ⚠️ 価格・市区町村・最寄駅・物件種別を入力してから申請してください。
+              ⚠️ 未入力の必須項目: {missingRequired.join("・")}
               <button onClick={() => onOpenTab("info")} style={{ marginLeft: 8, fontSize: 11, color: "#234f35", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>物件情報を編集</button>
             </div>
           )}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button onClick={() => handleStatusChange("AD_REQUEST")} disabled={saving || !requiredOk} style={{ ...btnPrimary, background: (!requiredOk || saving) ? "#aaa" : "#234f35", cursor: (!requiredOk || saving) ? "not-allowed" : "pointer" }}>
+            <button onClick={() => handleStatusChange("AD_REQUEST")} disabled={saving || !canPublish} style={{ ...btnPrimary, background: (!canPublish || saving) ? "#aaa" : "#234f35", cursor: (!canPublish || saving) ? "not-allowed" : "pointer" }}>
               📨 広告確認を申請する
             </button>
             <button onClick={handleAiCheck} disabled={checking} style={btnSecondary}>
@@ -573,35 +572,39 @@ function CompletionMeter({
   property: Record<string, unknown>;
   onTabSwitch: (tab: "photos" | "ad_confirm") => void;
 }) {
-  const checks = generateChecklist(property as Parameters<typeof generateChecklist>[0]);
-  const score = calculateCompletionScore(checks);
-  const incomplete = checks.filter(c => !c.completed && c.severity === "required");
-  if (score === 100 && incomplete.length === 0) return null;
+  const { score, required, missing } = calcPropertyCompletion(property as PropertyForCompletion);
+  const allMissing = [...required, ...missing];
+  if (score === 100 && allMissing.length === 0) return null;
 
   const barColor = score >= 80 ? "#234f35" : score >= 50 ? "#f57c00" : "#8c1f1f";
 
   return (
     <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e0deda", padding: "12px 16px", marginBottom: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: incomplete.length > 0 ? 10 : 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: allMissing.length > 0 ? 10 : 0 }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: "#706e68", whiteSpace: "nowrap" }}>完成度</span>
         <div style={{ flex: 1, height: 7, background: "#f2f1ed", borderRadius: 99, overflow: "hidden" }}>
           <div style={{ height: "100%", width: `${score}%`, background: barColor, borderRadius: 99, transition: "width .3s" }} />
         </div>
         <span style={{ fontSize: 13, fontWeight: 700, color: barColor, whiteSpace: "nowrap" }}>{score}%</span>
       </div>
-      {incomplete.length > 0 && (
+      {allMissing.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-          {incomplete.slice(0, 6).map(c => (
-            <button key={c.id} onClick={() => {
-              if (c.id === "ad_confirmed") onTabSwitch("ad_confirm");
-              else if (c.category === "写真") onTabSwitch("photos");
-            }}
+          {required.map(label => (
+            <button key={label} onClick={() => onTabSwitch("photos")}
               style={{ fontSize: 10, background: "#fdeaea", color: "#8c1f1f", padding: "2px 8px", borderRadius: 99, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>
-              ❌ {c.label}
+              ❌ {label}
             </button>
           ))}
-          {incomplete.length > 6 && (
-            <span style={{ fontSize: 10, color: "#888", padding: "2px 4px" }}>…他{incomplete.length - 6}件</span>
+          {missing.slice(0, Math.max(0, 6 - required.length)).map(label => (
+            <button key={label} onClick={() => {
+              if (label === "外観写真" || label === "間取り図" || label.includes("写真")) onTabSwitch("photos");
+            }}
+              style={{ fontSize: 10, background: "#fff3e0", color: "#e65100", padding: "2px 8px", borderRadius: 99, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>
+              △ {label}
+            </button>
+          ))}
+          {allMissing.length > 6 && (
+            <span style={{ fontSize: 10, color: "#888", padding: "2px 4px" }}>…他{allMissing.length - 6}件</span>
           )}
         </div>
       )}

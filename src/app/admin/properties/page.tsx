@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { PROPERTY_STATUS, getStatusDef } from "@/lib/workflow-status";
+import { calcPropertyCompletion } from "@/lib/property-completion";
 
 const TYPE_LABELS: Record<string, string> = {
   NEW_HOUSE: "新築戸建", USED_HOUSE: "中古戸建", MANSION: "マンション",
@@ -42,9 +43,9 @@ function daysAgo(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000);
 }
 
-function completionColor(photoCount: number, adOk: boolean, pendingCount: number): string {
-  if (pendingCount === 0) return "#1b5e20";
-  if (pendingCount <= 2 && adOk) return "#f57c00";
+function completionColor(score: number): string {
+  if (score >= 80) return "#1b5e20";
+  if (score >= 50) return "#f57c00";
   return "#8c1f1f";
 }
 
@@ -281,10 +282,18 @@ export default function PropertiesPage() {
                 const mainImg = p.images?.[0];
                 const photoCount = p.photo_count ?? p._count?.images ?? 0;
                 const adOk = !!p.ad_confirmed_at;
-                const pendingCount = p.pending_tasks?.length ?? 0;
-                const cc = completionColor(photoCount, adOk, pendingCount);
-                // Rough completion %
-                const completionPct = Math.max(0, 100 - pendingCount * 10);
+                const completion = calcPropertyCompletion({
+                  city: p.city,
+                  station_name1: p.station_name1,
+                  price: p.price,
+                  area_build_m2: p.area_build_m2,
+                  photo_count: photoCount,
+                  photo_has_exterior: p.photo_has_exterior,
+                  photo_has_floor_plan: p.photo_has_floor_plan,
+                  catch_copy: p.catch_copy,
+                });
+                const completionPct = completion.score;
+                const cc = completionColor(completionPct);
                 const daysListed = p.published_at ? daysAgo(p.published_at) : null;
 
                 return (
