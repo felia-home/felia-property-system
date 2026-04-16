@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
     slot?: number;
     sort_order?: number;
     is_active?: boolean;
+    banner_type?: string;
   };
 
   const banner = await prisma.banner.create({
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest) {
       slot: body.slot ?? 1,
       sort_order: body.sort_order ?? 0,
       is_active: body.is_active ?? true,
+      banner_type: body.banner_type ?? "free",
     },
   });
   return NextResponse.json({ success: true, banner });

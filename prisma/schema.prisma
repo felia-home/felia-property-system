@@ -1056,6 +1056,7 @@ model Banner {
   slot         Int      @default(1)     // 1-4（2カラム2行）
   is_active    Boolean  @default(true)
   sort_order   Int      @default(0)
+  banner_type  String   @default("free") // "free" | "search_top"
   created_at   DateTime @default(now())
   updated_at   DateTime @updatedAt
   @@map("banners")

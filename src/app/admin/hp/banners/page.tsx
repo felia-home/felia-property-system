@@ -12,7 +12,13 @@ type Banner = {
   slot: number;
   sort_order: number;
   is_active: boolean;
+  banner_type: string;
 };
+
+const BANNER_TYPES = [
+  { value: "free", label: "フリーバナー（HP上段/中段/下段）" },
+  { value: "search_top", label: "検索上部フルワイドバナー" },
+];
 
 const POSITIONS = [
   { value: "TOP", label: "上段" },
@@ -29,6 +35,7 @@ const EMPTY_FORM = {
   slot: 1,
   sort_order: 0,
   is_active: true,
+  banner_type: "free",
 };
 
 type FormState = typeof EMPTY_FORM;
@@ -95,6 +102,7 @@ export default function BannersPage() {
       slot: b.slot,
       sort_order: b.sort_order,
       is_active: b.is_active,
+      banner_type: b.banner_type ?? "free",
     });
     setShowForm(true);
     setMsg(null);
@@ -117,6 +125,7 @@ export default function BannersPage() {
         slot: Number(form.slot),
         sort_order: Number(form.sort_order),
         is_active: form.is_active,
+        banner_type: form.banner_type,
       };
       const res = await fetch(
         editing ? `/api/banners/${editing.id}` : "/api/banners",
@@ -198,6 +207,17 @@ export default function BannersPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
             {/* 左カラム：テキスト系 */}
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={labelSt}>バナー種別 <span style={{ color: "#e44" }}>*</span></label>
+                <select
+                  value={form.banner_type}
+                  onChange={e => f("banner_type", e.target.value)}
+                  style={{ ...inputSt, appearance: "none", background: "white" }}
+                >
+                  {BANNER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+
               <div>
                 <label style={labelSt}>管理用タイトル</label>
                 <input
@@ -359,6 +379,16 @@ export default function BannersPage() {
                       <div style={{ padding: 12 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {banner.title}
+                        </div>
+                        <div style={{ marginBottom: 4 }}>
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4,
+                            background: banner.banner_type === "search_top" ? "#e8f0fb" : "#f0f4f0",
+                            color: banner.banner_type === "search_top" ? "#2563eb" : "#4a6a4a",
+                            border: `1px solid ${banner.banner_type === "search_top" ? "#bfd3f8" : "#c8d8c8"}`,
+                          }}>
+                            {BANNER_TYPES.find(t => t.value === banner.banner_type)?.label ?? banner.banner_type}
+                          </span>
                         </div>
                         {banner.link_url && (
                           <div style={{ fontSize: 11, color: "#4a90d9", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

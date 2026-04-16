@@ -19,6 +19,7 @@ export async function PATCH(
     slot?: number;
     sort_order?: number;
     is_active?: boolean;
+    banner_type?: string;
   };
 
   const banner = await prisma.banner.update({
@@ -32,6 +33,7 @@ export async function PATCH(
       ...(body.slot !== undefined && { slot: body.slot }),
       ...(body.sort_order !== undefined && { sort_order: body.sort_order }),
       ...(body.is_active !== undefined && { is_active: body.is_active }),
+      ...(body.banner_type !== undefined && { banner_type: body.banner_type }),
     },
   });
   return NextResponse.json({ success: true, banner });
