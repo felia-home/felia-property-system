@@ -90,7 +90,7 @@ export default function BranchesPage() {
       if (data.lat && data.lng) {
         setForm(f => ({ ...f, lat: data.lat!.toString(), lng: data.lng!.toString() }));
       } else {
-        setGeocodeError("住所から緯度経度を取得できませんでした");
+        setGeocodeError("住所から緯度経度を取得できませんでした。「東京都渋谷区〇〇」のように都道府県から入力してください。");
       }
     } catch {
       setGeocodeError("取得に失敗しました");
