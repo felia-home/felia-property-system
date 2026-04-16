@@ -79,12 +79,31 @@ interface ActionPanelProps {
   onOpenTab: (tab: "info" | "photos" | "ad_confirm") => void;
 }
 
+const MEDIA_FLAGS = [
+  { key: "published_hp",      label: "フェリアホームHP（一般公開）" },
+  { key: "published_members", label: "フェリアホームHP（会員限定）" },
+  { key: "published_suumo",   label: "SUUMO" },
+  { key: "published_athome",  label: "athome" },
+  { key: "published_yahoo",   label: "Yahoo不動産" },
+  { key: "published_homes",   label: "HOMES" },
+] as const;
+
+type MediaFlagKey = typeof MEDIA_FLAGS[number]["key"];
+
 function ActionPanel({ property, onStatusChange, onOpenTab }: ActionPanelProps) {
   const status = String(property.status ?? "DRAFT");
   const [method, setMethod] = useState((property.ad_confirmation_method as string) ?? "FAX");
   const [confirmedBy, setConfirmedBy] = useState((property.ad_confirmed_by as string) ?? "");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [mediaFlags, setMediaFlags] = useState<Record<MediaFlagKey, boolean>>({
+    published_hp:      !!property.published_hp,
+    published_members: !!property.published_members,
+    published_suumo:   !!property.published_suumo,
+    published_athome:  !!property.published_athome,
+    published_yahoo:   !!property.published_yahoo,
+    published_homes:   !!property.published_homes,
+  });
   const [checking, setChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<Record<string, unknown> | null>(
     property.last_check_result ? (property.last_check_result as Record<string, unknown>) : null
@@ -109,6 +128,14 @@ function ActionPanel({ property, onStatusChange, onOpenTab }: ActionPanelProps) 
     });
     const data = await res.json();
     if (res.ok) {
+      // 広告OKの場合、選択した媒体フラグをPATCH
+      if (result === "ok") {
+        await fetch(`/api/properties/${property.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(mediaFlags),
+        });
+      }
       await onStatusChange("__reload__");
     } else {
       alert(data.error ?? "アップロードに失敗しました");
@@ -213,6 +240,24 @@ function ActionPanel({ property, onStatusChange, onOpenTab }: ActionPanelProps) 
           {/* Upload signed confirmation */}
           <div style={{ borderTop: "1px solid #f2f1ed", paddingTop: 14 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: "#3a2a1a", marginBottom: 10 }}>承諾書の返答を登録する</div>
+
+            {/* 媒体選択チェックボックス */}
+            <div style={{ border: "1px solid #e0deda", borderRadius: 8, padding: 14, marginBottom: 14, background: "#f9fafb" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>📋 掲載媒体の承認（広告確認）</div>
+              <div style={{ fontSize: 11, color: "#706e68", marginBottom: 10 }}>今回の広告確認でOKとなった媒体にチェックしてください</div>
+              {MEDIA_FLAGS.map(({ key, label }) => (
+                <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={mediaFlags[key]}
+                    onChange={e => setMediaFlags(prev => ({ ...prev, [key]: e.target.checked }))}
+                    style={{ width: 15, height: 15, cursor: "pointer", accentColor: "#234f35" }}
+                  />
+                  <span style={{ fontSize: 13, color: "#374151" }}>{label}</span>
+                </label>
+              ))}
+            </div>
+
             <div style={{ marginBottom: 10 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#5a4a3a", display: "block", marginBottom: 6 }}>確認相手（担当者名）</label>
               <input type="text" value={confirmedBy} onChange={e => setConfirmedBy(e.target.value)}
@@ -620,6 +665,47 @@ function HpFlagPanel({
             </div>
           </div>
         )}
+      </div>
+
+      {/* ポータルサイト掲載設定 */}
+      <div style={{ border: "1px solid #e0deda", borderRadius: 12, padding: 18, marginTop: 14, background: "#fff" }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#1c1b18", marginBottom: 4 }}>🏢 ポータルサイト掲載設定</div>
+        <div style={{ fontSize: 12, color: "#706e68", marginBottom: 16 }}>
+          広告確認時の設定を後から変更できます。※ 現在はフラグ管理のみ。API連携後に自動掲載されます。
+        </div>
+        {([
+          { key: "published_suumo",  label: "SUUMO",       color: "#00a040" },
+          { key: "published_athome", label: "athome",      color: "#e4007f" },
+          { key: "published_yahoo",  label: "Yahoo不動産",  color: "#ff0033" },
+          { key: "published_homes",  label: "HOMES",       color: "#0066cc" },
+        ] as { key: string; label: string; color: string }[]).map(({ key, label, color }) => {
+          const isOn = !!(property as Record<string, unknown>)[key];
+          return (
+            <div key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #f3f4f6" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#1c1b18" }}>{label}</span>
+                {isOn && (
+                  <span style={{ fontSize: 10, padding: "2px 7px", background: "#dcfce7", color: "#15803d", borderRadius: 4, fontWeight: 700 }}>
+                    掲載予定
+                  </span>
+                )}
+              </div>
+              <button
+                disabled={saving}
+                onClick={() => patch({ [key]: !isOn })}
+                style={{
+                  padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                  border: "none",
+                  background: saving ? "#aaa" : isOn ? "#dc2626" : color,
+                  color: "#fff",
+                  cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit",
+                }}
+              >
+                {isOn ? "掲載解除" : "掲載予約"}
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
