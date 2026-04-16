@@ -63,6 +63,8 @@ export default function TestimonialsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [generatingPhoto, setGeneratingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -132,6 +134,24 @@ export default function TestimonialsPage() {
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleGeneratePhoto = async () => {
+    setGeneratingPhoto(true);
+    setPhotoError(null);
+    try {
+      const res = await fetch('/api/admin/unsplash-photo');
+      const data = await res.json() as { url?: string; error?: string };
+      if (!res.ok) {
+        setPhotoError(data.error ?? '写真の取得に失敗しました');
+        return;
+      }
+      setForm(f => ({ ...f, image_url: data.url ?? '' }));
+    } catch {
+      setPhotoError('通信エラーが発生しました');
+    } finally {
+      setGeneratingPhoto(false);
     }
   };
 
@@ -268,9 +288,64 @@ export default function TestimonialsPage() {
               ))}
 
               <div>
-                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 6 }}>写真</label>
-                <ImageUploader folder="testimonials" currentUrl={form.image_url || undefined}
-                  onUpload={url => setForm(f => ({ ...f, image_url: url }))} />
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 6 }}>画像</label>
+
+                {/* プレビュー */}
+                {form.image_url && (
+                  <div style={{ marginBottom: 8 }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={form.image_url}
+                      alt="プレビュー"
+                      style={{
+                        width: "100%", maxHeight: 160,
+                        objectFit: "cover", borderRadius: 6,
+                        border: "1px solid #e5e7eb",
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* 自動生成ボタン */}
+                <button
+                  type="button"
+                  onClick={() => void handleGeneratePhoto()}
+                  disabled={generatingPhoto}
+                  style={{
+                    width: "100%", padding: 10,
+                    background: generatingPhoto ? "#9ca3af" : "#5BAD52",
+                    color: "#fff", border: "none", borderRadius: 6,
+                    cursor: generatingPhoto ? "not-allowed" : "pointer",
+                    fontSize: 14, fontWeight: 600, marginBottom: 8, fontFamily: "inherit",
+                  }}
+                >
+                  {generatingPhoto ? "🔄 取得中..." : "🏠 内装写真を自動生成"}
+                </button>
+
+                {/* URL直接入力 */}
+                <input
+                  value={form.image_url}
+                  onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))}
+                  placeholder="https://... または上のボタンで自動生成"
+                  style={{ ...inputSt, marginBottom: 4 }}
+                />
+
+                {/* ローカルアップロード */}
+                <ImageUploader
+                  folder="testimonials"
+                  currentUrl={form.image_url || undefined}
+                  label="ローカルから画像をアップロード"
+                  onUpload={url => setForm(f => ({ ...f, image_url: url }))}
+                />
+
+                {photoError && (
+                  <p style={{ color: "#dc2626", fontSize: 12, marginTop: 4, margin: "4px 0 0" }}>
+                    ⚠ {photoError}
+                  </p>
+                )}
+                <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 4, margin: "4px 0 0" }}>
+                  ※ 写真はUnsplash提供。ボタンを押すたびに異なる内装写真が選ばれます。
+                </p>
               </div>
 
               {[
