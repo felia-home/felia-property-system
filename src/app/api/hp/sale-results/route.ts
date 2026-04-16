@@ -7,11 +7,48 @@ export async function GET() {
   try {
     const results = await prisma.saleResult.findMany({
       where: { is_active: true },
-      orderBy: [{ sort_order: "asc" }, { created_at: "desc" }],
+      orderBy: [{ sort_order: "asc" }, { sale_year: "desc" }, { sale_month: "desc" }],
+      select: {
+        id: true,
+        sale_year: true,
+        sale_month: true,
+        year_month: true,
+        area_ward: true,
+        area_town: true,
+        area: true,
+        property_type: true,
+        floor_plan_image_url: true,
+        image_url_1: true,
+        comment: true,
+        sort_order: true,
+        staff: {
+          select: {
+            id: true,
+            name: true,
+            photo_url: true,
+          },
+        },
+      },
     });
-    return NextResponse.json({ results });
+
+    const formatted = results.map((r) => ({
+      id: r.id,
+      sale_year: r.sale_year ?? (r.year_month ? parseInt(r.year_month.split("-")[0]) : null),
+      sale_month: r.sale_month ?? (r.year_month ? parseInt(r.year_month.split("-")[1]) : null),
+      area_ward: r.area_ward ?? r.area ?? null,
+      area_town: r.area_town ?? null,
+      property_type: r.property_type,
+      floor_plan_image_url: r.floor_plan_image_url ?? r.image_url_1 ?? null,
+      comment: r.comment,
+      sort_order: r.sort_order,
+      staff: r.staff
+        ? { id: r.staff.id, name: r.staff.name, photo_url: r.staff.photo_url }
+        : null,
+    }));
+
+    return NextResponse.json({ sale_results: formatted });
   } catch (error) {
-    console.error("sale-results error:", error);
-    return NextResponse.json({ results: [] });
+    console.error("hp/sale-results error:", error);
+    return NextResponse.json({ sale_results: [] });
   }
 }

@@ -333,6 +333,7 @@ model Property {
   successor_agent       Staff?    @relation("PropertySuccessor", fields: [successor_agent_id], references: [id])
   inquiries             Inquiry[]
   contracts             Contract[]
+  sale_results          SaleResult[] @relation("SaleResultProperty")
   @@map("properties")
 }
 
@@ -851,6 +852,7 @@ model Staff {
   private_properties_as_agent PrivateProperty[] @relation("PrivatePropertyAgent")
   contracts_as_takken  Contract[] @relation("ContractTakken")
   testimonials         Testimonial[]
+  sale_results         SaleResult[]
 
   @@map("staffs")
 }
@@ -1223,6 +1225,18 @@ model SaleResult {
   sort_order    Int      @default(0)
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
+
+  // 拡張フィールド
+  sale_year            Int?
+  sale_month           Int?
+  area_ward            String?
+  area_town            String?
+  floor_plan_image_url String?
+  staff_id             String?
+  property_id          String?
+
+  staff    Staff?    @relation(fields: [staff_id], references: [id], onDelete: SetNull)
+  property Property? @relation("SaleResultProperty", fields: [property_id], references: [id], onDelete: SetNull)
 
   @@map("sale_results")
 }
