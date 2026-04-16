@@ -179,7 +179,7 @@ export async function PATCH(
       const terminal = ["SOLD", "CLOSED"];
       if (current && !terminal.includes(current.status)) {
         if (toBool(body.published_hp)) {
-          data.status = "PUBLISHING";
+          data.status = "PUBLISHED";   // 掲載中（PUBLISHING=掲載準備中 とは別）
         } else {
           data.status = "AD_OK";
         }
