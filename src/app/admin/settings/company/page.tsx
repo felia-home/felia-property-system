@@ -12,6 +12,7 @@ interface CompanyForm {
   hours: string;
   holiday: string;
   license: string;
+  access_text: string;
   lat: string;
   lng: string;
 }
@@ -19,10 +20,10 @@ interface CompanyForm {
 const EMPTY: CompanyForm = {
   name: "", postal_code: "", address: "", phone: "",
   fax: "", email: "", hours: "", holiday: "", license: "",
-  lat: "", lng: "",
+  access_text: "", lat: "", lng: "",
 };
 
-const FIELDS: { key: keyof CompanyForm; label: string; placeholder: string }[] = [
+const FIELDS: { key: keyof CompanyForm; label: string; placeholder: string; textarea?: boolean }[] = [
   { key: "name",        label: "会社名",               placeholder: "株式会社フェリアホーム" },
   { key: "postal_code", label: "郵便番号",              placeholder: "000-0000" },
   { key: "address",     label: "住所",                  placeholder: "東京都渋谷区幡ヶ谷2-14-7" },
@@ -32,6 +33,7 @@ const FIELDS: { key: keyof CompanyForm; label: string; placeholder: string }[] =
   { key: "hours",       label: "営業時間",              placeholder: "10:00〜19:00" },
   { key: "holiday",     label: "定休日",                placeholder: "水曜日・年末年始" },
   { key: "license",     label: "宅建業者免許番号",      placeholder: "東京都知事（X）第XXXXX号" },
+  { key: "access_text", label: "アクセス方法",          placeholder: "最寄り駅からの道順...", textarea: true },
   { key: "lat",         label: "緯度（Google Maps用）", placeholder: "35.6773" },
   { key: "lng",         label: "経度（Google Maps用）", placeholder: "139.6858" },
 ];
@@ -65,6 +67,7 @@ export default function CompanySettingsPage() {
             hours:       String(d.company.hours ?? ""),
             holiday:     String(d.company.holiday ?? ""),
             license:     String(d.company.license ?? ""),
+            access_text: String(d.company.access_text ?? ""),
             lat:         d.company.lat != null ? String(d.company.lat) : "",
             lng:         d.company.lng != null ? String(d.company.lng) : "",
           });
@@ -132,22 +135,38 @@ export default function CompanySettingsPage() {
         padding: 24, boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
       }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {FIELDS.map(({ key, label, placeholder }) => (
+          {FIELDS.map(({ key, label, placeholder, textarea }) => (
             <div key={key}>
               <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 5 }}>
                 {label}
               </label>
-              <input
-                value={form[key]}
-                onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                placeholder={placeholder}
-                disabled={!canEdit}
-                style={{
-                  ...inputSt,
-                  background: canEdit ? "#fff" : "#f9fafb",
-                  color: "#111827",
-                }}
-              />
+              {textarea ? (
+                <textarea
+                  value={form[key]}
+                  onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                  placeholder={placeholder}
+                  disabled={!canEdit}
+                  rows={4}
+                  style={{
+                    ...inputSt,
+                    resize: "vertical",
+                    background: canEdit ? "#fff" : "#f9fafb",
+                    color: "#111827",
+                  }}
+                />
+              ) : (
+                <input
+                  value={form[key]}
+                  onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                  placeholder={placeholder}
+                  disabled={!canEdit}
+                  style={{
+                    ...inputSt,
+                    background: canEdit ? "#fff" : "#f9fafb",
+                    color: "#111827",
+                  }}
+                />
+              )}
             </div>
           ))}
         </div>

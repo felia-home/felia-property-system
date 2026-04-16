@@ -1173,12 +1173,32 @@ model CompanySetting {
   hours       String?
   holiday     String?
   license     String?
+  access_text String?
   lat         Float?
   lng         Float?
   updated_at  DateTime @updatedAt
   created_at  DateTime @default(now())
 
   @@map("company_settings")
+}
+
+// 支店情報
+model CompanyBranch {
+  id          String   @id @default(uuid())
+  name        String
+  postal_code String?
+  address     String
+  phone       String?
+  fax         String?
+  access_text String?
+  lat         Decimal? @db.Decimal(10, 7)
+  lng         Decimal? @db.Decimal(10, 7)
+  is_active   Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("company_branches")
 }
 
 // 売却実績

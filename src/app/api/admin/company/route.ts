@@ -32,6 +32,7 @@ export async function PATCH(request: NextRequest) {
     hours?: string;
     holiday?: string;
     license?: string;
+    access_text?: string;
     lat?: string | number | null;
     lng?: string | number | null;
   };
@@ -46,6 +47,7 @@ export async function PATCH(request: NextRequest) {
     hours: body.hours || null,
     holiday: body.holiday || null,
     license: body.license || null,
+    access_text: body.access_text || null,
     lat: body.lat ? parseFloat(String(body.lat)) : null,
     lng: body.lng ? parseFloat(String(body.lng)) : null,
   };
