@@ -2,14 +2,14 @@ import sharp from "sharp";
 
 // フォルダ別リサイズ設定
 const RESIZE_CONFIGS: Record<string, { maxWidth: number; quality: number }> = {
-  "hero-banners":   { maxWidth: 1920, quality: 80 },
-  "banners":        { maxWidth: 1920, quality: 80 },
-  "search-banners": { maxWidth: 1920, quality: 80 },
+  "hero-banners":   { maxWidth: 1920, quality: 95 },
+  "banners":        { maxWidth: 1920, quality: 90 },
+  "search-banners": { maxWidth: 1920, quality: 90 },
   "flyers":         { maxWidth: 800,  quality: 85 },
   "staff":          { maxWidth: 1200, quality: 85 },
-  "properties":     { maxWidth: 1200, quality: 80 },
+  "properties":     { maxWidth: 1200, quality: 82 },
   "areas":          { maxWidth: 800,  quality: 80 },
-  "features":       { maxWidth: 1200, quality: 80 },
+  "features":       { maxWidth: 1200, quality: 82 },
   "testimonials":   { maxWidth: 1200, quality: 80 },
   "sale-results":   { maxWidth: 1200, quality: 80 },
   "general":        { maxWidth: 1200, quality: 80 },
