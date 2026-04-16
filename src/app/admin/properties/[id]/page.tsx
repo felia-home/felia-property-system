@@ -793,6 +793,207 @@ function CopyField({
   );
 }
 
+// ── CheckTab ─────────────────────────────────────────────────────────────────
+
+interface CheckLog {
+  id: string;
+  checked_at: string;
+  old_price: number | null;
+  new_price: number | null;
+  note: string | null;
+  staff: { id: string; name: string } | null;
+}
+
+function CheckTab({ propertyId, property, onReload }: {
+  propertyId: string;
+  property: Record<string, unknown>;
+  onReload: () => void;
+}) {
+  const [logs, setLogs] = useState<CheckLog[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [staffList, setStaffList] = useState<Array<{ id: string; name: string }>>([]);
+
+  // フォーム
+  const [checkedBy, setCheckedBy] = useState("");
+  const [newPrice, setNewPrice] = useState("");
+  const [note, setNote] = useState("");
+
+  useEffect(() => {
+    setLoadingLogs(true);
+    fetch(`/api/properties/${propertyId}/check`)
+      .then(r => r.json())
+      .then(d => setLogs(d.logs ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingLogs(false));
+
+    fetch("/api/staff").then(r => r.json()).then(d => setStaffList(d.staff ?? [])).catch(() => {});
+  }, [propertyId]);
+
+  const handleCheck = async () => {
+    setSaving(true);
+    setMsg(null);
+    try {
+      const body: Record<string, unknown> = { note: note || null };
+      if (checkedBy) body.checked_by = checkedBy;
+      if (newPrice !== "" && !isNaN(Number(newPrice))) body.new_price = Number(newPrice);
+
+      const res = await fetch(`/api/properties/${propertyId}/check`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? "失敗");
+      setMsg({ text: `確認を記録しました（次回確認: ${d.check_interval_days}日後）`, ok: true });
+      setNote("");
+      setNewPrice("");
+      // ログ再取得
+      const logsRes = await fetch(`/api/properties/${propertyId}/check`);
+      const logsData = await logsRes.json();
+      setLogs(logsData.logs ?? []);
+      onReload();
+    } catch (e) {
+      setMsg({ text: String(e), ok: false });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const price = Number(property.price ?? 0);
+  const lastCheckedAt = property.last_checked_at ? new Date(String(property.last_checked_at)) : null;
+  const checkIntervalDays = Number(property.check_interval_days ?? 14);
+  const publishedSuumo = Boolean(property.published_suumo);
+  const publishedAthome = Boolean(property.published_athome);
+  const publishedYahoo = Boolean(property.published_yahoo);
+  const publishedHomes = Boolean(property.published_homes);
+  const hasPortal = publishedSuumo || publishedAthome || publishedYahoo || publishedHomes;
+
+  const deadlineDays = lastCheckedAt
+    ? checkIntervalDays - Math.floor((Date.now() - lastCheckedAt.getTime()) / 86_400_000)
+    : null;
+
+  return (
+    <div>
+      {/* 確認状況パネル */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+        <div style={{ background: "#f7f6f2", borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontSize: 10, color: "#706e68", fontWeight: 500, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".05em" }}>前回確認日</div>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>
+            {lastCheckedAt ? lastCheckedAt.toLocaleDateString("ja-JP") : <span style={{ color: "#aaa" }}>未確認</span>}
+          </div>
+        </div>
+        <div style={{ background: "#f7f6f2", borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontSize: 10, color: "#706e68", fontWeight: 500, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".05em" }}>確認間隔</div>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>
+            {checkIntervalDays}日ごと
+            <span style={{ fontSize: 10, color: "#706e68", marginLeft: 6 }}>{hasPortal ? "（ポータル掲載中）" : "（HP公開のみ）"}</span>
+          </div>
+        </div>
+        <div style={{ background: deadlineDays === null ? "#fff3e0" : deadlineDays <= 0 ? "#fdeaea" : deadlineDays <= 3 ? "#fff3e0" : "#e8f5e9", borderRadius: 10, padding: "14px 16px" }}>
+          <div style={{ fontSize: 10, color: "#706e68", fontWeight: 500, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".05em" }}>次回確認まで</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: deadlineDays === null ? "#e65100" : deadlineDays <= 0 ? "#8c1f1f" : deadlineDays <= 3 ? "#e65100" : "#1b5e20" }}>
+            {deadlineDays === null ? "未確認" : deadlineDays <= 0 ? `${Math.abs(deadlineDays)}日超過` : `あと${deadlineDays}日`}
+          </div>
+        </div>
+      </div>
+
+      {/* 確認フォーム */}
+      <div style={{ background: "#f7f6f2", borderRadius: 10, padding: "20px", marginBottom: 20 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>物件確認を記録</h3>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <div>
+            <label style={{ fontSize: 11, color: "#706e68", display: "block", marginBottom: 4 }}>確認担当者</label>
+            <select
+              value={checkedBy}
+              onChange={e => setCheckedBy(e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", border: "1px solid #e0deda", borderRadius: 7, fontSize: 13, fontFamily: "inherit" }}
+            >
+              <option value="">— 選択してください —</option>
+              {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 11, color: "#706e68", display: "block", marginBottom: 4 }}>
+              価格変更（現在: {price.toLocaleString()}万円）
+            </label>
+            <input
+              type="number"
+              placeholder="変更なしの場合は空欄"
+              value={newPrice}
+              onChange={e => setNewPrice(e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", border: "1px solid #e0deda", borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+            />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 11, color: "#706e68", display: "block", marginBottom: 4 }}>確認メモ</label>
+          <textarea
+            placeholder="確認内容・売主からの連絡・現状など"
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            rows={3}
+            style={{ width: "100%", padding: "8px 10px", border: "1px solid #e0deda", borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }}
+          />
+        </div>
+
+        {msg && (
+          <div style={{ marginBottom: 10, padding: "8px 12px", borderRadius: 7, background: msg.ok ? "#e8f5e9" : "#fdeaea", color: msg.ok ? "#1b5e20" : "#8c1f1f", fontSize: 12 }}>
+            {msg.text}
+          </div>
+        )}
+
+        <button
+          onClick={handleCheck}
+          disabled={saving}
+          style={{ padding: "10px 24px", background: saving ? "#9e9e9e" : "#234f35", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit" }}
+        >
+          {saving ? "記録中..." : "確認済みとして記録する"}
+        </button>
+      </div>
+
+      {/* 確認ログ履歴 */}
+      <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>確認履歴</h3>
+      {loadingLogs ? (
+        <p style={{ fontSize: 12, color: "#706e68" }}>読み込み中...</p>
+      ) : logs.length === 0 ? (
+        <p style={{ fontSize: 12, color: "#aaa" }}>確認履歴はまだありません。</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {logs.map(log => (
+            <div key={log.id} style={{ background: "#f7f6f2", borderRadius: 8, padding: "12px 14px", fontSize: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <span style={{ fontWeight: 600, color: "#1c1b18" }}>
+                  {new Date(log.checked_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}
+                  {" "}
+                  <span style={{ fontWeight: 400, color: "#706e68", fontSize: 11 }}>
+                    {new Date(log.checked_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </span>
+                {log.staff && (
+                  <span style={{ fontSize: 11, color: "#706e68" }}>確認者: {log.staff.name}</span>
+                )}
+              </div>
+              {log.old_price != null && log.new_price != null && (
+                <div style={{ marginBottom: 3, color: "#e65100", fontWeight: 600 }}>
+                  価格変更: {Number(log.old_price).toLocaleString()}万円 → {Number(log.new_price).toLocaleString()}万円
+                </div>
+              )}
+              {log.note && (
+                <div style={{ color: "#706e68" }}>{log.note}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function PropertyDetailPage({ params }: { params: { id: string } }) {
@@ -800,7 +1001,7 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
   const [property, setProperty] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
-  const [mainTab, setMainTab] = useState<"info" | "photos" | "ad_confirm" | "workflow" | "copy" | "hp">("workflow");
+  const [mainTab, setMainTab] = useState<"info" | "photos" | "ad_confirm" | "workflow" | "copy" | "hp" | "check">("workflow");
   const [form, setForm] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1034,8 +1235,13 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
           ["photos", "写真管理"],
           ["copy", "広告文"],
           ["hp", "HP設定"],
+          ["check", "物件確認"],
         ] as const).map(([t, label]) => {
           const hasCopy = !!(property.catch_copy);
+          const lastChecked = property.last_checked_at ? new Date(String(property.last_checked_at)) : null;
+          const checkInterval = Number(property.check_interval_days ?? 14);
+          const daysSinceCheck = lastChecked ? Math.floor((Date.now() - lastChecked.getTime()) / 86_400_000) : null;
+          const checkAlert = daysSinceCheck === null || daysSinceCheck >= checkInterval;
           return (
             <button key={t} onClick={() => setMainTab(t)}
               style={{ padding: "8px 20px", fontSize: 13, borderRadius: 8, border: "1px solid " + (mainTab === t ? "#234f35" : "#e0deda"), background: mainTab === t ? "#234f35" : "#fff", color: mainTab === t ? "#fff" : "#706e68", fontWeight: mainTab === t ? 600 : 400, cursor: "pointer", fontFamily: "inherit" }}>
@@ -1045,6 +1251,9 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
               )}
               {t === "copy" && !hasCopy && (
                 <span title="広告文が未生成です" style={{ marginLeft: 5, fontSize: 10, background: "#9e9e9e", color: "#fff", borderRadius: 99, padding: "1px 5px" }}>未</span>
+              )}
+              {t === "check" && checkAlert && (
+                <span title="確認期限が超過または未確認です" style={{ marginLeft: 5, fontSize: 10, background: "#8c1f1f", color: "#fff", borderRadius: 99, padding: "1px 5px" }}>!</span>
               )}
             </button>
           );
@@ -1076,6 +1285,9 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
         )}
         {mainTab === "hp" && (
           <HpFlagPanel property={property} onReload={loadProperty} />
+        )}
+        {mainTab === "check" && (
+          <CheckTab propertyId={params.id} property={property} onReload={loadProperty} />
         )}
         {mainTab === "copy" && (
           <div>

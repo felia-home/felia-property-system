@@ -326,6 +326,10 @@ model Property {
   created_at            DateTime  @default(now())
   updated_at            DateTime  @updatedAt
 
+  // 物件確認管理
+  last_checked_at       DateTime?
+  check_interval_days   Int       @default(14)
+
   history               PropertyHistory[]
   images                PropertyImage[]
   store                 Store?    @relation(fields: [store_id], references: [id])
@@ -334,7 +338,22 @@ model Property {
   inquiries             Inquiry[]
   contracts             Contract[]
   sale_results          SaleResult[] @relation("SaleResultProperty")
+  check_logs            PropertyCheckLog[]
   @@map("properties")
+}
+
+model PropertyCheckLog {
+  id          String    @id @default(cuid())
+  property_id String
+  property    Property  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  checked_by  String?
+  staff       Staff?    @relation(fields: [checked_by], references: [id], onDelete: SetNull)
+  checked_at  DateTime  @default(now())
+  old_price   Decimal?  @db.Decimal(12, 2)
+  new_price   Decimal?  @db.Decimal(12, 2)
+  note        String?
+  created_at  DateTime  @default(now())
+  @@map("property_check_logs")
 }
 
 model PropertyImage {
@@ -853,6 +872,7 @@ model Staff {
   contracts_as_takken  Contract[] @relation("ContractTakken")
   testimonials         Testimonial[]
   sale_results         SaleResult[]
+  check_logs           PropertyCheckLog[]
 
   @@map("staffs")
 }

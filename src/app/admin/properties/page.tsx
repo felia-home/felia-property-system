@@ -40,6 +40,16 @@ interface Property {
   pending_tasks: string[];
   published_at: string | null;
   created_at: string;
+  // 掲載フラグ
+  published_hp: boolean;
+  published_members: boolean;
+  published_suumo: boolean;
+  published_athome: boolean;
+  published_yahoo: boolean;
+  published_homes: boolean;
+  // 物件確認
+  last_checked_at: string | null;
+  check_interval_days: number;
   images: Array<{ id: string; url: string; is_main: boolean }>;
   _count: { images: number };
 }
@@ -271,16 +281,16 @@ export default function PropertiesPage() {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#f7f6f2" }}>
-              {["", "物件情報", "ステータス", "写真", "広告文", "完成度", "価格", "掲載日数", ""].map(h => (
+              {["", "物件情報", "掲載", "ステータス", "写真", "広告文", "完成度", "価格", "掲載日数", ""].map(h => (
                 <th key={h} style={{ textAlign: "left", fontSize: 10, fontWeight: 500, color: "#706e68", letterSpacing: ".07em", textTransform: "uppercase", padding: "10px 14px", borderBottom: "1px solid #e0deda", whiteSpace: "nowrap" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>読み込み中...</td></tr>
+              <tr><td colSpan={10} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>読み込み中...</td></tr>
             ) : properties.length === 0 ? (
-              <tr><td colSpan={9} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>物件データがありません。</td></tr>
+              <tr><td colSpan={10} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>物件データがありません。</td></tr>
             ) : (
               properties.map(p => {
                 const def = getStatusDef(p.status);
@@ -306,6 +316,16 @@ export default function PropertiesPage() {
                 const cc = completionColor(completionPct);
                 const daysListed = p.published_at ? daysAgo(p.published_at) : null;
 
+                // 確認期限アラート
+                const checkDeadlineAlert = (() => {
+                  if (!p.last_checked_at) return "none"; // 未確認
+                  const daysSinceCheck = daysAgo(p.last_checked_at);
+                  const interval = p.check_interval_days ?? 14;
+                  if (daysSinceCheck >= interval) return "over";
+                  if (daysSinceCheck >= interval - 3) return "soon";
+                  return "ok";
+                })();
+
                 return (
                   <tr key={p.id} style={{ borderBottom: "1px solid #f3f2ef" }}>
                     {/* Thumbnail */}
@@ -330,6 +350,37 @@ export default function PropertiesPage() {
                       {p.property_number && (
                         <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{p.property_number}</div>
                       )}
+                      {/* 確認期限バッジ */}
+                      {checkDeadlineAlert === "over" && (
+                        <span title={`確認期限超過（${p.check_interval_days}日ごと）`} style={{ display: "inline-block", marginTop: 3, fontSize: 10, background: "#fdeaea", color: "#8c1f1f", padding: "1px 6px", borderRadius: 8, fontWeight: 600 }}>
+                          ⚠ 確認期限超過
+                        </span>
+                      )}
+                      {checkDeadlineAlert === "soon" && (
+                        <span title={`確認期限まで残り3日以内`} style={{ display: "inline-block", marginTop: 3, fontSize: 10, background: "#fff3e0", color: "#e65100", padding: "1px 6px", borderRadius: 8, fontWeight: 600 }}>
+                          ⏰ 期限まもなく
+                        </span>
+                      )}
+                      {checkDeadlineAlert === "none" && (p.published_hp || p.published_suumo || p.published_athome || p.published_yahoo || p.published_homes) && (
+                        <span title="まだ確認が記録されていません" style={{ display: "inline-block", marginTop: 3, fontSize: 10, background: "#fff3e0", color: "#e65100", padding: "1px 6px", borderRadius: 8, fontWeight: 600 }}>
+                          📋 未確認
+                        </span>
+                      )}
+                    </td>
+
+                    {/* 掲載バッジ */}
+                    <td style={{ padding: "12px 14px", whiteSpace: "nowrap" }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3, maxWidth: 100 }}>
+                        {p.published_hp && <span style={{ fontSize: 9, background: "#e8f5e9", color: "#1b5e20", padding: "1px 5px", borderRadius: 8, fontWeight: 600 }}>HP</span>}
+                        {p.published_members && <span style={{ fontSize: 9, background: "#e3f2fd", color: "#0d47a1", padding: "1px 5px", borderRadius: 8, fontWeight: 600 }}>会員</span>}
+                        {p.published_suumo && <span style={{ fontSize: 9, background: "#f3e5f5", color: "#6a1b9a", padding: "1px 5px", borderRadius: 8, fontWeight: 600 }}>SUUMO</span>}
+                        {p.published_athome && <span style={{ fontSize: 9, background: "#fce4ec", color: "#880e4f", padding: "1px 5px", borderRadius: 8, fontWeight: 600 }}>athome</span>}
+                        {p.published_yahoo && <span style={{ fontSize: 9, background: "#fff3e0", color: "#e65100", padding: "1px 5px", borderRadius: 8, fontWeight: 600 }}>Yahoo</span>}
+                        {p.published_homes && <span style={{ fontSize: 9, background: "#e0f2f1", color: "#004d40", padding: "1px 5px", borderRadius: 8, fontWeight: 600 }}>HOMES</span>}
+                        {!p.published_hp && !p.published_members && !p.published_suumo && !p.published_athome && !p.published_yahoo && !p.published_homes && (
+                          <span style={{ fontSize: 9, color: "#aaa" }}>—</span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Status badge */}
