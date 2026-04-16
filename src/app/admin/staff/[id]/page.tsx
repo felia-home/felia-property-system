@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import PermissionBadge from "@/components/admin/PermissionBadge";
 import { PERMISSIONS, Permission } from "@/lib/permissions";
 import ImageUploader from "@/components/admin/ImageUploader";
+import MultiImageUploader from "@/components/admin/MultiImageUploader";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ interface StaffFull {
   memorable_client: string | null;
   sub_image_url_1: string | null;
   sub_image_url_2: string | null;
+  daily_mindset: string | null;
   published_hp: boolean;
   hp_order: number;
   staff_code: string | null;
@@ -139,6 +141,9 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
   const [retireReason, setRetireReason] = useState("");
   const [successorId, setSuccessorId] = useState("");
   const [retiring, setRetiring] = useState(false);
+
+  // Additional images (drag & drop uploader)
+  const [additionalImages, setAdditionalImages] = useState<string[]>([])
 
   // Auth (password + delete)
   const { data: session } = useSession();
@@ -671,6 +676,16 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
                 <textarea value={form.memorable_client ?? ""} onChange={e => setF("memorable_client", e.target.value || null)} rows={4} style={{ ...inp, resize: "vertical" }} placeholder="印象に残っているお客様や仕事のエピソードを入力..." />
               </div>
               <div style={row}>
+                <label style={lbl}>日々心掛けている事</label>
+                <textarea
+                  value={form.daily_mindset ?? ""}
+                  onChange={e => setF("daily_mindset", e.target.value || null)}
+                  rows={4}
+                  style={{ ...inp, resize: "vertical" }}
+                  placeholder="日々の仕事で心がけていることを入力..."
+                />
+              </div>
+              <div style={row}>
                 <label style={lbl}>サブ画像1</label>
                 <ImageUploader folder="staff" currentUrl={form.sub_image_url_1 ?? undefined} label="サブ画像1をアップロード" onUpload={url => setF("sub_image_url_1", url)} />
                 {form.sub_image_url_1 && (
@@ -684,6 +699,47 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
                 {form.sub_image_url_2 && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={form.sub_image_url_2} alt="サブ画像2" style={{ marginTop: 8, height: 80, borderRadius: 4, objectFit: "cover" }} />
+                )}
+              </div>
+              <div style={row}>
+                <label style={lbl}>追加画像（複数枚・ドラッグ＆ドロップ対応）</label>
+                <p style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>アップロードしたURLをサブ画像1・サブ画像2にコピーしてご利用ください</p>
+                <MultiImageUploader
+                  folder="staff"
+                  maxFiles={10}
+                  onUpload={(urls) => {
+                    setAdditionalImages(prev => [...prev, ...urls])
+                    if (urls[0] && !form.sub_image_url_1) {
+                      setForm(prev => ({ ...prev, sub_image_url_1: urls[0] }))
+                    }
+                    if (urls[1] && !form.sub_image_url_2) {
+                      setForm(prev => ({ ...prev, sub_image_url_2: urls[1] }))
+                    }
+                  }}
+                />
+                {additionalImages.length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <p style={{ fontSize: 12, color: "#374151", fontWeight: 600, marginBottom: 6 }}>アップロード済みURL（クリックでコピー）</p>
+                    {additionalImages.map((url, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        <input
+                          readOnly
+                          value={url}
+                          style={{ flex: 1, padding: "4px 8px", fontSize: 11, border: "1px solid #e5e7eb", borderRadius: 4, background: "#f9fafb", cursor: "text" }}
+                          onClick={(e) => {
+                            (e.target as HTMLInputElement).select()
+                            void navigator.clipboard.writeText(url)
+                          }}
+                        />
+                        <button
+                          onClick={() => void navigator.clipboard.writeText(url)}
+                          style={{ padding: "4px 8px", fontSize: 11, background: "#5BAD52", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          コピー
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>

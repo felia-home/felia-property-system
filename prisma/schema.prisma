@@ -817,6 +817,7 @@ model Staff {
   memorable_client  String?
   sub_image_url_1   String?
   sub_image_url_2   String?
+  daily_mindset     String?
   published_hp      Boolean   @default(false)
   hp_order          Int       @default(0)
 

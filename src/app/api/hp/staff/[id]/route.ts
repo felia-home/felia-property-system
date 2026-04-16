@@ -35,6 +35,7 @@ export async function GET(
         favorite_word: staff.favorite_word,
         hobby: staff.hobby,
         memorable_client: staff.memorable_client,
+        daily_mindset: staff.daily_mindset,
         sub_images: [staff.sub_image_url_1, staff.sub_image_url_2].filter(Boolean),
         qualifications: staff.qualifications,
         specialty_areas: staff.specialty_areas,
