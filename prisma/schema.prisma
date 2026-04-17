@@ -253,6 +253,9 @@ model Property {
   env_sunlight            String?
   env_view                String?
 
+  // 設備・仕様（ポータル対応チェックボックス）
+  features              String[]  @default([])
+
   // 掲載設定
   published_hp          Boolean   @default(false)
   published_members     Boolean   @default(false)

@@ -5,6 +5,7 @@ import {
   PropertyFormTabs, propertyToForm, formToBody,
 } from "@/components/admin/property-form-tabs";
 import PhotoManager from "@/components/admin/photo-manager";
+import PropertyFeaturesSection from "@/components/admin/PropertyFeaturesSection";
 import { getWorkflowStep, WORKFLOW, WORKFLOW_KANBAN_COLUMNS, type WorkflowStatus } from "@/lib/workflow";
 import { calcPropertyCompletion, type PropertyForCompletion } from "@/lib/property-completion";
 
@@ -900,8 +901,11 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
   const [property, setProperty] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
-  const [mainTab, setMainTab] = useState<"info" | "photos" | "ad_confirm" | "workflow" | "copy" | "hp" | "check">("workflow");
+  const [mainTab, setMainTab] = useState<"info" | "photos" | "ad_confirm" | "workflow" | "copy" | "hp" | "check" | "features">("workflow");
   const [form, setForm] = useState<Record<string, string>>({});
+  const [features, setFeatures] = useState<string[]>([]);
+  const [featuresSaving, setFeaturesSaving] = useState(false);
+  const [featuresMsg, setFeaturesMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -922,6 +926,7 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
     if (res.ok && d.property) {
       setProperty(d.property);
       setForm(propertyToForm(d.property));
+      setFeatures(Array.isArray(d.property.features) ? d.property.features : []);
       setCopyFields({
         title: String(d.property.title ?? ""),
         catch_copy: String(d.property.catch_copy ?? ""),
@@ -1134,6 +1139,7 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
           ["photos", "写真管理"],
           ["copy", "広告文"],
           ["hp", "HP設定"],
+          ["features", "設備・仕様"],
           ["check", "物件確認"],
         ] as const).map(([t, label]) => {
           const hasCopy = !!(property.catch_copy);
@@ -1184,6 +1190,64 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
         )}
         {mainTab === "hp" && (
           <HpFlagPanel property={property} onReload={loadProperty} />
+        )}
+        {mainTab === "features" && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px" }}>設備・仕様</h2>
+                <p style={{ fontSize: 12, color: "#706e68", margin: 0 }}>
+                  ポータルサイトへの連携項目を選択します。バッジ（S/A/Y）はSUUMO / athome / Yahoo! に対応。
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                {featuresMsg && (
+                  <span style={{ fontSize: 13, color: featuresMsg.ok ? "#1b5e20" : "#8c1f1f" }}>
+                    {featuresMsg.text}
+                  </span>
+                )}
+                <button
+                  onClick={async () => {
+                    setFeaturesSaving(true);
+                    setFeaturesMsg(null);
+                    try {
+                      const res = await fetch(`/api/properties/${params.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ features }),
+                      });
+                      const d = await res.json();
+                      if (res.ok) {
+                        setProperty(d.property);
+                        setFeaturesMsg({ text: "✅ 保存しました", ok: true });
+                        setTimeout(() => setFeaturesMsg(null), 3000);
+                      } else {
+                        setFeaturesMsg({ text: d.error ?? "保存に失敗しました", ok: false });
+                      }
+                    } catch {
+                      setFeaturesMsg({ text: "通信エラーが発生しました", ok: false });
+                    } finally {
+                      setFeaturesSaving(false);
+                    }
+                  }}
+                  disabled={featuresSaving}
+                  style={{
+                    padding: "9px 22px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                    background: featuresSaving ? "#888" : "#234f35",
+                    color: "#fff", border: "none",
+                    cursor: featuresSaving ? "not-allowed" : "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  {featuresSaving ? "保存中..." : "💾 保存する"}
+                </button>
+              </div>
+            </div>
+            <PropertyFeaturesSection
+              selectedFeatures={features}
+              onChange={setFeatures}
+            />
+          </div>
         )}
         {mainTab === "check" && (
           <CheckTab propertyId={params.id} property={property} />
