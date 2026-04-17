@@ -7,6 +7,16 @@ export async function GET() {
     where: { is_felia_selection: true, status: "PUBLISHED" },
     orderBy: { published_at: "desc" },
     take: 10,
+    include: {
+      images: {
+        orderBy: { order: "asc" },
+        select: {
+          id: true,
+          url: true,
+          order: true,
+        },
+      },
+    },
   });
   return NextResponse.json({ properties });
 }
