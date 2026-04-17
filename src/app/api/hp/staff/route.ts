@@ -3,6 +3,15 @@ import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
+const INTERVIEW_LABELS = [
+  "自社の強み",
+  "会社の雰囲気",
+  "あれば望ましい経験や能力",
+  "どのような人が向いているか",
+  "仕事として楽しいエピソード",
+  "これから入社する人へのメッセージ",
+];
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -10,11 +19,15 @@ export async function GET(req: NextRequest) {
 
     const staffList = await prisma.staff.findMany({
       where: {
-        published_hp: true,
         is_active: true,
-        ...(recruitOnly ? { show_on_recruit: true } : {}),
+        ...(recruitOnly
+          ? { show_on_recruit: true }
+          : { published_hp: true }),
       },
-      orderBy: { hp_order: "asc" },
+      orderBy: [
+        { hp_order: "asc" },
+        { created_at: "asc" },
+      ],
       select: {
         id: true,
         name: true,
@@ -51,23 +64,14 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const INTERVIEW_LABELS = [
-      "自社の強み",
-      "会社の雰囲気",
-      "あれば望ましい経験や能力",
-      "どのような人が向いているか",
-      "仕事として楽しいエピソード",
-      "これから入社する人へのメッセージ",
-    ];
-
-    const formatted = staffList.map(s => ({
+    const staffs = staffList.map(s => ({
       id: s.id,
       name: s.name,
       name_kana: s.name_kana,
       nickname: s.nickname,
       position: s.position,
       department: s.department,
-      store_name: s.store?.name ?? null,
+      store_name: s.store?.name ?? "",
       photo_url: s.photo_url,
       bio: s.bio,
       catchphrase: s.catchphrase,
@@ -93,9 +97,9 @@ export async function GET(req: NextRequest) {
         .filter(item => item.answer),
     }));
 
-    return NextResponse.json({ staff: formatted });
+    return NextResponse.json({ staffs });
   } catch (error) {
     console.error("hp/staff error:", error);
-    return NextResponse.json({ staff: [] });
+    return NextResponse.json({ staffs: [] }, { status: 500 });
   }
 }
