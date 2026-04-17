@@ -10,6 +10,8 @@ interface ImportImage {
 
 interface ImportMansion {
   name: string;
+  city?: string;    // 区名
+  address?: string; // 町名
   images: ImportImage[];
 }
 
@@ -43,7 +45,12 @@ export async function POST(req: NextRequest) {
       }
 
       const mansion = await prisma.mansionBuilding.create({
-        data: { name: m.name.trim() },
+        data: {
+          name: m.name.trim(),
+          city: m.city?.trim() || null,
+          address: m.address?.trim() || null,
+          prefecture: "東京都",
+        },
       });
 
       for (let i = 0; i < m.images.length; i++) {

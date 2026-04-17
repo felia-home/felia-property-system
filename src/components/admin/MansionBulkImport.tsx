@@ -4,6 +4,8 @@ import { useState, useRef } from 'react';
 
 interface MansionEntry {
   name: string;
+  city: string;    // 区名 (parts[0])
+  address: string; // 町名 (parts[1])
   files: File[];
 }
 
@@ -23,19 +25,24 @@ function isImageFile(file: File): boolean {
 }
 
 function parseFilesToMansions(files: FileList): MansionEntry[] {
-  const map = new Map<string, File[]>();
+  const map = new Map<string, MansionEntry>();
 
   for (const file of Array.from(files)) {
     if (!isImageFile(file)) continue;
     const parts = (file.webkitRelativePath || file.name).split('/');
-    if (parts.length < 2) continue;
-    // Use the folder immediately containing the image as the mansion name
-    const mansionName = parts[parts.length - 2];
-    if (!map.has(mansionName)) map.set(mansionName, []);
-    map.get(mansionName)!.push(file);
+    // 必要構成: 区名/町名/マンション名/画像.jpg = 4パーツ以上
+    if (parts.length < 4) continue;
+    const ward = parts[0];        // 区名
+    const town = parts[1];        // 町名
+    const mansionName = parts[2]; // マンション名
+    const key = `${ward}/${town}/${mansionName}`;
+    if (!map.has(key)) {
+      map.set(key, { name: mansionName, city: ward, address: town, files: [] });
+    }
+    map.get(key)!.files.push(file);
   }
 
-  return Array.from(map.entries()).map(([name, files]) => ({ name, files }));
+  return Array.from(map.values());
 }
 
 interface Props {
@@ -66,7 +73,12 @@ export default function MansionBulkImport({ onComplete }: Props) {
     setResult(null);
 
     try {
-      const importData: { name: string; images: { url: string; filename: string }[] }[] = [];
+      const importData: {
+        name: string;
+        city: string;
+        address: string;
+        images: { url: string; filename: string }[];
+      }[] = [];
 
       for (let i = 0; i < mansions.length; i++) {
         const m = mansions[i];
@@ -84,7 +96,7 @@ export default function MansionBulkImport({ onComplete }: Props) {
           }
         }
 
-        importData.push({ name: m.name, images: uploadedImages });
+        importData.push({ name: m.name, city: m.city, address: m.address, images: uploadedImages });
       }
 
       setProgress('データベースに登録中...');
@@ -108,7 +120,7 @@ export default function MansionBulkImport({ onComplete }: Props) {
     <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e0deda', padding: 20, marginBottom: 24 }}>
       <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4, color: '#1a1a1a' }}>フォルダ一括インポート</h3>
       <p style={{ fontSize: 12, color: '#706e68', marginBottom: 14 }}>
-        フォルダ構成: 親フォルダ → マンション名のサブフォルダ → 外観写真
+        フォルダ構成: 区名フォルダ / 町名フォルダ / マンション名フォルダ / 画像.jpg
       </p>
 
       {/* Drop zone */}
@@ -136,8 +148,8 @@ export default function MansionBulkImport({ onComplete }: Props) {
           <>
             <div style={{ fontSize: 32, marginBottom: 8 }}>📁</div>
             <div>フォルダをドラッグ&ドロップ、またはクリックして選択</div>
-            <div style={{ fontSize: 11, marginTop: 6, color: '#aaa' }}>
-              フォルダ選択ダイアログが開きます
+            <div style={{ fontSize: 11, marginTop: 6, color: '#9ca3af' }}>
+              構成: 区名フォルダ / 町名フォルダ / マンション名フォルダ / 画像.jpg
             </div>
           </>
         )}
@@ -159,6 +171,8 @@ export default function MansionBulkImport({ onComplete }: Props) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ background: '#f7f6f2' }}>
+                <th style={{ textAlign: 'left', padding: '6px 10px', fontWeight: 600, color: '#706e68' }}>区名</th>
+                <th style={{ textAlign: 'left', padding: '6px 10px', fontWeight: 600, color: '#706e68' }}>町名</th>
                 <th style={{ textAlign: 'left', padding: '6px 10px', fontWeight: 600, color: '#706e68' }}>マンション名</th>
                 <th style={{ textAlign: 'right', padding: '6px 10px', fontWeight: 600, color: '#706e68' }}>画像数</th>
               </tr>
@@ -166,7 +180,9 @@ export default function MansionBulkImport({ onComplete }: Props) {
             <tbody>
               {mansions.map((m, i) => (
                 <tr key={i} style={{ borderTop: '1px solid #f0f0f0' }}>
-                  <td style={{ padding: '6px 10px', color: '#1a1a1a' }}>{m.name}</td>
+                  <td style={{ padding: '6px 10px', color: '#706e68' }}>{m.city}</td>
+                  <td style={{ padding: '6px 10px', color: '#706e68' }}>{m.address}</td>
+                  <td style={{ padding: '6px 10px', color: '#1a1a1a', fontWeight: 500 }}>{m.name}</td>
                   <td style={{ padding: '6px 10px', textAlign: 'right', color: '#706e68' }}>{m.files.length}枚</td>
                 </tr>
               ))}
