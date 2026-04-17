@@ -813,20 +813,20 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
 
             <div style={{ fontSize: 13, fontWeight: "bold", color: "#374151", margin: "20px 0 12px" }}>
               インタビュー Q&A
-              <span style={{ fontSize: 11, fontWeight: "normal", color: "#9ca3af", marginLeft: 8 }}>
-                質問と回答を自由に入力してください
-              </span>
             </div>
 
-            {([1, 2, 3, 4, 5, 6] as const).map(n => (
+            {[
+              { n: 1, label: "自社の強み" },
+              { n: 2, label: "会社の雰囲気" },
+              { n: 3, label: "あれば望ましい経験や能力" },
+              { n: 4, label: "どのような人が向いているか" },
+              { n: 5, label: "仕事として楽しいエピソード" },
+              { n: 6, label: "これから入社する人へのメッセージ" },
+            ].map(({ n, label }) => (
               <div key={n} style={{ ...row, marginBottom: 14 }}>
-                <label style={lbl}>Q{n}</label>
+                <label style={{ ...lbl, color: "#6b7280" }}>Q{n}. {label}</label>
                 <textarea
-                  placeholder={
-                    n === 1 ? "例: Q. この仕事を選んだ理由は？\nA. お客様の人生の大きな決断に関わる仕事に魅力を感じました。" :
-                    n === 2 ? "例: Q. 仕事で大切にしていることは？\nA. お客様の立場に立って考えること。" :
-                    `インタビュー Q${n} を入力`
-                  }
+                  placeholder={`Q${n}. ${label} への回答を入力`}
                   value={(form as Record<string, unknown>)[`interview_q${n}`] as string ?? ""}
                   onChange={e => setF(`interview_q${n}` as keyof StaffFull, e.target.value || null)}
                   rows={3}

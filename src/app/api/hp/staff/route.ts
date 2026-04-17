@@ -51,6 +51,15 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    const INTERVIEW_LABELS = [
+      "自社の強み",
+      "会社の雰囲気",
+      "あれば望ましい経験や能力",
+      "どのような人が向いているか",
+      "仕事として楽しいエピソード",
+      "これから入社する人へのメッセージ",
+    ];
+
     const formatted = staffList.map(s => ({
       id: s.id,
       name: s.name,
@@ -76,12 +85,12 @@ export async function GET(req: NextRequest) {
       joined_at: s.joined_at,
       motto: s.motto,
       favorite: s.favorite,
-      interview_q1: s.interview_q1,
-      interview_q2: s.interview_q2,
-      interview_q3: s.interview_q3,
-      interview_q4: s.interview_q4,
-      interview_q5: s.interview_q5,
-      interview_q6: s.interview_q6,
+      interviews: [1, 2, 3, 4, 5, 6]
+        .map(n => ({
+          question: INTERVIEW_LABELS[n - 1],
+          answer: (s as unknown as Record<string, string | null>)[`interview_q${n}`] ?? "",
+        }))
+        .filter(item => item.answer),
     }));
 
     return NextResponse.json({ staff: formatted });
