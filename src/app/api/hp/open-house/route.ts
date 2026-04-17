@@ -12,6 +12,18 @@ export async function GET() {
     },
     orderBy: { open_house_start: "asc" },
     take: 6,
+    include: {
+      images: {
+        orderBy: { order: "asc" },
+        select: {
+          id: true,
+          url: true,
+          order: true,
+          caption: true,
+          room_type: true,
+        },
+      },
+    },
   });
   return NextResponse.json({ properties });
 }

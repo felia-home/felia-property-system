@@ -14,6 +14,8 @@ export async function GET() {
           id: true,
           url: true,
           order: true,
+          caption: true,
+          room_type: true,
         },
       },
     },
