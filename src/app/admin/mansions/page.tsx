@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import MansionBulkImport from "@/components/admin/MansionBulkImport";
 
 interface ExteriorImage {
   id: string;
@@ -28,6 +29,7 @@ export default function MansionsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Form state
@@ -99,13 +101,26 @@ export default function MansionsPage() {
           <h1 style={{ fontSize: 20, fontWeight: 500 }}>マンション建物マスタ</h1>
           <p style={{ fontSize: 12, color: "#706e68", marginTop: 4 }}>外観写真・建物情報の一元管理。複数物件で共有されます。</p>
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-        >
-          + 新規マンション登録
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => { setShowBulkImport(!showBulkImport); setShowForm(false); }}
+            style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: showBulkImport ? "#e8f5e9" : "#f7f6f2", color: showBulkImport ? "#234f35" : "#444", border: "1px solid #e0deda", cursor: "pointer", fontFamily: "inherit" }}
+          >
+            📁 フォルダ一括インポート
+          </button>
+          <button
+            onClick={() => { setShowForm(!showForm); setShowBulkImport(false); }}
+            style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+          >
+            + 新規マンション登録
+          </button>
+        </div>
       </div>
+
+      {/* Bulk import */}
+      {showBulkImport && (
+        <MansionBulkImport onComplete={() => { load(); setShowBulkImport(false); }} />
+      )}
 
       {/* New mansion form */}
       {showForm && (
