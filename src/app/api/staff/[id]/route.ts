@@ -72,6 +72,9 @@ export async function PUT(
       "qualification", "favorite_word", "hobby", "memorable_client",
       "sub_image_url_1", "sub_image_url_2", "daily_mindset",
       "takken_number", "takken_prefecture", "takken_expires_at",
+      "show_on_recruit", "joined_at", "motto", "favorite",
+      "interview_q1", "interview_q2", "interview_q3",
+      "interview_q4", "interview_q5", "interview_q6",
     ];
 
     const dateFields = ["birth_date", "hire_date", "trial_end_date", "takken_expires_at"];

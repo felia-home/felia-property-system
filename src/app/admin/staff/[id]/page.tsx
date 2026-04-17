@@ -62,6 +62,16 @@ interface StaffFull {
   daily_mindset: string | null;
   published_hp: boolean;
   hp_order: number;
+  show_on_recruit: boolean;
+  joined_at: string | null;
+  motto: string | null;
+  favorite: string | null;
+  interview_q1: string | null;
+  interview_q2: string | null;
+  interview_q3: string | null;
+  interview_q4: string | null;
+  interview_q5: string | null;
+  interview_q6: string | null;
   staff_code: string | null;
   is_active: boolean;
   retirement_date: string | null;
@@ -655,6 +665,20 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
             </div>
           </div>
 
+          {/* 採用ページ表示フラグ */}
+          <div style={section}>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12, color: "#3a2a1a" }}>採用ページ設定</div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={form.show_on_recruit ?? false}
+                onChange={e => setF("show_on_recruit", e.target.checked)}
+                style={{ width: 16, height: 16, cursor: "pointer" }}
+              />
+              <span style={{ fontSize: 13, fontWeight: "bold", color: "#374151" }}>採用ページに表示する</span>
+            </label>
+          </div>
+
           {/* HP追加情報 */}
           <div style={section}>
             <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 16, color: "#3a2a1a" }}>HP掲載追加情報</div>
@@ -743,6 +767,73 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
                 )}
               </div>
             </div>
+          </div>
+
+          {/* 採用ページ用情報 */}
+          <div style={{ ...section, marginTop: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: 15, color: "#374151", marginBottom: 16 }}>
+              採用ページ用情報
+              <span style={{ fontSize: 11, fontWeight: "normal", color: "#9ca3af", marginLeft: 8 }}>
+                「採用ページに表示する」をONにした場合に使用されます
+              </span>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={row}>
+                <label style={lbl}>入社年月</label>
+                <input
+                  type="text"
+                  placeholder="例: 2021年4月"
+                  value={form.joined_at ?? ""}
+                  onChange={e => setF("joined_at", e.target.value || null)}
+                  style={{ ...inp, width: 200 }}
+                />
+              </div>
+              <div style={row}>
+                <label style={lbl}>仕事のモットー</label>
+                <input
+                  type="text"
+                  placeholder="例: 誠実に、丁寧に"
+                  value={form.motto ?? ""}
+                  onChange={e => setF("motto", e.target.value || null)}
+                  style={inp}
+                />
+              </div>
+              <div style={row}>
+                <label style={lbl}>好きな言葉（採用用）</label>
+                <input
+                  type="text"
+                  placeholder="例: 一期一会"
+                  value={form.favorite ?? ""}
+                  onChange={e => setF("favorite", e.target.value || null)}
+                  style={inp}
+                />
+              </div>
+            </div>
+
+            <div style={{ fontSize: 13, fontWeight: "bold", color: "#374151", margin: "20px 0 12px" }}>
+              インタビュー Q&A
+              <span style={{ fontSize: 11, fontWeight: "normal", color: "#9ca3af", marginLeft: 8 }}>
+                質問と回答を自由に入力してください
+              </span>
+            </div>
+
+            {([1, 2, 3, 4, 5, 6] as const).map(n => (
+              <div key={n} style={{ ...row, marginBottom: 14 }}>
+                <label style={lbl}>Q{n}</label>
+                <textarea
+                  placeholder={
+                    n === 1 ? "例: Q. この仕事を選んだ理由は？\nA. お客様の人生の大きな決断に関わる仕事に魅力を感じました。" :
+                    n === 2 ? "例: Q. 仕事で大切にしていることは？\nA. お客様の立場に立って考えること。" :
+                    `インタビュー Q${n} を入力`
+                  }
+                  value={(form as Record<string, unknown>)[`interview_q${n}`] as string ?? ""}
+                  onChange={e => setF(`interview_q${n}` as keyof StaffFull, e.target.value || null)}
+                  rows={3}
+                  style={{ ...inp, resize: "vertical", lineHeight: 1.6 }}
+                />
+              </div>
+            ))}
           </div>
 
           {/* Preview */}

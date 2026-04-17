@@ -41,6 +41,16 @@ export async function GET(
         specialty_areas: staff.specialty_areas,
         specialty_types: staff.specialty_types,
         sort_order: staff.hp_order,
+        show_on_recruit: staff.show_on_recruit,
+        joined_at: staff.joined_at,
+        motto: staff.motto,
+        favorite: staff.favorite,
+        interview_q1: staff.interview_q1,
+        interview_q2: staff.interview_q2,
+        interview_q3: staff.interview_q3,
+        interview_q4: staff.interview_q4,
+        interview_q5: staff.interview_q5,
+        interview_q6: staff.interview_q6,
       },
     });
   } catch (error) {

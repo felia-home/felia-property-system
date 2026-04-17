@@ -860,6 +860,18 @@ model Staff {
   published_hp      Boolean   @default(false)
   hp_order          Int       @default(0)
 
+  // ===== 採用ページ =====
+  show_on_recruit   Boolean   @default(false)
+  joined_at         String?
+  motto             String?
+  favorite          String?
+  interview_q1      String?
+  interview_q2      String?
+  interview_q3      String?
+  interview_q4      String?
+  interview_q5      String?
+  interview_q6      String?
+
   // ===== 在籍・退職 =====
   is_active         Boolean   @default(true)
   retirement_date   DateTime?

@@ -18,6 +18,7 @@ interface StaffMember {
   tel_work: string | null;
   is_active: boolean;
   staff_code: string | null;
+  show_on_recruit?: boolean;
   store: { id: string; name: string; store_code: string } | null;
   _count?: { properties_as_agent: number };
 }
@@ -250,14 +251,25 @@ export default function StaffListPage() {
               )}
 
               {/* Staff code badge */}
-              <div style={{
-                fontSize: 11, fontFamily: "monospace",
-                background: s.staff_code ? "#f0f7f3" : "#fafaf8",
-                color: s.staff_code ? "#234f35" : "#aaa",
-                border: `1px solid ${s.staff_code ? "#c3e6cb" : "#e0deda"}`,
-                borderRadius: 6, padding: "3px 8px", display: "inline-block",
-              }}>
-                {s.staff_code ? `📋 ${s.staff_code}` : "コード未設定"}
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <div style={{
+                  fontSize: 11, fontFamily: "monospace",
+                  background: s.staff_code ? "#f0f7f3" : "#fafaf8",
+                  color: s.staff_code ? "#234f35" : "#aaa",
+                  border: `1px solid ${s.staff_code ? "#c3e6cb" : "#e0deda"}`,
+                  borderRadius: 6, padding: "3px 8px", display: "inline-block",
+                }}>
+                  {s.staff_code ? `📋 ${s.staff_code}` : "コード未設定"}
+                </div>
+                {s.show_on_recruit && (
+                  <span style={{
+                    fontSize: 10, background: "#dcfce7", color: "#166534",
+                    padding: "2px 6px", borderRadius: 10, fontWeight: "bold",
+                    border: "1px solid #bbf7d0",
+                  }}>
+                    採用
+                  </span>
+                )}
               </div>
 
               {s._count && (
