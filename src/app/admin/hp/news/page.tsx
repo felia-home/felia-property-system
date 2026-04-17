@@ -11,9 +11,8 @@ type NewsItem = {
 };
 
 const CATEGORIES = [
-  { value: "NEWS", label: "お知らせ", bg: "#e6f1fb", color: "#185fa5" },
-  { value: "PROPERTY", label: "物件情報", bg: "#eaf3de", color: "#3b6d11" },
-  { value: "EVENT", label: "イベント", bg: "#faeeda", color: "#854f0b" },
+  { value: "INFORMATION", label: "会社からのお知らせ", bg: "#dcfce7", color: "#15803d" },
+  { value: "NEWS",        label: "新着物件のお知らせ", bg: "#dbeafe", color: "#1d4ed8" },
 ];
 
 const Toggle = ({ on, onClick }: { on: boolean; onClick: () => void }) => (
@@ -26,7 +25,7 @@ export default function NewsPage() {
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<NewsItem | null>(null);
-  const [form, setForm] = useState({ title: "", content: "", category: "NEWS", is_published: false });
+  const [form, setForm] = useState({ title: "", content: "", category: "INFORMATION", is_published: false });
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState<"all" | "published" | "draft">("all");
 
@@ -34,7 +33,7 @@ export default function NewsPage() {
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const f = (k: string, v: unknown) => setForm(p => ({ ...p, [k]: v }));
 
-  const openNew = () => { setEditing(null); setForm({ title: "", content: "", category: "NEWS", is_published: false }); setShowForm(true); };
+  const openNew = () => { setEditing(null); setForm({ title: "", content: "", category: "INFORMATION", is_published: false }); setShowForm(true); };
   const openEdit = (n: NewsItem) => { setEditing(n); setForm({ title: n.title, content: n.content, category: n.category, is_published: n.is_published }); setShowForm(true); };
   const handleSave = async () => {
     setSaving(true);
@@ -94,7 +93,7 @@ export default function NewsPage() {
                   style={{ width: "100%", padding: "10px 12px", border: "1px solid #e0e0e0", borderRadius: "10px", fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
               </div>
               <div>
-                <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#666", marginBottom: "6px" }}>カテゴリ</label>
+                <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#666", marginBottom: "6px" }}>種別</label>
                 <select value={form.category} onChange={e => f("category", e.target.value)}
                   style={{ padding: "10px 12px", border: "1px solid #e0e0e0", borderRadius: "10px", fontSize: "14px", outline: "none", background: "white", fontFamily: "inherit" }}>
                   {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
@@ -130,12 +129,13 @@ export default function NewsPage() {
             <p style={{ color: "#888", margin: 0 }}>お知らせがありません</p>
           </div>
         ) : (filtered ?? []).map((news, i) => {
-          const cat = CATEGORIES.find(c => c.value === news.category);
+          const cat = CATEGORIES.find(c => c.value === news.category)
+            ?? { bg: "#f5f5f5", color: "#999", label: news.category };
           return (
             <div key={news.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", borderBottom: i < filtered.length - 1 ? "1px solid #f5f5f5" : "none", background: "white" }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: "100px", background: cat?.bg, color: cat?.color }}>{cat?.label}</span>
+                  <span style={{ fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: "100px", background: cat.bg, color: cat.color }}>{cat.label}</span>
                   <span style={{ fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: "100px", background: news.is_published ? "#eaf3de" : "#f5f5f5", color: news.is_published ? "#3b6d11" : "#999" }}>
                     {news.is_published ? "公開中" : "下書き"}
                   </span>
