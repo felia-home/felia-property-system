@@ -1316,3 +1316,17 @@ model HeroBanner {
 
   @@map("hero_banners")
 }
+// HPセクション管理
+model HpSection {
+  id          String   @id @default(uuid())
+  section_key String   @unique
+  label       String
+  is_visible  Boolean  @default(true)
+  sort_order  Int      @default(0)
+  heading     String?
+  subheading  String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("hp_sections")
+}
