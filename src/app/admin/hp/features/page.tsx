@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import ImageUploader from "@/components/admin/ImageUploader";
+import TokushuConditionsForm from "@/components/admin/TokushuConditionsForm";
+import type { TokushuConditions, SortType } from "@/lib/tokushuConditions";
 
 type Feature = {
   id: string;
@@ -10,6 +12,9 @@ type Feature = {
   link_url: string | null;
   is_active: boolean;
   sort_order: number;
+  conditions: TokushuConditions | null;
+  display_limit: number | null;
+  sort_type: string | null;
 };
 
 const Toggle = ({ on, onClick }: { on: boolean; onClick: () => void }) => (
@@ -29,7 +34,13 @@ export default function FeaturesPage() {
   const [features, setFeatures] = useState<Feature[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Feature | null>(null);
-  const [form, setForm] = useState({ title: "", description: "", image_url: "", link_url: "", is_active: true, sort_order: 0 });
+  const [form, setForm] = useState({
+    title: "", description: "", image_url: "", link_url: "",
+    is_active: true, sort_order: 0,
+  });
+  const [conditions, setConditions] = useState<TokushuConditions>({});
+  const [sortType, setSortType] = useState<SortType>("newest");
+  const [displayLimit, setDisplayLimit] = useState<number>(20);
   const [saving, setSaving] = useState(false);
 
   const load = () => fetch("/api/features").then(r => r.json()).then((d: { features?: Feature[] }) => setFeatures(d.features ?? []));
@@ -39,21 +50,47 @@ export default function FeaturesPage() {
   const openNew = () => {
     setEditing(null);
     setForm({ title: "", description: "", image_url: "", link_url: "", is_active: true, sort_order: features.length });
+    setConditions({});
+    setSortType("newest");
+    setDisplayLimit(20);
     setShowForm(true);
   };
   const openEdit = (feat: Feature) => {
     setEditing(feat);
-    setForm({ title: feat.title, description: feat.description ?? "", image_url: feat.image_url ?? "", link_url: feat.link_url ?? "", is_active: feat.is_active, sort_order: feat.sort_order });
+    setForm({
+      title: feat.title,
+      description: feat.description ?? "",
+      image_url: feat.image_url ?? "",
+      link_url: feat.link_url ?? "",
+      is_active: feat.is_active,
+      sort_order: feat.sort_order,
+    });
+    setConditions((feat.conditions as TokushuConditions) ?? {});
+    setSortType((feat.sort_type as SortType) ?? "newest");
+    setDisplayLimit(feat.display_limit ?? 20);
     setShowForm(true);
   };
   const handleSave = async () => {
     setSaving(true);
     const url = editing ? `/api/features/${editing.id}` : "/api/features";
-    await fetch(url, { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    await fetch(url, {
+      method: editing ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...form,
+        conditions,
+        sort_type: sortType,
+        display_limit: displayLimit,
+      }),
+    });
     setSaving(false); setShowForm(false); setEditing(null); load();
   };
   const toggleActive = async (feat: Feature) => {
-    await fetch(`/api/features/${feat.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...feat, is_active: !feat.is_active }) });
+    await fetch(`/api/features/${feat.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...feat, is_active: !feat.is_active }),
+    });
     load();
   };
   const handleDelete = async (id: string) => {
@@ -62,8 +99,14 @@ export default function FeaturesPage() {
     load();
   };
 
+  const handleConditionsChange = (c: TokushuConditions, s: SortType, l: number) => {
+    setConditions(c);
+    setSortType(s);
+    setDisplayLimit(l);
+  };
+
   return (
-    <div style={{ padding: "32px", maxWidth: "860px" }}>
+    <div style={{ padding: "32px", maxWidth: "900px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
         <div>
           <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0, color: "#1a1a1a" }}>特集管理</h1>
@@ -82,6 +125,8 @@ export default function FeaturesPage() {
             <h2 style={{ fontSize: "17px", fontWeight: 700, margin: 0 }}>{editing ? "特集を編集" : "新しい特集"}</h2>
             <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "#999", lineHeight: 1 }}>×</button>
           </div>
+
+          {/* 基本情報 */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               {[
@@ -132,6 +177,23 @@ export default function FeaturesPage() {
               )}
             </div>
           </div>
+
+          {/* 絞り込み条件 */}
+          <div style={{ marginTop: "24px", borderTop: "1px solid #f0f0f0", paddingTop: "20px" }}>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", marginBottom: "12px" }}>
+              物件絞り込み条件（オプション）
+              <span style={{ fontSize: "12px", fontWeight: 400, color: "#888", marginLeft: 8 }}>
+                条件を設定するとHP側で該当物件を動的に表示できます
+              </span>
+            </div>
+            <TokushuConditionsForm
+              conditions={conditions}
+              sortType={sortType}
+              displayLimit={displayLimit}
+              onChange={handleConditionsChange}
+            />
+          </div>
+
           <div style={{ display: "flex", gap: "10px", marginTop: "20px", paddingTop: "20px", borderTop: "1px solid #f0f0f0", justifyContent: "flex-end" }}>
             <button onClick={() => setShowForm(false)} style={{ padding: "10px 20px", borderRadius: "10px", fontSize: "14px", cursor: "pointer", border: "1px solid #e0e0e0", background: "white", color: "#444", fontFamily: "inherit" }}>キャンセル</button>
             <button onClick={handleSave} disabled={saving || !form.title} style={{
@@ -168,7 +230,17 @@ export default function FeaturesPage() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{feat.title}</div>
-                <div style={{ fontSize: "12px", color: "#aaa", marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{feat.link_url ?? "リンクなし"}</div>
+                <div style={{ fontSize: "12px", color: "#aaa", marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {feat.link_url ?? "リンクなし"}
+                  {feat.conditions && Object.keys(feat.conditions).some(k => {
+                    const v = (feat.conditions as Record<string, unknown>)[k];
+                    return Array.isArray(v) ? v.length > 0 : v != null;
+                  }) && (
+                    <span style={{ marginLeft: 8, fontSize: 10, background: "#e3f2fd", color: "#1565c0", padding: "1px 6px", borderRadius: 4 }}>
+                      絞り込みあり
+                    </span>
+                  )}
+                </div>
               </div>
               <div style={{ fontSize: "12px", fontWeight: 700, padding: "3px 10px", borderRadius: "100px", background: feat.is_active ? "#eaf3de" : "#f5f5f5", color: feat.is_active ? "#3b6d11" : "#999", flexShrink: 0 }}>
                 {feat.is_active ? "公開中" : "非表示"}

@@ -1046,15 +1046,18 @@ model Contract {
 
 // 特集管理
 model Feature {
-  id           String   @id @default(cuid())
-  title        String
-  description  String?  @db.Text
-  image_url    String?
-  link_url     String?
-  is_active    Boolean  @default(true)
-  sort_order   Int      @default(0)
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  title         String
+  description   String?  @db.Text
+  image_url     String?
+  link_url      String?
+  is_active     Boolean  @default(true)
+  sort_order    Int      @default(0)
+  conditions    Json?    @default("{}")
+  display_limit Int?     @default(20)
+  sort_type     String?  @default("newest")
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
   @@map("features")
 }
 

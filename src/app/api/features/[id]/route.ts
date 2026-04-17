@@ -12,6 +12,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       link_url: body.link_url,
       is_active: body.is_active,
       sort_order: body.sort_order,
+      ...(body.conditions    !== undefined && { conditions:    body.conditions }),
+      ...(body.sort_type     !== undefined && { sort_type:     body.sort_type }),
+      ...(body.display_limit !== undefined && { display_limit: body.display_limit }),
     },
   });
   return NextResponse.json({ success: true, feature });
