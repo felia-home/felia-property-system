@@ -118,9 +118,18 @@ export default function FeaturesPage() {
         }}>＋ 特集を追加</button>
       </div>
 
-      {/* フォーム */}
+      {/* フォーム（オーバーレイモーダル） */}
       {showForm && (
-        <div style={{ background: "white", border: "1px solid #e8e8e8", borderRadius: "16px", padding: "24px", marginBottom: "24px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 50,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "flex-start", justifyContent: "center",
+            overflowY: "auto", padding: "40px 16px",
+          }}
+          onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}
+        >
+        <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 800, padding: 32, position: "relative", margin: "auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
             <h2 style={{ fontSize: "17px", fontWeight: 700, margin: 0 }}>{editing ? "特集を編集" : "新しい特集"}</h2>
             <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "#999", lineHeight: 1 }}>×</button>
@@ -202,6 +211,7 @@ export default function FeaturesPage() {
               opacity: (saving || !form.title) ? 0.5 : 1,
             }}>{saving ? "保存中..." : editing ? "変更を保存" : "特集を追加"}</button>
           </div>
+        </div>
         </div>
       )}
 
