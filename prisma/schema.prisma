@@ -244,6 +244,8 @@ model Property {
   // 周辺環境
   env_elementary_school   String?
   env_junior_high_school  String?
+  school_elementary       String?  // 小学校区（自動取得）
+  school_junior_high      String?  // 中学校区（自動取得）
   env_supermarket         String?
   env_hospital            String?
   env_park                String?
@@ -343,6 +345,7 @@ model Property {
   contracts             Contract[]
   sale_results          SaleResult[] @relation("SaleResultProperty")
   check_logs            PropertyCheckLog[]
+  env_image_links       PropertyEnvImageLink[]
   @@map("properties")
 }
 
@@ -429,7 +432,19 @@ model PropertyEnvironmentImage {
   ai_caption    String?
   uploaded_by   String?
   created_at    DateTime @default(now())
+  property_links PropertyEnvImageLink[]
   @@map("property_environment_images")
+}
+
+model PropertyEnvImageLink {
+  id           String                   @id @default(cuid())
+  property_id  String
+  env_image_id String
+  property     Property                 @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  env_image    PropertyEnvironmentImage @relation(fields: [env_image_id], references: [id], onDelete: Cascade)
+  created_at   DateTime                 @default(now())
+  @@unique([property_id, env_image_id])
+  @@map("property_env_image_links")
 }
 
 model PropertyHistory {

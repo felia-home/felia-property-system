@@ -155,14 +155,15 @@ export default function MansionBulkImport({ onComplete }: Props) {
         )}
       </div>
 
-      {/* @ts-expect-error webkitdirectory is non-standard */}
       <input
         ref={inputRef}
-        type="file"
-        webkitdirectory="true"
-        multiple
-        style={{ display: 'none' }}
-        onChange={e => e.target.files && handleFiles(e.target.files)}
+        {...({
+          type: "file",
+          webkitdirectory: "true",
+          multiple: true,
+          style: { display: 'none' },
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => e.target.files && handleFiles(e.target.files),
+        } as React.InputHTMLAttributes<HTMLInputElement>)}
       />
 
       {/* Preview table */}
