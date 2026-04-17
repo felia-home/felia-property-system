@@ -18,6 +18,9 @@ export async function POST(req: NextRequest) {
       link_url: body.link_url || null,
       is_active: body.is_active ?? true,
       sort_order: body.sort_order ?? 0,
+      conditions:    body.conditions    ?? {},
+      sort_type:     body.sort_type     ?? "newest",
+      display_limit: body.display_limit ?? 20,
     },
   });
   return NextResponse.json({ success: true, feature });
