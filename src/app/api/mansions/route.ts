@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { uploadFile } from "@/lib/storage";
 
-// GET /api/mansions?name=xxx — autocomplete search
+// GET /api/mansions           — 全件一覧
+// GET /api/mansions?id=xxx    — 1件取得
+// GET /api/mansions?q=xxx     — 名前検索（オートコンプリート）
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const name = searchParams.get("name");
     const id = searchParams.get("id");
+    const q = searchParams.get("q") ?? searchParams.get("name") ?? "";
 
     if (id) {
       const mansion = await prisma.mansionBuilding.findUnique({
@@ -18,26 +20,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ mansion });
     }
 
-    if (!name || name.length < 1) {
-      return NextResponse.json({ mansions: [] });
-    }
-
     const mansions = await prisma.mansionBuilding.findMany({
-      where: { name: { contains: name } },
+      where: q ? { name: { contains: q } } : undefined,
       include: {
         exterior_images: {
-          where: { is_primary: true },
-          take: 1,
+          orderBy: { created_at: "asc" },
+          take: 5,
+          select: {
+            id: true,
+            url: true,
+            filename: true,
+            caption: true,
+            is_primary: true,
+          },
         },
       },
-      take: 10,
-      orderBy: { name: "asc" },
+      orderBy: { created_at: "desc" },
     });
 
     return NextResponse.json({ mansions });
   } catch (error) {
     console.error("GET /api/mansions error:", error);
-    return NextResponse.json({ error: "検索に失敗しました" }, { status: 500 });
+    return NextResponse.json({ mansions: [] }, { status: 500 });
   }
 }
 
