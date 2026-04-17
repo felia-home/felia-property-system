@@ -80,8 +80,6 @@ interface ActionPanelProps {
 }
 
 const MEDIA_FLAGS = [
-  { key: "published_hp",      label: "フェリアホームHP（一般公開）" },
-  { key: "published_members", label: "フェリアホームHP（会員限定）" },
   { key: "published_suumo",   label: "SUUMO" },
   { key: "published_athome",  label: "athome" },
   { key: "published_yahoo",   label: "Yahoo不動産" },
@@ -97,8 +95,6 @@ function ActionPanel({ property, onStatusChange, onOpenTab }: ActionPanelProps) 
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [mediaFlags, setMediaFlags] = useState<Record<MediaFlagKey, boolean>>({
-    published_hp:      !!property.published_hp,
-    published_members: !!property.published_members,
     published_suumo:   !!property.published_suumo,
     published_athome:  !!property.published_athome,
     published_yahoo:   !!property.published_yahoo,
@@ -243,8 +239,9 @@ function ActionPanel({ property, onStatusChange, onOpenTab }: ActionPanelProps) 
 
             {/* 媒体選択チェックボックス */}
             <div style={{ border: "1px solid #e0deda", borderRadius: 8, padding: 14, marginBottom: 14, background: "#f9fafb" }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>📋 掲載媒体の承認（広告確認）</div>
-              <div style={{ fontSize: 11, color: "#706e68", marginBottom: 10 }}>今回の広告確認でOKとなった媒体にチェックしてください</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>📋 ポータルサイト掲載許可（広告確認）</div>
+              <div style={{ fontSize: 11, color: "#706e68", marginBottom: 10 }}>今回の広告確認でOKとなったポータルにチェックしてください</div>
+              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 10 }}>※ HP・会員公開はHP設定タブから内勤が手動で設定してください</div>
               {MEDIA_FLAGS.map(({ key, label }) => (
                 <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7, cursor: "pointer" }}>
                   <input
