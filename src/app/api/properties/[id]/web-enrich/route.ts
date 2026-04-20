@@ -27,6 +27,7 @@ export async function POST(
       select: {
         id: true,
         city: true,
+        town: true,
         address: true,
         property_type: true,
         price: true,
@@ -51,7 +52,7 @@ export async function POST(
 
     const propertyTypeStr = TYPE_LABEL[property.property_type ?? ""] ?? "";
     const priceStr = property.price ? `${property.price}万円` : "";
-    const fullAddress = [property.city, property.address].filter(Boolean).join("");
+    const fullAddress = [property.city, property.town, property.address].filter(Boolean).join("");
     const buildingNameStr = property.building_name ?? "";
 
     // マンション名があれば最優先、なければ住所で検索
