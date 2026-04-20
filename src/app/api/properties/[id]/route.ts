@@ -27,6 +27,20 @@ const toStringArray = (v: unknown): string[] | null => {
 
 // ── フィールド分類 ────────────────────────────────────────────────────────────
 
+// NOT NULL 制約のある String フィールド — null を渡すとPrismaエラーになるため
+// null/undefined を受け取った場合は update data から除外する（DB の既存値を保持）
+const NOT_NULL_STRING_FIELDS = new Set([
+  "property_type",
+  "transaction_type",
+  "brokerage_type",
+  "status",
+  "prefecture",
+  "city",
+  "address",
+  "address_display_level",
+  "ad_transfer_consent",
+]);
+
 const STRING_FIELDS = new Set([
   "property_type","transaction_type","brokerage_type","status",
   "title","catch_copy","description_hp","description_portal","description_suumo","description_athome",
@@ -149,6 +163,8 @@ export async function PATCH(
 
     for (const [key, val] of Object.entries(body)) {
       if (STRING_FIELDS.has(key)) {
+        // NOT NULL フィールドに null/undefined が来た場合はスキップ（DB既存値を保持）
+        if (NOT_NULL_STRING_FIELDS.has(key) && (val === null || val === undefined)) continue;
         data[key] = val;
       } else if (INT_FIELDS.has(key)) {
         data[key] = toInt(val);
