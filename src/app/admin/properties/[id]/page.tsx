@@ -920,6 +920,9 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
   // 物件情報タブ内AI生成
   const [generatingForm, setGeneratingForm] = useState(false);
 
+  // ジオコード
+  const [geocoding, setGeocoding] = useState(false);
+
   // Web検索補完
   const [webEnrichLoading, setWebEnrichLoading] = useState(false);
   const [webEnrichResult, setWebEnrichResult] = useState<{
@@ -997,6 +1000,58 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
       }
     } else {
       setMsg({ text: data.error ?? "更新に失敗しました", ok: false });
+    }
+  };
+
+  const handleGeocodeAndEnrich = async () => {
+    const addr = [form.prefecture, form.city, form.town, form.address].filter(Boolean).join("");
+    if (!addr) {
+      setMsg({ text: "住所（都道府県・区市町村・番地）を入力してください", ok: false });
+      return;
+    }
+    setGeocoding(true);
+    setMsg(null);
+    try {
+      // Step 1: Nominatim でジオコード
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1`;
+      const geoRes = await fetch(url);
+      const geoData = await geoRes.json() as Array<{ lat: string; lon: string }>;
+      if (!geoData[0]) {
+        setMsg({ text: "住所から緯度経度を取得できませんでした。住所を確認してください。", ok: false });
+        return;
+      }
+      const lat = parseFloat(geoData[0].lat).toFixed(6);
+      const lng = parseFloat(geoData[0].lon).toFixed(6);
+
+      // Step 2: フォームに反映
+      setForm(f => ({ ...f, latitude: lat, longitude: lng }));
+
+      // Step 3: DBに lat/lng を保存（auto-enrich が DB から読むため）
+      await fetch(`/api/properties/${params.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ latitude: parseFloat(lat), longitude: parseFloat(lng) }),
+      });
+
+      // Step 4: auto-enrich（最寄り駅・学区・周辺環境写真）
+      const enrichRes = await fetch(`/api/properties/${params.id}/auto-enrich`, { method: "POST" });
+      const enrichData = await enrichRes.json();
+
+      if (enrichRes.ok) {
+        // リロードしてフォームに反映
+        await loadProperty();
+        setMsg({
+          text: `✅ 緯度経度を取得しました。${enrichData.message ?? ""}`,
+          ok: true,
+        });
+      } else {
+        setMsg({ text: `✅ 緯度経度を取得しました（補完: ${enrichData.error ?? "スキップ"}）`, ok: true });
+      }
+      setTimeout(() => setMsg(null), 8000);
+    } catch (e) {
+      setMsg({ text: `エラーが発生しました: ${String(e)}`, ok: false });
+    } finally {
+      setGeocoding(false);
     }
   };
 
@@ -1267,6 +1322,8 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
               tab={tab} setTab={setTab} form={form} setForm={setForm}
               onGenerateContent={handleGenerateToForm}
               generatingContent={generatingForm}
+              onGeocode={handleGeocodeAndEnrich}
+              geocoding={geocoding}
             />
           </div>
         )}

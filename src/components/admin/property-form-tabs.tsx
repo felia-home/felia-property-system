@@ -753,9 +753,11 @@ interface TabsProps {
   setForm: SetForm;
   onGenerateContent?: () => void;
   generatingContent?: boolean;
+  onGeocode?: () => void;
+  geocoding?: boolean;
 }
 
-export function PropertyFormTabs({ tab, setTab, form, setForm, onGenerateContent, generatingContent }: TabsProps) {
+export function PropertyFormTabs({ tab, setTab, form, setForm, onGenerateContent, generatingContent, onGeocode, geocoding }: TabsProps) {
   const isLand = form.property_type === "LAND";
   const isMansion = form.property_type === "MANSION" || form.property_type === "NEW_MANSION";
 
@@ -894,11 +896,18 @@ export function PropertyFormTabs({ tab, setTab, form, setForm, onGenerateContent
             <div style={{ flex: 1 }}>
               <FI label="経度" name="longitude" form={form} setForm={setForm} type="number" placeholder="139.745433" />
             </div>
-            <button onClick={handleGeocode} style={{
-              padding: "7px 14px", borderRadius: 7, fontSize: 12, fontWeight: 500,
-              background: "#234f35", color: "#fff", border: "none", cursor: "pointer",
-              fontFamily: "inherit", whiteSpace: "nowrap", marginBottom: 1,
-            }}>住所から自動取得</button>
+            <button
+              onClick={() => onGeocode ? onGeocode() : handleGeocode()}
+              disabled={geocoding}
+              style={{
+                padding: "7px 14px", borderRadius: 7, fontSize: 12, fontWeight: 500,
+                background: geocoding ? "#888" : "#234f35", color: "#fff", border: "none",
+                cursor: geocoding ? "not-allowed" : "pointer",
+                fontFamily: "inherit", whiteSpace: "nowrap", marginBottom: 1,
+              }}
+            >
+              {geocoding ? "取得中..." : "住所から自動取得"}
+            </button>
           </div>
           <div style={sectionTitle}>最寄駅・交通（最大3件）</div>
           {([1,2,3] as const).map(n => (
