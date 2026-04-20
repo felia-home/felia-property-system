@@ -1003,41 +1003,38 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
     }
   };
 
-  // 「丁目」を数字+'-' に正規化して Nominatim が解析しやすい形式にする
-  const normalizeAddressStr = (s: string) =>
-    s.replace(/(\d+)丁目/g, "$1-").replace(/　/g, " ").trim();
-
-  // フォールバック付き住所クエリ生成
+  // 国土地理院API用クエリ生成（日本語住所そのまま・丁目変換不要）
   const buildAddressQueries = (): string[] => {
     const pref = form.prefecture ?? "東京都";
     const city = form.city ?? "";
     const town = form.town ?? "";
     const address = form.address ?? "";
-    const full  = normalizeAddressStr([pref, city, town, address].filter(Boolean).join(""));
-    const short = normalizeAddressStr([city, town, address].filter(Boolean).join(""));
-    const area  = normalizeAddressStr([pref, city, town].filter(Boolean).join(""));
-    return [...new Set([full, short, area])].filter(Boolean);
+    const queries = [
+      [pref, city, town, address].filter(Boolean).join(""),
+      [city, town, address].filter(Boolean).join(""),
+      [pref, city, town].filter(Boolean).join(""),
+    ];
+    return [...new Set(queries)].filter(Boolean);
   };
 
-  // Nominatim を複数クエリでフォールバック
+  // 国土地理院 住所検索API でフォールバック
+  // レスポンス: [{ geometry: { coordinates: [lng, lat] }, properties: { title } }]
   const tryGeocode = async (queries: string[]): Promise<{ lat: number; lng: number } | null> => {
     for (const q of queries) {
       console.log("🔍 geocode trying:", q);
       try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=jp`;
-        const res = await fetch(url, {
-          headers: { "User-Agent": "FeliaHome/1.0 (admin@felia-home.jp)" },
-        });
-        const data = await res.json() as Array<{ lat: string; lon: string }>;
+        const url = `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(q)}`;
+        const res = await fetch(url);
+        const data = await res.json() as Array<{ geometry: { coordinates: [number, number] } }>;
         console.log("🔍 geocode result for", q, ":", data);
         if (data && data.length > 0) {
-          return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+          const [lng, lat] = data[0].geometry.coordinates; // 国土地理院は [lng, lat] 順
+          return { lat, lng };
         }
       } catch (e) {
-        console.error("geocode fetch error:", e);
+        console.error("geocode error for", q, ":", e);
       }
-      // Nominatim レート制限対策
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 300));
     }
     return null;
   };
