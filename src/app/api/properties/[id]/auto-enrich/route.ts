@@ -18,14 +18,20 @@ interface OverpassNode {
 async function queryOverpass(query: string): Promise<OverpassNode[]> {
   try {
     console.log("[auto-enrich] Overpass query:", query.slice(0, 120));
+    const body = new URLSearchParams({ data: query });
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",
-      body: `data=${encodeURIComponent(query)}`,
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json",
+        "User-Agent": "FeliaPropertySystem/1.0 (contact: info@felia-home.jp)",
+      },
+      body: body.toString(),
       signal: AbortSignal.timeout(25000),
     });
     if (!res.ok) {
-      console.log("[auto-enrich] Overpass error:", res.status, res.statusText);
+      const text = await res.text().catch(() => "");
+      console.log("[auto-enrich] Overpass error:", res.status, res.statusText, text.slice(0, 200));
       return [];
     }
     const data = await res.json() as { elements: OverpassNode[] };
@@ -96,7 +102,8 @@ out body;`;
   let juniorHigh: string | null = null;
   for (const s of sorted) {
     if (!elementary && s.name.includes("小学校")) elementary = s.name;
-    if (!juniorHigh && s.name.includes("中学校")) juniorHigh = s.name;
+    // 「小学校」を含まない「中学校」のみを中学校と判定（小中一貫校を除外）
+    if (!juniorHigh && s.name.includes("中学校") && !s.name.includes("小学校")) juniorHigh = s.name;
     if (elementary && juniorHigh) break;
   }
 
