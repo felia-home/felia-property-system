@@ -17,16 +17,22 @@ interface OverpassNode {
 
 async function queryOverpass(query: string): Promise<OverpassNode[]> {
   try {
+    console.log("[auto-enrich] Overpass query:", query.slice(0, 120));
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",
       body: `data=${encodeURIComponent(query)}`,
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       signal: AbortSignal.timeout(25000),
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.log("[auto-enrich] Overpass error:", res.status, res.statusText);
+      return [];
+    }
     const data = await res.json() as { elements: OverpassNode[] };
+    console.log("[auto-enrich] Overpass elements:", data.elements?.length ?? 0);
     return (data.elements ?? []).filter((e) => e.type === "node");
-  } catch {
+  } catch (e) {
+    console.log("[auto-enrich] Overpass exception:", e);
     return [];
   }
 }
@@ -136,6 +142,9 @@ export async function POST(
       latitude: true,
       longitude: true,
       city: true,
+      station_line1: true,
+      station_name1: true,
+      station_walk1: true,
       station_line2: true,
       station_name2: true,
       station_walk2: true,
@@ -154,6 +163,8 @@ export async function POST(
   const lat = property.latitude as number | null;
   const lng = property.longitude as number | null;
 
+  console.log("[auto-enrich] property:", params.id, "lat:", lat, "lng:", lng);
+
   if (!lat || !lng) {
     return NextResponse.json({ error: "緯度経度が未設定です" }, { status: 400 });
   }
@@ -161,8 +172,17 @@ export async function POST(
   const updateData: Record<string, unknown> = {};
   const enriched: string[] = [];
 
-  // ---- 最寄り駅（2・3番目が空の場合のみ）----
+  // ---- 最寄り駅（空の場合のみ）----
   const top3 = await findNearbyStations(lat, lng);
+  console.log("[auto-enrich] nearby stations:", top3.length, top3.map(s => s.name).join(", "));
+
+  // 駅1が空の場合は最も近い駅で埋める
+  if (!property.station_line1 && !property.station_name1 && top3[0]) {
+    updateData.station_line1 = formatLineName(top3[0].line);
+    updateData.station_name1 = top3[0].name;
+    updateData.station_walk1 = top3[0].walk_minutes;
+    enriched.push(`交通1: ${top3[0].name}（${top3[0].walk_minutes}分）`);
+  }
 
   if (!property.station_line2 && !property.station_name2 && top3[1]) {
     updateData.station_line2 = formatLineName(top3[1].line);
@@ -180,6 +200,7 @@ export async function POST(
 
   // ---- 学校区（空の場合のみ）----
   const schools = await findNearbySchools(lat, lng);
+  console.log("[auto-enrich] schools:", schools);
 
   if (!property.school_elementary && schools.elementary) {
     updateData.school_elementary = schools.elementary;
