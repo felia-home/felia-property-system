@@ -175,7 +175,8 @@ export async function PATCH(
       } else if (DATETIME_FIELDS.has(key)) {
         data[key] = toDateTime(val);
       } else if (STRING_ARRAY_FIELDS.has(key)) {
-        data[key] = toStringArray(val);
+        // String[] NOT NULL のため null は [] にフォールバック
+        data[key] = toStringArray(val) ?? [];
       } else if (JSON_FIELDS.has(key)) {
         data[key] = val;
       }
