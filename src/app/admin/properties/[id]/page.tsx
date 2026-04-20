@@ -1003,13 +1003,50 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
     }
   };
 
+  // 「丁目」を数字+'-' に正規化して Nominatim が解析しやすい形式にする
+  const normalizeAddressStr = (s: string) =>
+    s.replace(/(\d+)丁目/g, "$1-").replace(/　/g, " ").trim();
+
+  // フォールバック付き住所クエリ生成
+  const buildAddressQueries = (): string[] => {
+    const pref = form.prefecture ?? "東京都";
+    const city = form.city ?? "";
+    const town = form.town ?? "";
+    const address = form.address ?? "";
+    const full  = normalizeAddressStr([pref, city, town, address].filter(Boolean).join(""));
+    const short = normalizeAddressStr([city, town, address].filter(Boolean).join(""));
+    const area  = normalizeAddressStr([pref, city, town].filter(Boolean).join(""));
+    return [...new Set([full, short, area])].filter(Boolean);
+  };
+
+  // Nominatim を複数クエリでフォールバック
+  const tryGeocode = async (queries: string[]): Promise<{ lat: number; lng: number } | null> => {
+    for (const q of queries) {
+      console.log("🔍 geocode trying:", q);
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=jp`;
+        const res = await fetch(url, {
+          headers: { "User-Agent": "FeliaHome/1.0 (admin@felia-home.jp)" },
+        });
+        const data = await res.json() as Array<{ lat: string; lon: string }>;
+        console.log("🔍 geocode result for", q, ":", data);
+        if (data && data.length > 0) {
+          return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        }
+      } catch (e) {
+        console.error("geocode fetch error:", e);
+      }
+      // Nominatim レート制限対策
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    return null;
+  };
+
   const handleGeocodeAndEnrich = async () => {
-    const addressStr = [form.prefecture, form.city, form.town, form.address]
-      .filter(Boolean).join("");
+    const queries = buildAddressQueries();
+    console.log("🔍 geocode queries:", queries);
 
-    console.log("🔍 geocode start:", addressStr);
-
-    if (!addressStr) {
+    if (queries.length === 0 || !queries[0]) {
       setMsg({ text: "住所（都道府県・区市町村・番地）を入力してください", ok: false });
       return;
     }
@@ -1018,27 +1055,17 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
     setMsg(null);
 
     try {
-      // Step 1: Nominatim でジオコード
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addressStr)}&format=json&limit=1`;
-      console.log("🔍 geocode url:", url);
-
-      const geoRes = await fetch(url, {
-        headers: { "User-Agent": "FeliaHome/1.0 (admin@felia-home.jp)" },
-      });
-      const geoData = await geoRes.json() as Array<{ lat: string; lon: string }>;
-      console.log("🔍 geocode result:", geoData);
-
-      if (!geoData || geoData.length === 0) {
-        console.warn("🔍 geocode: no results");
+      // Step 1: フォールバック付きジオコード
+      const result = await tryGeocode(queries);
+      if (!result) {
         setMsg({ text: "住所から緯度経度を取得できませんでした。住所を確認してください。", ok: false });
         return;
       }
 
-      const lat = parseFloat(geoData[0].lat);
-      const lng = parseFloat(geoData[0].lon);
+      const { lat, lng } = result;
       console.log("🔍 geocode lat/lng:", lat, lng);
 
-      // Step 2: フォームに反映（string 化して渡す）
+      // Step 2: フォームに反映
       setForm(f => ({ ...f, latitude: String(lat), longitude: String(lng) }));
 
       // Step 3: DBに lat/lng を保存（auto-enrich が DB から読むため）
