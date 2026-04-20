@@ -920,6 +920,17 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
   // 物件情報タブ内AI生成
   const [generatingForm, setGeneratingForm] = useState(false);
 
+  // Web検索補完
+  const [webEnrichLoading, setWebEnrichLoading] = useState(false);
+  const [webEnrichResult, setWebEnrichResult] = useState<{
+    current: Record<string, unknown>;
+    enriched: Record<string, unknown>;
+    query: string;
+    is_mansion: boolean;
+  } | null>(null);
+  const [showWebEnrichModal, setShowWebEnrichModal] = useState(false);
+  const [selectedEnrichFields, setSelectedEnrichFields] = useState<Set<string>>(new Set());
+
   const loadProperty = async () => {
     const res = await fetch(`/api/properties/${params.id}`);
     const d = await res.json();
@@ -987,6 +998,48 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
     } else {
       setMsg({ text: data.error ?? "更新に失敗しました", ok: false });
     }
+  };
+
+  const handleWebEnrich = async () => {
+    setWebEnrichLoading(true);
+    try {
+      const res = await fetch(`/api/properties/${params.id}/web-enrich`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error ?? "Web検索に失敗しました"); return; }
+      if (data.enriched) {
+        setWebEnrichResult(data);
+        setShowWebEnrichModal(true);
+        const fields = Object.keys(data.enriched).filter(
+          k => k !== "sources" && data.enriched[k] !== null
+        );
+        setSelectedEnrichFields(new Set(fields));
+      }
+    } catch {
+      alert("Web検索に失敗しました");
+    } finally {
+      setWebEnrichLoading(false);
+    }
+  };
+
+  const handleApplyEnriched = () => {
+    if (!webEnrichResult) return;
+    const patch: Record<string, unknown> = {};
+    for (const key of selectedEnrichFields) {
+      if (webEnrichResult.enriched[key] !== null) {
+        patch[key] = webEnrichResult.enriched[key];
+      }
+    }
+    // form は文字列 Record なので文字列変換して反映
+    setForm(prev => {
+      const next = { ...prev };
+      for (const [k, v] of Object.entries(patch)) {
+        next[k] = v == null ? "" : String(v);
+      }
+      return next;
+    });
+    setShowWebEnrichModal(false);
+    setMsg({ text: "✅ 反映しました。「保存する」で確定してください。", ok: true });
+    setTimeout(() => setMsg(null), 8000);
   };
 
   const handleGenerateToForm = async () => {
@@ -1099,6 +1152,22 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
           )}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {property.ad_confirmation_file && (
+            <a
+              href={String(property.ad_confirmation_file)}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "7px 14px", borderRadius: 8, fontSize: 12,
+                background: "#fff", border: "1px solid #d1d5db",
+                color: "#374151", fontWeight: 600, textDecoration: "none",
+                cursor: "pointer",
+              }}
+            >
+              📄 広告確認PDF
+            </a>
+          )}
           {!editing ? (
             <button onClick={() => { setEditing(true); setMainTab("info"); }}
               style={{ padding: "7px 16px", borderRadius: 8, fontSize: 12, border: "1px solid #e0deda", background: "#fff", cursor: "pointer", fontFamily: "inherit" }}>
@@ -1174,11 +1243,32 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
           />
         )}
         {mainTab === "info" && (
-          <PropertyFormTabs
-            tab={tab} setTab={setTab} form={form} setForm={setForm}
-            onGenerateContent={handleGenerateToForm}
-            generatingContent={generatingForm}
-          />
+          <div>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16 }}>
+              <button
+                type="button"
+                onClick={handleWebEnrich}
+                disabled={webEnrichLoading}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "8px 16px", borderRadius: 6, fontSize: 13,
+                  background: webEnrichLoading ? "#e5e7eb" : "#eff6ff",
+                  color: webEnrichLoading ? "#9ca3af" : "#1d4ed8",
+                  border: "1px solid #bfdbfe", fontWeight: 600,
+                  cursor: webEnrichLoading ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {webEnrichLoading ? "🔍 検索中..." : "🌐 Web検索で情報を補完"}
+              </button>
+              <span style={{ fontSize: 11, color: "#9ca3af" }}>マンション名・管理会社・修繕積立金などをWebから自動取得</span>
+            </div>
+            <PropertyFormTabs
+              tab={tab} setTab={setTab} form={form} setForm={setForm}
+              onGenerateContent={handleGenerateToForm}
+              generatingContent={generatingForm}
+            />
+          </div>
         )}
         {mainTab === "photos" && (
           <PhotoManager
@@ -1252,6 +1342,122 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
         {mainTab === "check" && (
           <CheckTab propertyId={params.id} property={property} />
         )}
+        {/* Web検索補完モーダル */}
+        {showWebEnrichModal && webEnrichResult && (() => {
+          const ALL_ENRICHABLE = [
+            { key: "building_name",      label: "マンション名" },
+            { key: "building_year",      label: "築年" },
+            { key: "building_month",     label: "築月" },
+            { key: "total_units",        label: "総戸数" },
+            { key: "floors_total",       label: "総階数" },
+            { key: "management_company", label: "管理会社" },
+            { key: "management_type",    label: "管理形態" },
+            { key: "repair_reserve",     label: "修繕積立金（月額）" },
+            { key: "management_fee",     label: "管理費（月額）" },
+            { key: "structure",          label: "構造" },
+          ];
+          const enrichableFields = ALL_ENRICHABLE.filter(
+            f => f.key in webEnrichResult.enriched && webEnrichResult.enriched[f.key] !== null
+          );
+          return (
+            <div style={{
+              position: "fixed", inset: 0, zIndex: 100,
+              background: "rgba(0,0,0,0.5)",
+              display: "flex", alignItems: "flex-start", justifyContent: "center",
+              overflowY: "auto", padding: "40px 16px",
+            }}>
+              <div style={{
+                background: "#fff", borderRadius: 12, width: "100%", maxWidth: 640,
+                padding: 32, position: "relative", margin: "auto",
+              }}>
+                <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
+                  🌐 Web検索結果
+                </h2>
+                <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 20 }}>
+                  検索: {webEnrichResult.query}
+                </p>
+
+                {enrichableFields.length === 0 ? (
+                  <p style={{ fontSize: 13, color: "#9ca3af", marginBottom: 24 }}>
+                    反映できる情報が見つかりませんでした。
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
+                    {enrichableFields.map(({ key, label }) => {
+                      const newVal = webEnrichResult.enriched[key] as string | number | null;
+                      const currentVal = (webEnrichResult.current as Record<string, string | number | null>)[key];
+                      return (
+                        <label key={key} style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          padding: "10px 12px", border: "1px solid #e5e7eb",
+                          borderRadius: 8, cursor: "pointer",
+                          background: selectedEnrichFields.has(key) ? "#eff6ff" : "#fff",
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedEnrichFields.has(key)}
+                            onChange={e => {
+                              const next = new Set(selectedEnrichFields);
+                              e.target.checked ? next.add(key) : next.delete(key);
+                              setSelectedEnrichFields(next);
+                            }}
+                            style={{ width: 16, height: 16, flexShrink: 0 }}
+                          />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>
+                              {label}
+                            </div>
+                            <div style={{ display: "flex", gap: 8, marginTop: 2, fontSize: 12 }}>
+                              <span style={{ color: "#9ca3af" }}>
+                                現在: {currentVal != null ? String(currentVal) : "未設定"}
+                              </span>
+                              <span style={{ color: "#1d4ed8", fontWeight: 700 }}>
+                                → {String(newVal)}
+                              </span>
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {Array.isArray(webEnrichResult.enriched.sources) && webEnrichResult.enriched.sources.length > 0 && (
+                  <div style={{ marginBottom: 20, fontSize: 11, color: "#6b7280" }}>
+                    情報源: {(webEnrichResult.enriched.sources as string[]).join(", ")}
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowWebEnrichModal(false)}
+                    style={{
+                      padding: "8px 20px", borderRadius: 6, border: "1px solid #d1d5db",
+                      background: "#fff", fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                    }}
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleApplyEnriched}
+                    disabled={selectedEnrichFields.size === 0}
+                    style={{
+                      padding: "8px 20px", borderRadius: 6, border: "none",
+                      background: selectedEnrichFields.size === 0 ? "#9ca3af" : "#1d4ed8",
+                      color: "#fff", fontSize: 13, fontWeight: 700,
+                      cursor: selectedEnrichFields.size === 0 ? "not-allowed" : "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    選択した項目を反映する
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
         {mainTab === "copy" && (
           <div>
             {/* Action bar */}
