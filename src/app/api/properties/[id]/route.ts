@@ -42,7 +42,8 @@ const STRING_FIELDS = new Set([
   "delivery_timing","delivery_status","reins_number","reins_status","delivery_condition",
   "seller_company","seller_phone","seller_contact","seller_agent","seller_fax","seller_transaction_type","seller_brokerage_type",
   "suumo_id","athome_id","yahoo_id","homes_id",
-  "agent_id","store_id","property_number","internal_memo","source",
+  "property_number","internal_memo","source",
+  // agent_id / store_id / successor_agent_id はリレーションIDのため connect/disconnect で処理
   "ad_confirmation_method","ad_confirmed_by","ad_confirmation_file",
   "last_confirmed_by","last_check_result",
   "eq_earthquake_resistant",
@@ -163,6 +164,20 @@ export async function PATCH(
         data[key] = val;
       }
       // 未知フィールドは無視（セキュリティ上のallowlist）
+    }
+
+    // ── リレーションID → connect / disconnect 変換 ───────────────────────────────
+    if ("agent_id" in body) {
+      const v = body.agent_id as string | null | undefined;
+      data.agent = v ? { connect: { id: v } } : { disconnect: true };
+    }
+    if ("store_id" in body) {
+      const v = body.store_id as string | null | undefined;
+      data.store = v ? { connect: { id: v } } : { disconnect: true };
+    }
+    if ("successor_agent_id" in body) {
+      const v = body.successor_agent_id as string | null | undefined;
+      data.successor_agent = v ? { connect: { id: v } } : { disconnect: true };
     }
 
     if (Object.keys(data).length === 0) {
