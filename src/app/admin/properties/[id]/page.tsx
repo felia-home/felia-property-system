@@ -1004,51 +1004,65 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
   };
 
   const handleGeocodeAndEnrich = async () => {
-    const addr = [form.prefecture, form.city, form.town, form.address].filter(Boolean).join("");
-    if (!addr) {
+    const addressStr = [form.prefecture, form.city, form.town, form.address]
+      .filter(Boolean).join("");
+
+    console.log("🔍 geocode start:", addressStr);
+
+    if (!addressStr) {
       setMsg({ text: "住所（都道府県・区市町村・番地）を入力してください", ok: false });
       return;
     }
+
     setGeocoding(true);
     setMsg(null);
+
     try {
       // Step 1: Nominatim でジオコード
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr)}&format=json&limit=1`;
-      const geoRes = await fetch(url);
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addressStr)}&format=json&limit=1`;
+      console.log("🔍 geocode url:", url);
+
+      const geoRes = await fetch(url, {
+        headers: { "User-Agent": "FeliaHome/1.0 (admin@felia-home.jp)" },
+      });
       const geoData = await geoRes.json() as Array<{ lat: string; lon: string }>;
-      if (!geoData[0]) {
+      console.log("🔍 geocode result:", geoData);
+
+      if (!geoData || geoData.length === 0) {
+        console.warn("🔍 geocode: no results");
         setMsg({ text: "住所から緯度経度を取得できませんでした。住所を確認してください。", ok: false });
         return;
       }
-      const lat = parseFloat(geoData[0].lat).toFixed(6);
-      const lng = parseFloat(geoData[0].lon).toFixed(6);
 
-      // Step 2: フォームに反映
-      setForm(f => ({ ...f, latitude: lat, longitude: lng }));
+      const lat = parseFloat(geoData[0].lat);
+      const lng = parseFloat(geoData[0].lon);
+      console.log("🔍 geocode lat/lng:", lat, lng);
+
+      // Step 2: フォームに反映（string 化して渡す）
+      setForm(f => ({ ...f, latitude: String(lat), longitude: String(lng) }));
 
       // Step 3: DBに lat/lng を保存（auto-enrich が DB から読むため）
       await fetch(`/api/properties/${params.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latitude: parseFloat(lat), longitude: parseFloat(lng) }),
+        body: JSON.stringify({ latitude: lat, longitude: lng }),
       });
 
       // Step 4: auto-enrich（最寄り駅・学区・周辺環境写真）
       const enrichRes = await fetch(`/api/properties/${params.id}/auto-enrich`, { method: "POST" });
       const enrichData = await enrichRes.json();
+      console.log("🔍 enrich result:", enrichData);
 
-      if (enrichRes.ok) {
-        // リロードしてフォームに反映
-        await loadProperty();
-        setMsg({
-          text: `✅ 緯度経度を取得しました。${enrichData.message ?? ""}`,
-          ok: true,
-        });
-      } else {
-        setMsg({ text: `✅ 緯度経度を取得しました（補完: ${enrichData.error ?? "スキップ"}）`, ok: true });
-      }
+      // Step 5: DB から再取得してフォームをリロード
+      await loadProperty();
+
+      const enrichMsg = enrichRes.ok
+        ? (enrichData.message ?? "補完完了")
+        : `補完スキップ: ${enrichData.error ?? "エラー"}`;
+      setMsg({ text: `✅ 緯度経度を取得しました。${enrichMsg}`, ok: true });
       setTimeout(() => setMsg(null), 8000);
     } catch (e) {
+      console.error("geocode error:", e);
       setMsg({ text: `エラーが発生しました: ${String(e)}`, ok: false });
     } finally {
       setGeocoding(false);
