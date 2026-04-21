@@ -110,16 +110,22 @@ out body;`;
 
   if (stationNodes.length === 0) return [];
 
-  // Step2: 駅ノードIDを指定してルートリレーションを取得
+  // Step2: 駅ノードIDを指定してリレーションを取得（正規表現なし・コード側でフィルタ）
   const nodeIds = stationNodes.map(n => n.id).join(",");
   const relQuery = `[out:json][timeout:20];
 node(id:${nodeIds});
-rel["route"~"train|subway|monorail|tram|light_rail"](bn);
+rel(bn);
 out body;`;
 
   const relElements = await queryOverpassRaw(relQuery);
-  const routeRelations = relElements.filter(e => e.type === "relation");
-  console.log("[auto-enrich] route relations:", routeRelations.length);
+  const RAIL_ROUTE_TYPES = new Set(["train", "subway", "monorail", "tram", "light_rail", "railway"]);
+  const routeRelations = relElements.filter(e => {
+    if (e.type !== "relation") return false;
+    const route = (e.tags?.route ?? "") as string;
+    return RAIL_ROUTE_TYPES.has(route);
+  });
+  console.log("[auto-enrich] route relations:", routeRelations.length,
+    routeRelations.slice(0, 3).map(r => r.tags?.["name:ja"] || r.tags?.name).join(", "));
 
   // リレーション members から nodeId → 路線名リスト のマップを構築
   const nodeLineMap = new Map<number, string[]>();
