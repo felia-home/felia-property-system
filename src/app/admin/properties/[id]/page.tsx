@@ -1126,11 +1126,18 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
       // Step 2: フォームに反映
       setForm(f => ({ ...f, latitude: String(lat), longitude: String(lng) }));
 
-      // Step 3: DBに lat/lng を保存（auto-enrich が DB から読むため）
+      // Step 3: DBに lat/lng + 住所関連フィールドを保存
+      // （loadProperty() 後にフォームがリセットされても住所が消えないよう一緒に保存）
       await fetch(`/api/properties/${params.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latitude: lat, longitude: lng }),
+        body: JSON.stringify({
+          latitude: lat,
+          longitude: lng,
+          address: form.address ?? "",
+          town:    form.town    ?? "",
+          city:    form.city    ?? "",
+        }),
       });
 
       // Step 4: auto-enrich（最寄り駅・学区・周辺環境写真）
