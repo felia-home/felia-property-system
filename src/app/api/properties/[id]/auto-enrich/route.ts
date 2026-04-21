@@ -251,21 +251,22 @@ export async function POST(
   const top3 = await findNearbyStations(lat, lng);
   console.log("[auto-enrich] nearby stations:", top3.length, top3.map(s => `${s.name}(${s.line})`).join(", "));
 
-  if (!property.station_line1 && !property.station_name1 && top3[0]) {
+  // 駅名・路線名ともに存在する場合のみ保存（片方だけの場合は保存しない）
+  if (!property.station_line1 && !property.station_name1 && top3[0]?.name && top3[0]?.line) {
     updateData.station_line1 = top3[0].line;
     updateData.station_name1 = top3[0].name;
     updateData.station_walk1 = top3[0].walk_minutes;
     enriched.push(`交通1: ${top3[0].name}（${top3[0].walk_minutes}分）`);
   }
 
-  if (!property.station_line2 && !property.station_name2 && top3[1]) {
+  if (!property.station_line2 && !property.station_name2 && top3[1]?.name && top3[1]?.line) {
     updateData.station_line2 = top3[1].line;
     updateData.station_name2 = top3[1].name;
     updateData.station_walk2 = top3[1].walk_minutes;
     enriched.push(`交通2: ${top3[1].name}（${top3[1].walk_minutes}分）`);
   }
 
-  if (!property.station_line3 && !property.station_name3 && top3[2]) {
+  if (!property.station_line3 && !property.station_name3 && top3[2]?.name && top3[2]?.line) {
     updateData.station_line3 = top3[2].line;
     updateData.station_name3 = top3[2].name;
     updateData.station_walk3 = top3[2].walk_minutes;
