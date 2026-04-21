@@ -93,26 +93,33 @@ function formatLineName(line: string): string {
   return line;
 }
 
-// ---- 最寄り駅（上位3件）— ノード＋ルートリレーションから路線名を取得 ----
+// ---- 最寄り駅（上位3件）— 2リクエスト方式でリレーションから路線名を取得 ----
 async function findNearbyStations(
   lat: number, lng: number, radiusM = 1500
 ): Promise<{ name: string; line: string; walk_minutes: number }[]> {
-  // 駅ノードを取得し、同時にその駅が属するルートリレーションも取得する
-  const query = `[out:json][timeout:30];
-(
-  node["railway"="station"](around:${radiusM},${lat},${lng});
-)->.stations;
-.stations out body;
-rel["route"~"^(train|subway|monorail|tram|light_rail)$"](bn.stations);
+  // Step1: 駅ノードを取得
+  const stationQuery = `[out:json][timeout:20];
+node["railway"="station"](around:${radiusM},${lat},${lng});
 out body;`;
 
-  const elements = await queryOverpassRaw(query);
+  const stationElements = await queryOverpassRaw(stationQuery);
+  const stationNodes = stationElements.filter(
+    e => e.type === "node" && e.tags?.railway === "station"
+  );
+  console.log("[auto-enrich] station nodes:", stationNodes.length);
 
-  // ノードとリレーションを分類
-  const stationNodes = elements.filter(e => e.type === "node" && e.tags?.railway === "station");
-  const routeRelations = elements.filter(e => e.type === "relation");
+  if (stationNodes.length === 0) return [];
 
-  console.log("[auto-enrich] station nodes:", stationNodes.length, "route relations:", routeRelations.length);
+  // Step2: 駅ノードIDを指定してルートリレーションを取得
+  const nodeIds = stationNodes.map(n => n.id).join(",");
+  const relQuery = `[out:json][timeout:20];
+node(id:${nodeIds});
+rel["route"~"train|subway|monorail|tram|light_rail"](bn);
+out body;`;
+
+  const relElements = await queryOverpassRaw(relQuery);
+  const routeRelations = relElements.filter(e => e.type === "relation");
+  console.log("[auto-enrich] route relations:", routeRelations.length);
 
   // リレーション members から nodeId → 路線名リスト のマップを構築
   const nodeLineMap = new Map<number, string[]>();
@@ -140,7 +147,7 @@ out body;`;
       const name = node.tags?.["name:ja"] || node.tags?.["name"] || "";
       if (!name) return null;
 
-      // 路線名: リレーションから取得 > ノードの line/operator タグ
+      // 路線名: リレーションから取得 > ノードの line/operator タグ（フォールバック）
       const linesFromRel = nodeLineMap.get(node.id) ?? [];
       const lineFromTag =
         node.tags?.["line"] ||
@@ -148,9 +155,7 @@ out body;`;
         node.tags?.["operator"] ||
         node.tags?.["network"] ||
         "";
-      const line = linesFromRel.length > 0
-        ? linesFromRel[0]   // 複数路線は最初の1件（表示フィールドが1つのため）
-        : lineFromTag;
+      const line = linesFromRel.length > 0 ? linesFromRel[0] : lineFromTag;
 
       return { name, line, walk_minutes: distanceToWalkMinutes(distKm), distKm };
     })
@@ -162,6 +167,11 @@ out body;`;
       line: formatLineName(line),
       walk_minutes,
     }));
+}
+
+/** OSM データの学校名から余分なスペース・改行を除去して正規化 */
+function normalizeSchoolName(name: string): string {
+  return name.replace(/\s+/g, "").trim();
 }
 
 // ---- 近隣学校（小学校・中学校）— nwr で way も取得 ----
@@ -178,7 +188,8 @@ out center;`;
     .map((el) => {
       const coords = getCoords(el);
       if (!coords) return null;
-      const name = el.tags?.["name:ja"] || el.tags?.["name"] || "";
+      const rawName = el.tags?.["name:ja"] || el.tags?.["name"] || "";
+      const name = normalizeSchoolName(rawName);
       if (!name) return null;
       return { name, distKm: calcDistanceKm(lat, lng, coords.lat, coords.lon) };
     })
