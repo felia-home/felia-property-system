@@ -934,6 +934,21 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
   const [showWebEnrichModal, setShowWebEnrichModal] = useState(false);
   const [selectedEnrichFields, setSelectedEnrichFields] = useState<Set<string>>(new Set());
 
+  // ── 資料・ドキュメント ─────────────────────────────────────
+  const [documents, setDocuments] = useState<{
+    id: string; name: string; url: string;
+    file_type: string; memo: string | null;
+  }[]>([]);
+  const [docUploading, setDocUploading] = useState(false);
+
+  const loadDocuments = async (propId: string) => {
+    try {
+      const res = await fetch(`/api/properties/${propId}/documents`);
+      const data = await res.json();
+      setDocuments(data.documents ?? []);
+    } catch { /* ignore */ }
+  };
+
   const loadProperty = async () => {
     const res = await fetch(`/api/properties/${params.id}`);
     const d = await res.json();
@@ -956,8 +971,54 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
     loadProperty()
       .catch(() => setMsg({ text: "物件情報の取得に失敗しました", ok: false }))
       .finally(() => setLoading(false));
+    loadDocuments(params.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
+
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setDocUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+      const uploadData = await uploadRes.json();
+      if (!uploadData.url) { setMsg({ text: "アップロードに失敗しました", ok: false }); return; }
+
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      const fileType = ["pdf"].includes(ext) ? "pdf"
+        : ["png","jpg","jpeg","webp","gif"].includes(ext) ? "image" : "other";
+      const defaultName = file.name.replace(/\.[^.]+$/, "");
+      const name = window.prompt("資料名を入力してください", defaultName) ?? defaultName;
+
+      await fetch(`/api/properties/${params.id}/documents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, url: uploadData.url, file_type: fileType }),
+      });
+      await loadDocuments(params.id);
+      setMsg({ text: `「${name}」を追加しました`, ok: true });
+      setTimeout(() => setMsg(null), 4000);
+    } catch (err) {
+      console.error("document upload error:", err);
+      setMsg({ text: "資料のアップロードに失敗しました", ok: false });
+    } finally {
+      setDocUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleDeleteDocument = async (docId: string, docName: string) => {
+    if (!window.confirm(`「${docName}」を削除しますか？`)) return;
+    try {
+      await fetch(`/api/properties/${params.id}/documents?docId=${docId}`, { method: "DELETE" });
+      await loadDocuments(params.id);
+    } catch (err) {
+      console.error("document delete error:", err);
+      setMsg({ text: "削除に失敗しました", ok: false });
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -1337,11 +1398,118 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
 
       <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", padding: 24 }}>
         {mainTab === "workflow" && (
-          <ActionPanel
-            property={property}
-            onStatusChange={handleStatusChange}
-            onOpenTab={(t) => setMainTab(t)}
-          />
+          <div>
+            <ActionPanel
+              property={property}
+              onStatusChange={handleStatusChange}
+              onOpenTab={(t) => setMainTab(t)}
+            />
+
+            {/* 資料・ドキュメント管理 */}
+            <div style={{ marginTop: 28, borderTop: "1px solid #e5e7eb", paddingTop: 22 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#374151" }}>
+                  📎 資料・ドキュメント
+                </span>
+                <label style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "6px 14px", borderRadius: 6, fontSize: 12,
+                  background: docUploading ? "#e5e7eb" : "#f0fdf4",
+                  border: "1px solid #86efac", color: "#166534",
+                  fontWeight: 700, cursor: docUploading ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
+                }}>
+                  {docUploading ? "アップロード中..." : "＋ 資料を追加"}
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp"
+                    style={{ display: "none" }}
+                    disabled={docUploading}
+                    onChange={handleDocumentUpload}
+                  />
+                </label>
+              </div>
+
+              {/* 広告確認PDF（既存） */}
+              {property.ad_confirmation_file && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "8px 12px", border: "1px solid #e5e7eb",
+                  borderRadius: 6, marginBottom: 6, background: "#fafafa",
+                }}>
+                  <span>📄</span>
+                  <div style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#374151" }}>
+                    広告確認PDF
+                  </div>
+                  <a
+                    href={String(property.ad_confirmation_file)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      fontSize: 12, padding: "4px 10px", borderRadius: 4,
+                      background: "#eff6ff", color: "#1d4ed8",
+                      border: "1px solid #bfdbfe", textDecoration: "none",
+                    }}
+                  >
+                    開く
+                  </a>
+                </div>
+              )}
+
+              {/* アップロード済み資料一覧 */}
+              {documents.map(doc => (
+                <div key={doc.id} style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "8px 12px", border: "1px solid #e5e7eb",
+                  borderRadius: 6, marginBottom: 6, background: "#fff",
+                }}>
+                  <span>
+                    {doc.file_type === "pdf" ? "📄" : doc.file_type === "image" ? "🖼️" : "📎"}
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{doc.name}</div>
+                    {doc.memo && (
+                      <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{doc.memo}</div>
+                    )}
+                  </div>
+                  <a
+                    href={doc.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      fontSize: 12, padding: "4px 10px", borderRadius: 4,
+                      background: "#eff6ff", color: "#1d4ed8",
+                      border: "1px solid #bfdbfe", textDecoration: "none",
+                    }}
+                  >
+                    開く
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteDocument(doc.id, doc.name)}
+                    style={{
+                      fontSize: 12, padding: "4px 8px", borderRadius: 4,
+                      background: "#fff", color: "#ef4444",
+                      border: "1px solid #fca5a5", cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    削除
+                  </button>
+                </div>
+              ))}
+
+              {documents.length === 0 && !property.ad_confirmation_file && (
+                <div style={{
+                  textAlign: "center", padding: 20,
+                  color: "#9ca3af", fontSize: 12,
+                  border: "1px dashed #e5e7eb", borderRadius: 6,
+                }}>
+                  資料が登録されていません。「＋ 資料を追加」からPDFや画像をアップロードできます。
+                </div>
+              )}
+            </div>
+          </div>
         )}
         {mainTab === "info" && (
           <div>
