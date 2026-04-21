@@ -6,40 +6,102 @@ import { generatePropertyNumber } from "@/lib/staffCode";
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status");
-    const search = searchParams.get("search");
-    const storeId = searchParams.get("store_id");
-    const agentId = searchParams.get("agent_id");
-    const noCopy = searchParams.get("noCopy") === "true";
 
-    const where: Record<string, unknown> = { is_deleted: false };
-    if (status) where.status = status;
-    if (storeId) where.store_id = storeId;
-    if (agentId) where.agent_id = agentId;
-    if (noCopy) where.catch_copy = null;
-    if (search) {
-      where.OR = [
-        { city: { contains: search } },
-        { address: { contains: search } },
-        { station_name1: { contains: search } },
-      ];
+    // ── 既存パラメータ ──────────────────────────────────────────
+    const status        = searchParams.get("status");
+    const search        = searchParams.get("search");      // keyword の後方互換
+    const storeId       = searchParams.get("store_id");
+    const agentId       = searchParams.get("agent_id");
+    const noCopy        = searchParams.get("noCopy") === "true";
+    const publishedHp   = searchParams.get("published_hp");
+
+    // ── 新規パラメータ ──────────────────────────────────────────
+    const city          = searchParams.get("city") ?? "";
+    const keyword       = searchParams.get("keyword") ?? "";
+    const propertyType  = searchParams.get("property_type") ?? "";
+    const rooms         = searchParams.get("rooms") ?? "";
+    const station       = searchParams.get("station") ?? "";
+    const priceMin      = searchParams.get("price_min") ? Number(searchParams.get("price_min")) : null;
+    const priceMax      = searchParams.get("price_max") ? Number(searchParams.get("price_max")) : null;
+    const page          = Math.max(1, Number(searchParams.get("page") ?? "1"));
+    const limit         = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? "20")));
+
+    // ── WHERE 条件（AND 配列で複数 OR 条件の衝突を回避）────────
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const andConditions: any[] = [{ is_deleted: false }];
+
+    if (status)       andConditions.push({ status });
+    if (storeId)      andConditions.push({ store_id: storeId });
+    if (agentId)      andConditions.push({ agent_id: agentId });
+    if (noCopy)       andConditions.push({ catch_copy: null });
+    if (city)         andConditions.push({ city });
+    if (propertyType) andConditions.push({ property_type: propertyType });
+    if (rooms)        andConditions.push({ rooms: { contains: rooms } });
+    if (publishedHp !== null) andConditions.push({ published_hp: publishedHp === "true" });
+
+    if (priceMin !== null || priceMax !== null) {
+      andConditions.push({
+        price: {
+          ...(priceMin !== null ? { gte: priceMin } : {}),
+          ...(priceMax !== null ? { lte: priceMax } : {}),
+        },
+      });
     }
 
-    const properties = await prisma.property.findMany({
-      where,
-      orderBy: { created_at: "desc" },
-      take: 100,
-      include: {
-        images: {
-          select: { id: true, url: true, is_main: true },
-          orderBy: [{ is_main: "desc" }, { order: "asc" }],
-          take: 1,
-        },
-        _count: { select: { images: true } },
-      },
-    });
+    // キーワード検索（?search= との後方互換あり）
+    const kw = keyword || search || "";
+    if (kw) {
+      andConditions.push({
+        OR: [
+          { city:       { contains: kw } },
+          { town:       { contains: kw } },
+          { address:    { contains: kw } },
+          { title:      { contains: kw } },
+          { catch_copy: { contains: kw } },
+          { station_name1: { contains: kw } },
+        ],
+      });
+    }
 
-    return NextResponse.json({ properties, total: properties.length });
+    // 駅名検索（keyword とは独立した AND 条件）
+    if (station) {
+      andConditions.push({
+        OR: [
+          { station_name1: { contains: station } },
+          { station_name2: { contains: station } },
+          { station_name3: { contains: station } },
+        ],
+      });
+    }
+
+    const where = { AND: andConditions };
+
+    // ── DB クエリ（件数 + ページネーション）────────────────────
+    const [total, properties] = await Promise.all([
+      prisma.property.count({ where }),
+      prisma.property.findMany({
+        where,
+        orderBy: { created_at: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          images: {
+            select: { id: true, url: true, is_main: true },
+            orderBy: [{ is_main: "desc" }, { order: "asc" }],
+            take: 1,
+          },
+          _count: { select: { images: true } },
+        },
+      }),
+    ]);
+
+    return NextResponse.json({
+      total,
+      page,
+      limit,
+      total_pages: Math.ceil(total / limit),
+      properties,
+    });
   } catch (error) {
     console.error("GET /api/properties error:", error);
     return NextResponse.json({ error: "物件一覧の取得に失敗しました" }, { status: 500 });
