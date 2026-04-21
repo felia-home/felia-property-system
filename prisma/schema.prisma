@@ -346,7 +346,23 @@ model Property {
   sale_results          SaleResult[] @relation("SaleResultProperty")
   check_logs            PropertyCheckLog[]
   env_image_links       PropertyEnvImageLink[]
+  documents             PropertyDocument[]
   @@map("properties")
+}
+
+model PropertyDocument {
+  id          String   @id @default(cuid())
+  property_id String
+  name        String
+  url         String
+  file_type   String   @default("pdf")
+  memo        String?
+  uploaded_at DateTime @default(now())
+  sort_order  Int      @default(0)
+
+  property    Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
+
+  @@map("property_documents")
 }
 
 model PropertyCheckLog {
