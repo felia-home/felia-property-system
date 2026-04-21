@@ -110,6 +110,9 @@ out body;`;
 
   if (stationNodes.length === 0) return [];
 
+  // レート制限対策: Step1 → Step2 間に待機
+  await new Promise(r => setTimeout(r, 1500));
+
   // Step2: 駅ノードIDを指定してリレーションを取得（正規表現なし・コード側でフィルタ）
   const nodeIds = stationNodes.map(n => n.id).join(",");
   const relQuery = `[out:json][timeout:20];
@@ -118,6 +121,13 @@ rel(bn);
 out body;`;
 
   const relElements = await queryOverpassRaw(relQuery);
+
+  // フィルタ前: 全 route タグ値をデバッグ出力
+  const allRouteTypes = relElements
+    .filter(e => e.type === "relation")
+    .map(e => e.tags?.route ?? "(no route tag)");
+  console.log("[auto-enrich] all route types:", [...new Set(allRouteTypes)]);
+
   const RAIL_ROUTE_TYPES = new Set(["train", "subway", "monorail", "tram", "light_rail", "railway"]);
   const routeRelations = relElements.filter(e => {
     if (e.type !== "relation") return false;
@@ -289,6 +299,9 @@ export async function POST(
     updateData.station_walk3 = top3[2].walk_minutes;
     enriched.push(`交通3: ${top3[2].name}（${top3[2].walk_minutes}分）`);
   }
+
+  // レート制限対策: 駅クエリ（2リクエスト）完了後、学校クエリ前に待機
+  await new Promise(r => setTimeout(r, 1500));
 
   // ---- 学校区（空の場合のみ）----
   const schools = await findNearbySchools(lat, lng);
