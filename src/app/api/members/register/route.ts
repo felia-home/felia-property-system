@@ -53,14 +53,20 @@ export async function POST(req: NextRequest) {
     try {
       await prisma.customer.create({
         data: {
-          name: member.name,
-          email: member.email,
-          tel: member.phone ?? null,
-          source: "HP_MEMBER",
-          status: "NEW",
-          member_id: member.id,
-          is_member: true,
-          member_registered_at: new Date(),
+          name:                  member.name,
+          email:                 member.email,
+          tel:                   member.phone ?? null,
+          source:                "HP_MEMBER",
+          status:                "NEW",
+          is_member:             true,
+          member_registered_at:  member.created_at,
+          member_id:             member.id,
+          desired_property_type: [],
+          desired_areas:         [],
+          desired_stations:      [],
+          desired_rooms:         [],
+          desired_features:      [],
+          tags:                  [],
         },
       });
     } catch (e) {
