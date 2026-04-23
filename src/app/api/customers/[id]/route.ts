@@ -160,11 +160,18 @@ export async function DELETE(
       );
     }
 
-    // HP会員の場合は紐づく Member も物理削除
-    if (customer.source === "HP_MEMBER" && customer.member) {
-      await prisma.member.delete({ where: { id: customer.member.id } });
+    // HP会員の場合: FK制約のため先に member_id を NULL にしてから Member を削除
+    if (customer.source === "HP_MEMBER" && customer.member_id) {
+      // Step1: 顧客の member_id を NULL に（外部キー制約を解除）
+      await prisma.customer.update({
+        where: { id: params.id },
+        data: { member_id: null },
+      });
+      // Step2: 会員を物理削除
+      await prisma.member.delete({ where: { id: customer.member_id } });
     }
 
+    // Step3: 顧客を論理削除
     await prisma.customer.update({
       where: { id: params.id },
       data: { is_deleted: true, deleted_at: new Date() },
@@ -172,7 +179,7 @@ export async function DELETE(
 
     return NextResponse.json({
       ok: true,
-      member_deleted: customer.source === "HP_MEMBER" && !!customer.member,
+      member_deleted: customer.source === "HP_MEMBER" && !!customer.member_id,
     });
   } catch (error) {
     console.error("DELETE /api/customers/[id] error:", error);
