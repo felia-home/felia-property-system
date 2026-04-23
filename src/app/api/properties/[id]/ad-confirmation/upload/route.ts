@@ -72,6 +72,25 @@ export async function POST(
       data: updateData,
     });
 
+    // PDF が新規アップロードされた場合、property_documents にも登録（重複スキップ）
+    const savedPdfUrl = fileUrl ?? (property.ad_confirmation_file as string | null);
+    if (savedPdfUrl) {
+      const existing = await prisma.propertyDocument.findFirst({
+        where: { property_id: params.id, url: savedPdfUrl },
+      });
+      if (!existing) {
+        await prisma.propertyDocument.create({
+          data: {
+            property_id: params.id,
+            name: "広告確認PDF",
+            url: savedPdfUrl,
+            file_type: "pdf",
+            memo: "広告確認アップロードから自動登録",
+          },
+        }).catch(() => { /* 同時リクエスト等による重複は無視 */ });
+      }
+    }
+
     // Log to history
     await prisma.propertyHistory.create({
       data: {

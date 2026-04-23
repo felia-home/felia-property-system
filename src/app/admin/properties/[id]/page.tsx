@@ -1042,6 +1042,7 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
     // Special signal to just reload
     if (next === "__reload__") {
       await loadProperty();
+      await loadDocuments(params.id);
       return;
     }
 
