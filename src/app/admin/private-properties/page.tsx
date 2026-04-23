@@ -22,7 +22,7 @@ interface PrivateProperty {
   is_mansion: boolean;
   area: string | null;
   town: string | null;
-  price: number | null;
+  price: string | null;
   area_land_m2: number | null;
   area_build_m2: number | null;
   commission: string | null;
@@ -71,7 +71,7 @@ function NewModal({ commissions, staffList, onClose, onCreate }: NewModalProps) 
       is_mansion:   form.property_type === "mansion",
       area:         form.area || null,
       town:         form.town || null,
-      price:        form.price ? Number(form.price) : null,
+      price:        form.price || null,
       commission:   form.commission || null,
       area_land_m2: form.area_land_m2 ? Number(form.area_land_m2) : null,
       area_build_m2: form.area_build_m2 ? Number(form.area_build_m2) : null,
@@ -128,9 +128,9 @@ function NewModal({ commissions, staffList, onClose, onCreate }: NewModalProps) 
           </div>
 
           <div style={fieldSt}>
-            <label style={labelSt}>価格（万円）</label>
-            <input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
-              placeholder="14500" style={inputSt} />
+            <label style={labelSt}>価格</label>
+            <input type="text" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
+              placeholder="例: 5000万円、1億2000万円、未定" style={inputSt} />
           </div>
 
           <div style={fieldSt}>
@@ -294,7 +294,7 @@ function PropertyRow({
               onChange={e => onFieldChange(property.id, "area_land_m2", e.target.value === "" ? null : parseFloat(e.target.value))}
               onBlur={() => onSave(property.id)}
               placeholder="土地㎡"
-              style={{ ...inSt, width: 60, fontSize: 11 }}
+              style={{ ...inSt, width: 90, fontSize: 11 }}
             />
             <span style={{ fontSize: 10, color: "#6b7280" }}>㎡</span>
             <input
@@ -303,7 +303,7 @@ function PropertyRow({
               onChange={e => onFieldChange(property.id, "area_build_m2", e.target.value === "" ? null : parseFloat(e.target.value))}
               onBlur={() => onSave(property.id)}
               placeholder="建物㎡"
-              style={{ ...inSt, width: 60, fontSize: 11 }}
+              style={{ ...inSt, width: 90, fontSize: 11 }}
             />
             <span style={{ fontSize: 10, color: "#6b7280" }}>㎡</span>
           </div>
@@ -334,12 +334,12 @@ function PropertyRow({
         {/* 価格・手数料 */}
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           <input
-            type="number"
+            type="text"
             value={property.price ?? ""}
-            onChange={e => onFieldChange(property.id, "price", e.target.value === "" ? null : Number(e.target.value))}
+            onChange={e => onFieldChange(property.id, "price", e.target.value || null)}
             onBlur={() => onSave(property.id)}
-            placeholder="万円"
-            style={{ ...inSt, color: "#c62828", fontWeight: 700, fontSize: 14 }}
+            placeholder="例: 5000万円、1億2000万円"
+            style={{ ...inSt, color: "#c62828", fontWeight: 700, fontSize: 13 }}
           />
           <div style={{ display: "flex", gap: 4 }}>
             <select

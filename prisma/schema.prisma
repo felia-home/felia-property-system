@@ -934,7 +934,7 @@ model PrivateProperty {
   is_mansion       Boolean   @default(false)
   area             String?   // 区
   town             String?   // 町名
-  price            Int?      // 万円
+  price            String?   // 価格（自由文字列: 例 "5000万円"、"1億2000万円"）
   area_land_m2     Float?
   area_build_m2    Float?
   commission       String?
