@@ -190,6 +190,193 @@ function NewModal({ commissions, staffList, onClose, onCreate }: NewModalProps) 
   );
 }
 
+// ── 編集モーダル ───────────────────────────────────────────────────────────────
+
+interface EditModalProps {
+  property: PrivateProperty;
+  commissions: Commission[];
+  staffList: Staff[];
+  onClose: () => void;
+  onSave: (id: string, data: Record<string, unknown>) => Promise<void>;
+}
+
+function EditModal({ property, commissions, staffList, onClose, onSave }: EditModalProps) {
+  const [form, setForm] = useState({
+    listing_type:  property.listing_type,
+    property_type: property.is_land ? "land" : property.is_mansion ? "mansion" : "house",
+    area:          property.area ?? "",
+    town:          property.town ?? "",
+    price:         property.price != null ? String(property.price) : "",
+    area_land_m2:  property.area_land_m2 != null ? String(property.area_land_m2) : "",
+    area_build_m2: property.area_build_m2 != null ? String(property.area_build_m2) : "",
+    commission:    property.commission ?? "",
+    seller_name:   property.seller_name ?? "",
+    agent_id:      property.agent?.id ?? "",
+    note:          property.note ?? "",
+    status:        property.status,
+  });
+  const [saving, setSaving] = useState(false);
+
+  const fieldSt: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 4 };
+  const labelSt: React.CSSProperties = { fontSize: 12, color: "#555", fontWeight: 500 };
+  const inputSt: React.CSSProperties = { padding: "7px 10px", border: "1px solid #ddd", borderRadius: 5, fontSize: 13, fontFamily: "inherit", width: "100%", boxSizing: "border-box" };
+  const grid2: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 };
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave(property.id, {
+      listing_type:  form.listing_type,
+      is_land:       form.property_type === "land",
+      is_house:      form.property_type === "house",
+      is_mansion:    form.property_type === "mansion",
+      area:          form.area || null,
+      town:          form.town || null,
+      price:         form.price ? Number(form.price) : null,
+      area_land_m2:  form.area_land_m2 ? Number(form.area_land_m2) : null,
+      area_build_m2: form.area_build_m2 ? Number(form.area_build_m2) : null,
+      commission:    form.commission || null,
+      seller_name:   form.seller_name || null,
+      agent_id:      form.agent_id || null,
+      note:          form.note || null,
+      status:        form.status,
+    });
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+      <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: 580, maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
+            ✏️ 編集 — {property.property_no}
+          </h2>
+          <button onClick={onClose}
+            style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#888", lineHeight: 1 }}>
+            ×
+          </button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* ステータス */}
+          <div style={fieldSt}>
+            <label style={labelSt}>ステータス</label>
+            <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={inputSt}>
+              <option value="ACTIVE">稼動中（ACTIVE）</option>
+              <option value="CLOSED">終了（CLOSED）</option>
+            </select>
+          </div>
+
+          {/* 未公開区分 */}
+          <div style={fieldSt}>
+            <label style={labelSt}>未公開区分</label>
+            <select value={form.listing_type} onChange={e => setForm(f => ({ ...f, listing_type: e.target.value }))} style={inputSt}>
+              <option value="SENIN">専任</option>
+              <option value="PRIVATE">未公開・レインズ非公開</option>
+            </select>
+          </div>
+
+          {/* 物件種別 */}
+          <div style={fieldSt}>
+            <label style={labelSt}>物件種別</label>
+            <div style={{ display: "flex", gap: 20 }}>
+              {[["land", "土地"], ["house", "戸建て"], ["mansion", "マンション"]].map(([v, l]) => (
+                <label key={v} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, cursor: "pointer" }}>
+                  <input type="radio" name="edit_property_type" value={v}
+                    checked={form.property_type === v}
+                    onChange={() => setForm(f => ({ ...f, property_type: v }))} />
+                  {l}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* 所在地 */}
+          <div style={grid2}>
+            <div style={fieldSt}>
+              <label style={labelSt}>区（エリア）</label>
+              <input value={form.area} onChange={e => setForm(f => ({ ...f, area: e.target.value }))}
+                placeholder="例: 杉並区" style={inputSt} />
+            </div>
+            <div style={fieldSt}>
+              <label style={labelSt}>町名</label>
+              <input value={form.town} onChange={e => setForm(f => ({ ...f, town: e.target.value }))}
+                placeholder="例: 善福寺1丁目" style={inputSt} />
+            </div>
+          </div>
+
+          {/* 価格 */}
+          <div style={fieldSt}>
+            <label style={labelSt}>価格（万円）</label>
+            <input type="number" value={form.price}
+              onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
+              placeholder="14500" style={inputSt} />
+          </div>
+
+          {/* 面積 */}
+          <div style={grid2}>
+            <div style={fieldSt}>
+              <label style={labelSt}>土地面積（㎡）</label>
+              <input type="number" value={form.area_land_m2}
+                onChange={e => setForm(f => ({ ...f, area_land_m2: e.target.value }))} style={inputSt} />
+            </div>
+            <div style={fieldSt}>
+              <label style={labelSt}>建物面積（㎡）</label>
+              <input type="number" value={form.area_build_m2}
+                onChange={e => setForm(f => ({ ...f, area_build_m2: e.target.value }))} style={inputSt} />
+            </div>
+          </div>
+
+          {/* 手数料 */}
+          <div style={fieldSt}>
+            <label style={labelSt}>手数料</label>
+            <select value={form.commission} onChange={e => setForm(f => ({ ...f, commission: e.target.value }))} style={inputSt}>
+              <option value="">選択してください</option>
+              {commissions.map(c => <option key={c.id} value={c.value}>{c.label}</option>)}
+            </select>
+          </div>
+
+          {/* 売主・元付業者名 */}
+          <div style={fieldSt}>
+            <label style={labelSt}>売主・元付業者名</label>
+            <input value={form.seller_name} onChange={e => setForm(f => ({ ...f, seller_name: e.target.value }))}
+              placeholder="例: ヒロコーポレーション" style={inputSt} />
+          </div>
+
+          {/* 担当者 */}
+          {staffList.length > 0 && (
+            <div style={fieldSt}>
+              <label style={labelSt}>担当者</label>
+              <select value={form.agent_id} onChange={e => setForm(f => ({ ...f, agent_id: e.target.value }))} style={inputSt}>
+                <option value="">未割当</option>
+                {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* 備考 */}
+          <div style={fieldSt}>
+            <label style={labelSt}>備考</label>
+            <textarea value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
+              rows={3} style={{ ...inputSt, resize: "vertical" }} />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+          <button onClick={onClose}
+            style={{ flex: 1, padding: "10px 0", borderRadius: 7, border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
+            キャンセル
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            style={{ flex: 2, padding: "10px 0", borderRadius: 7, background: saving ? "#888" : "#1565c0", color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
+            {saving ? "保存中..." : "保存する"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── 物件行コンポーネント ───────────────────────────────────────────────────────
 
 interface PropertyRowProps {
@@ -200,11 +387,12 @@ interface PropertyRowProps {
   onClose: (id: string) => void;
   onUploadMyosoku: (id: string, file: File) => void;
   onShowAddCommission: () => void;
+  onEdit: (property: PrivateProperty) => void;
 }
 
 function PropertyRow({
   property, commissions, onUpdate, onConfirm, onClose,
-  onUploadMyosoku, onShowAddCommission,
+  onUploadMyosoku, onShowAddCommission, onEdit,
 }: PropertyRowProps) {
   const [commission, setCommission] = useState(property.commission ?? "");
   const [note, setNote] = useState(property.note ?? "");
@@ -344,6 +532,12 @@ function PropertyRow({
         {/* アクションボタン */}
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <button
+            onClick={() => onEdit(property)}
+            style={{ padding: "5px 10px", fontSize: 12, fontWeight: 600, background: "#fff3e0", color: "#e65100", border: "1px solid #ffcc80", borderRadius: 4, cursor: "pointer", fontFamily: "inherit" }}
+          >
+            ✏️ 編集
+          </button>
+          <button
             onClick={() => onConfirm(property.id)}
             style={{
               padding: "5px 10px", fontSize: 12, fontWeight: 600,
@@ -390,6 +584,7 @@ export default function PrivatePropertiesPage() {
   const [loading, setLoading] = useState(true);
 
   const [showNewModal, setShowNewModal] = useState(false);
+  const [editTarget, setEditTarget] = useState<PrivateProperty | null>(null);
   const [showAddCommission, setShowAddCommission] = useState(false);
   const [newCommissionLabel, setNewCommissionLabel] = useState("");
   const [addingCommission, setAddingCommission] = useState(false);
@@ -627,8 +822,20 @@ export default function PrivatePropertiesPage() {
             onClose={handleClose}
             onUploadMyosoku={handleUploadMyosoku}
             onShowAddCommission={() => setShowAddCommission(true)}
+            onEdit={setEditTarget}
           />
         ))
+      )}
+
+      {/* 編集モーダル */}
+      {editTarget && (
+        <EditModal
+          property={editTarget}
+          commissions={commissions}
+          staffList={staffList}
+          onClose={() => setEditTarget(null)}
+          onSave={handleUpdate}
+        />
       )}
 
       {/* 新規作成モーダル */}

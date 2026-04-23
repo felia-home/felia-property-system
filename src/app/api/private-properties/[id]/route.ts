@@ -5,6 +5,7 @@ const UPDATABLE = [
   "listing_type", "is_land", "is_house", "is_mansion",
   "area", "town", "price", "area_land_m2", "area_build_m2",
   "commission", "note", "seller_name", "agent_id",
+  "status", "price_display", "transaction_type",
 ];
 
 export async function PATCH(
