@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 const STATUS_LABELS: Record<string, string> = {
   NEW: "新規", CONTACTING: "連絡中", VISITING: "内見調整中",
@@ -141,6 +142,7 @@ function TagList({ items, onRemove, onAdd, placeholder }: {
 
 export default function CustomerDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
@@ -346,6 +348,24 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
     finally { setAddingAct(false); }
   };
 
+  const handleDeleteCustomer = async () => {
+    if (!customer) return;
+    if (!confirm(`「${customer.name}」を削除しますか？\nこの操作は取り消せません。`)) return;
+
+    const res = await fetch(`/api/customers/${customer.id}`, { method: "DELETE" });
+    if (res.ok) {
+      alert("削除しました");
+      router.push("/admin/customers");
+    } else {
+      const data = await res.json() as { error?: string };
+      alert(data.error ?? "削除に失敗しました");
+    }
+  };
+
+  const canDelete = ["ADMIN", "MANAGER", "OWNER"].includes(
+    (session?.user as { permission?: string })?.permission ?? ""
+  );
+
   if (loading) return <div style={{ padding: 28, color: "#706e68" }}>読み込み中...</div>;
   if (!customer) return <div style={{ padding: 28, color: "#8c1f1f" }}>顧客が見つかりません</div>;
 
@@ -383,6 +403,20 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
             </span>
           )}
           {customer.do_not_contact && <span style={{ background: "#fdeaea", color: "#8c1f1f", padding: "3px 10px", borderRadius: 99, fontSize: 11 }}>連絡不要</span>}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={handleDeleteCustomer}
+              style={{
+                marginLeft: "auto", padding: "6px 14px", borderRadius: 6,
+                border: "1px solid #fca5a5", background: "#fff",
+                color: "#ef4444", fontSize: 12, fontWeight: 600,
+                cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              🗑️ 顧客を削除
+            </button>
+          )}
         </div>
         <p style={{ fontSize: 12, color: "#706e68", marginTop: 4 }}>
           登録: {new Date(customer.created_at).toLocaleDateString("ja-JP")}

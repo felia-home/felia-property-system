@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 const UPDATABLE_FIELDS = [
   "name", "name_kana", "email", "tel", "tel_mobile", "line_id",
@@ -121,17 +123,48 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/customers/[id] — 論理削除
+// DELETE /api/customers/[id] — 論理削除（管理者・マネージャー・オーナーのみ）
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const permission = (session?.user as { permission?: string })?.permission ?? "";
+  if (!["ADMIN", "MANAGER", "OWNER"].includes(permission)) {
+    return NextResponse.json({ error: "権限がありません" }, { status: 403 });
+  }
+
   try {
+    const customer = await prisma.customer.findUnique({
+      where: { id: params.id },
+      include: {
+        contracts: {
+          where: { status: { not: "CANCELLED" } },
+          take: 1,
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!customer || customer.is_deleted) {
+      return NextResponse.json({ error: "顧客が見つかりません" }, { status: 404 });
+    }
+
+    if (customer.contracts.length > 0) {
+      return NextResponse.json(
+        { error: "有効な契約が存在するため削除できません" },
+        { status: 400 }
+      );
+    }
+
     await prisma.customer.update({
       where: { id: params.id },
       data: { is_deleted: true, deleted_at: new Date() },
     });
-    return NextResponse.json({ message: "削除しました" });
+
+    return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("DELETE /api/customers/[id] error:", error);
     return NextResponse.json({ error: "削除に失敗しました" }, { status: 500 });
