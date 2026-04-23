@@ -305,6 +305,29 @@ export default function CustomersPage() {
         </div>
       )}
 
+      {/* HP会員タブ */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 16, borderBottom: "1px solid #e5e7eb" }}>
+        {([
+          { key: "",          label: "全顧客" },
+          { key: "HP_MEMBER", label: "👤 HP会員" },
+        ] as { key: string; label: string }[]).map(tab => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setFilterSource(tab.key)}
+            style={{
+              padding: "8px 20px", border: "none", background: "none",
+              fontSize: 13, fontWeight: filterSource === tab.key ? "bold" : "normal",
+              color: filterSource === tab.key ? "#5BAD52" : "#6b7280",
+              borderBottom: filterSource === tab.key ? "2px solid #5BAD52" : "2px solid transparent",
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Filters + Table */}
       <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e0deda", overflow: "hidden" }}>
         <div style={{ padding: "14px 20px", borderBottom: "1px solid #e0deda", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>

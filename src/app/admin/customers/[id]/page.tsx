@@ -84,6 +84,7 @@ interface Customer {
   member_id: string | null;
   member: {
     id: string; email: string; name: string; phone: string | null;
+    is_active: boolean; created_at: string; last_login_at: string | null;
     profile: {
       property_types: string[]; desired_areas: string[]; desired_lines: string[];
       budget_max: number | null; desired_area_m2_min: number | null;
@@ -350,7 +351,10 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
 
   const handleDeleteCustomer = async () => {
     if (!customer) return;
-    if (!confirm(`「${customer.name}」を削除しますか？\nこの操作は取り消せません。`)) return;
+    const message = customer.source === "HP_MEMBER"
+      ? `「${customer.name}」を削除しますか？\nHP会員アカウントも同時に削除されます。\nこの操作は取り消せません。`
+      : `「${customer.name}」を削除しますか？\nこの操作は取り消せません。`;
+    if (!confirm(message)) return;
 
     const res = await fetch(`/api/customers/${customer.id}`, { method: "DELETE" });
     if (res.ok) {
@@ -427,6 +431,43 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
 
       {error && <div style={{ background: "#fdeaea", color: "#8c1f1f", padding: "10px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>{error}</div>}
       {msg && <div style={{ background: "#e8f5e9", color: "#2e7d32", padding: "10px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>{msg}</div>}
+
+      {/* HP会員情報セクション */}
+      {customer.source === "HP_MEMBER" && customer.member && (
+        <div style={{
+          background: "#eff6ff", border: "1px solid #bfdbfe",
+          borderRadius: 8, padding: 16, marginBottom: 16,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: "bold", color: "#1d4ed8", marginBottom: 8 }}>
+            👤 HP会員情報
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 13 }}>
+            <div>
+              <span style={{ color: "#6b7280" }}>メール: </span>
+              {customer.member.email}
+            </div>
+            <div>
+              <span style={{ color: "#6b7280" }}>登録日: </span>
+              {new Date(customer.member.created_at).toLocaleDateString("ja-JP")}
+            </div>
+            <div>
+              <span style={{ color: "#6b7280" }}>最終ログイン: </span>
+              {customer.member.last_login_at
+                ? new Date(customer.member.last_login_at).toLocaleDateString("ja-JP")
+                : "未ログイン"}
+            </div>
+            <div>
+              <span style={{ color: "#6b7280" }}>ステータス: </span>
+              <span style={{
+                color: customer.member.is_active ? "#166534" : "#991b1b",
+                fontWeight: "bold",
+              }}>
+                {customer.member.is_active ? "有効" : "無効"}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ display: "flex", borderBottom: "2px solid #e0deda", marginBottom: 20, gap: 0 }}>

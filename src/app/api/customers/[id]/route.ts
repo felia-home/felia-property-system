@@ -145,6 +145,7 @@ export async function DELETE(
           take: 1,
           select: { id: true },
         },
+        member: { select: { id: true } },
       },
     });
 
@@ -159,12 +160,20 @@ export async function DELETE(
       );
     }
 
+    // HP会員の場合は紐づく Member も物理削除
+    if (customer.source === "HP_MEMBER" && customer.member) {
+      await prisma.member.delete({ where: { id: customer.member.id } });
+    }
+
     await prisma.customer.update({
       where: { id: params.id },
       data: { is_deleted: true, deleted_at: new Date() },
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      member_deleted: customer.source === "HP_MEMBER" && !!customer.member,
+    });
   } catch (error) {
     console.error("DELETE /api/customers/[id] error:", error);
     return NextResponse.json({ error: "削除に失敗しました" }, { status: 500 });

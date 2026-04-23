@@ -28,7 +28,6 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { href: "/admin/customers",          label: "ダッシュボード", icon: "人" },
       { href: "/admin/customers/follow-up",label: "AI追客",         icon: "🤖" },
-      { href: "/admin/members",            label: "会員一覧",       icon: "👥" },
       { href: "/admin/notifications",      label: "通知管理",       icon: "📧" },
     ],
   },
