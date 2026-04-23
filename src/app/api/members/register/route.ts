@@ -49,28 +49,46 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // customers テーブルへ自動連携
+    // customers テーブルへ自動連携（既存顧客がある場合は復元・更新）
     try {
-      await prisma.customer.create({
-        data: {
-          name:                  member.name,
-          email:                 member.email,
-          tel:                   member.phone ?? null,
-          source:                "HP_MEMBER",
-          status:                "NEW",
-          is_member:             true,
-          member_registered_at:  member.created_at,
-          member_id:             member.id,
-          desired_property_type: [],
-          desired_areas:         [],
-          desired_stations:      [],
-          desired_rooms:         [],
-          desired_features:      [],
-          tags:                  [],
-        },
+      const existingCustomer = await prisma.customer.findFirst({
+        where: { email: member.email },
       });
+
+      if (existingCustomer) {
+        await prisma.customer.update({
+          where: { id: existingCustomer.id },
+          data: {
+            member_id:            member.id,
+            source:               "HP_MEMBER",
+            is_member:            true,
+            member_registered_at: member.created_at,
+            is_deleted:           false,
+            deleted_at:           null,
+          },
+        });
+      } else {
+        await prisma.customer.create({
+          data: {
+            name:                  member.name,
+            email:                 member.email,
+            tel:                   member.phone ?? null,
+            source:                "HP_MEMBER",
+            status:                "NEW",
+            is_member:             true,
+            member_registered_at:  member.created_at,
+            member_id:             member.id,
+            desired_property_type: [],
+            desired_areas:         [],
+            desired_stations:      [],
+            desired_rooms:         [],
+            desired_features:      [],
+            tags:                  [],
+          },
+        });
+      }
     } catch (e) {
-      console.error("customer auto-create failed:", e);
+      console.error("customer auto-create/update failed:", e);
     }
 
     return NextResponse.json({
