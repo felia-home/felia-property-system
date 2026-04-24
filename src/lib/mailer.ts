@@ -1,6 +1,26 @@
 import { sendEmail } from "@/lib/email";
 
 /**
+ * 汎用メール送信（text / html 両対応）
+ */
+export async function sendMail({
+  to,
+  subject,
+  text,
+  html,
+}: {
+  to: string;
+  subject: string;
+  text?: string;
+  html?: string;
+}) {
+  const htmlBody =
+    html ??
+    `<pre style="font-family:sans-serif;white-space:pre-wrap;">${text ?? ""}</pre>`;
+  return sendEmail({ to, subject, html: htmlBody });
+}
+
+/**
  * 会員向け物件通知メールを送信する
  * 既存の Resend ベースの sendEmail をラップ
  */
