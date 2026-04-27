@@ -23,6 +23,7 @@ interface PrivateProperty {
   area: string | null;
   town: string | null;
   price: string | null;
+  price_display: string | null;
   area_land_m2: number | null;
   area_build_m2: number | null;
   commission: string | null;
@@ -331,15 +332,23 @@ function PropertyRow({
           />
         </div>
 
-        {/* 価格・手数料 */}
+        {/* 価格・表示価格・手数料 */}
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           <input
             type="text"
             value={property.price ?? ""}
             onChange={e => onFieldChange(property.id, "price", e.target.value || null)}
             onBlur={() => onSave(property.id)}
-            placeholder="例: 5000万円、1億2000万円"
+            placeholder="価格 (例: 5000万円)"
             style={{ ...inSt, color: "#c62828", fontWeight: 700, fontSize: 13 }}
+          />
+          <input
+            type="text"
+            value={property.price_display ?? ""}
+            onChange={e => onFieldChange(property.id, "price_display", e.target.value || null)}
+            onBlur={() => onSave(property.id)}
+            placeholder="表示価格 (HP表示用、任意)"
+            style={{ ...inSt, fontSize: 11, color: "#6b7280" }}
           />
           <div style={{ display: "flex", gap: 4 }}>
             <select
@@ -513,6 +522,7 @@ export default function PrivatePropertiesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           price:         item.price,
+          price_display: item.price_display,
           area:          item.area,
           town:          item.town,
           status:        item.status,
