@@ -1421,3 +1421,39 @@ model HpSection {
 
   @@map("hp_sections")
 }
+
+// レインズ物件（会員限定公開）
+model ReinsProperty {
+  id                String   @id @default(cuid())
+  reins_no          BigInt?
+  source_type       String
+  property_type     String?
+  price             Int?
+  address           String?
+  area              String?
+  town              String?
+  area_m2           Float?
+  area_build_m2     Float?
+  area_land_m2      Float?
+  use_zone          String?
+  rooms             String?
+  building_name     String?
+  floor             Int?
+  management_fee    Int?
+  transaction_type  String?
+  station_line      String?
+  station_name      String?
+  walk_minutes      Int?
+  agent             String?
+  built_year        Int?
+  built_year_text   String?
+  building_coverage Float?
+  floor_area_ratio  Float?
+  road_contact      String?
+  direction         String?
+  dedup_key         String?  @unique
+  is_active         Boolean  @default(true)
+  imported_at       DateTime @default(now())
+
+  @@map("reins_properties")
+}
