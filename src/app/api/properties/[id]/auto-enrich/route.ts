@@ -140,57 +140,98 @@ out body;`;
   if (stationNodes.length === 0) return [];
 
   // レート制限対策: Step1 → Step2 間に待機
-  await new Promise(r => setTimeout(r, 1500));
+  await new Promise(r => setTimeout(r, 800));
 
-  // Step2: 周辺エリア(2000m)の鉄道ルートリレーションを直接取得
-  // 駅ノードのIDをキーにしたrel(bn)では、wayメンバー登録の駅が拾えないため、
-  // 中心座標近傍の路線リレーションをそのまま取得し、メンバーNodeIDを横断的に集める
-  const relQuery = `[out:json][timeout:25];
-rel["route"~"train|subway|monorail|tram|light_rail"](around:2000,${lat},${lng});
-out body;`;
+  // Step2: 駅ノードを直接含む鉄道way（線路）を取得し、wayのタグから路線名を得る
+  // route relation 経由は members の格納形式に依存して取りこぼすため、way 直接取得が確実
+  const nodeIds = stationNodes.map(n => n.id).join(",");
+  const wayQuery = `[out:json][timeout:25];
+node(id:${nodeIds});
+way["railway"~"rail|subway|tram|light_rail|monorail"](bn);
+out tags;`;
 
-  const relElements = await queryOverpassRaw(relQuery);
+  const wayElements = await queryOverpassRaw(wayQuery);
+  const ways = wayElements.filter(e => e.type === "way");
+  console.log("[auto-enrich] railway ways found:", ways.length);
 
-  const allRouteTypes = relElements
-    .filter(e => e.type === "relation")
-    .map(e => e.tags?.route ?? "(no route tag)");
-  console.log("[auto-enrich] all route types:", [...new Set(allRouteTypes)]);
+  // 全wayの路線名候補を抽出（重複除外）
+  const wayLineNames = [...new Set(
+    ways.map(w => {
+      const t = w.tags ?? {};
+      return t["name:ja"] || t.name || t["railway:name"] || t.ref || "";
+    }).filter(Boolean)
+  )];
+  console.log("[auto-enrich] way line names:", wayLineNames.join(", "));
 
-  const routeRelations = relElements.filter(e => e.type === "relation");
-  console.log("[auto-enrich] route relations found:", routeRelations.length);
+  // operator マッピング
+  const operatorMap: Record<string, string> = {
+    "東日本旅客鉄道":         "JR東日本",
+    "東日本旅客鉄道株式会社": "JR東日本",
+    "東京地下鉄":             "東京メトロ",
+    "東京地下鉄株式会社":     "東京メトロ",
+    "東京都交通局":           "都営",
+    "JR東日本":               "JR東日本",
+    "東京急行電鉄":           "東急",
+    "小田急電鉄":             "小田急",
+    "京王電鉄":               "京王",
+    "西武鉄道":               "西武",
+    "東武鉄道":               "東武",
+    "京成電鉄":               "京成",
+    "相模鉄道":               "相鉄",
+    "京浜急行電鉄":           "京急",
+  };
+  const networkMap: Record<string, string> = {
+    "JR東日本":   "JR東日本",
+    "東京メトロ": "東京メトロ",
+    "都営地下鉄": "都営",
+  };
 
-  // 路線情報リスト（各路線名 + メンバーNodeID集合）
-  const lineInfos: { lineName: string; memberNodeIds: Set<number> }[] = [];
-  for (const rel of routeRelations) {
-    const lineName = extractLineName(rel.tags ?? {});
-    if (!lineName) continue;
-    const memberNodeIds = new Set<number>();
-    for (const member of rel.members ?? []) {
-      if (member.type === "node") memberNodeIds.add(member.ref);
-    }
-    lineInfos.push({ lineName, memberNodeIds });
-  }
-  console.log("[auto-enrich] line infos:",
-    lineInfos.map(l => `${l.lineName}(${l.memberNodeIds.size}nodes)`).join(", ")
-  );
-
-  // 駅ノードID → 路線名リスト のマップを構築
-  const nodeLineMap = new Map<number, string[]>();
+  // 駅ノードID → 路線名 のマップを構築（駅自体のタグ + wayの路線名から推定）
+  const nodeLineMap = new Map<number, string>();
   for (const node of stationNodes) {
-    const matched: string[] = [];
-    for (const info of lineInfos) {
-      if (info.memberNodeIds.has(node.id) && !matched.includes(info.lineName)) {
-        matched.push(info.lineName);
-      }
+    const tags = node.tags ?? {};
+    const stationName = tags["name:ja"] || tags.name || "";
+
+    // 1. 駅ノード自体のタグ
+    const lineFromTags =
+      tags["railway:line"] ||
+      tags.line ||
+      tags["ref:train_name"] ||
+      "";
+    if (lineFromTags) {
+      nodeLineMap.set(node.id, lineFromTags);
+      continue;
     }
-    if (matched.length > 0) nodeLineMap.set(node.id, matched);
+
+    // 2. wayの路線名から駅名と紐づくものを探す（駅名や駅名の一部を含む路線名）
+    const baseStation = stationName.replace(/駅$/, "");
+    const matchingWayLine = wayLineNames.find(name =>
+      typeof name === "string" && (
+        name.includes(stationName) ||
+        (baseStation && name.includes(baseStation))
+      )
+    );
+    if (matchingWayLine) {
+      nodeLineMap.set(node.id, matchingWayLine);
+      continue;
+    }
+
+    // 3. 駅自体の operator/network から推定
+    const operator = tags.operator || "";
+    const network = tags.network || "";
+    const inferred =
+      operatorMap[operator] ||
+      networkMap[network] ||
+      operator ||
+      network ||
+      "";
+    if (inferred) nodeLineMap.set(node.id, inferred);
   }
-  console.log("[auto-enrich] nodeLineMap size:", nodeLineMap.size);
-  console.log("[auto-enrich] station line mapping:",
-    stationNodes.slice(0, 8).map(n => {
+
+  console.log("[auto-enrich] final station mapping:",
+    stationNodes.map(n => {
       const nm = n.tags?.["name:ja"] || n.tags?.name || "";
-      const lines = nodeLineMap.get(n.id) ?? [];
-      return `${nm}→${lines.join("/") || "(none)"}`;
+      return `${nm}→${nodeLineMap.get(n.id) || "(none)"}`;
     }).join(", ")
   );
 
@@ -202,34 +243,7 @@ out body;`;
       const name = node.tags?.["name:ja"] || node.tags?.["name"] || "";
       if (!name) return null;
 
-      // 路線名: リレーションから取得 > ノードの line/operator タグ（フォールバック）
-      const linesFromRel = nodeLineMap.get(node.id) ?? [];
-      const operator =
-        node.tags?.["line"] ||
-        node.tags?.["railway:line"] ||
-        node.tags?.["operator"] ||
-        "";
-      const network = node.tags?.["network"] || "";
-      const operatorMap: Record<string, string> = {
-        "東日本旅客鉄道":         "JR東日本",
-        "東日本旅客鉄道株式会社": "JR東日本",
-        "東京地下鉄":             "東京メトロ",
-        "東京地下鉄株式会社":     "東京メトロ",
-        "東京都交通局":           "都営",
-        "JR東日本":               "JR東日本",
-      };
-      const networkMap: Record<string, string> = {
-        "JR東日本":   "JR東日本",
-        "東京メトロ": "東京メトロ",
-        "都営地下鉄": "都営",
-      };
-      const lineFromTag =
-        operatorMap[operator] ||
-        networkMap[network] ||
-        operator ||
-        network ||
-        "";
-      const line = linesFromRel.length > 0 ? linesFromRel[0] : lineFromTag;
+      const line = nodeLineMap.get(node.id) ?? "";
 
       return { name, line, walk_minutes: distanceToWalkMinutes(distKm), distKm };
     })
