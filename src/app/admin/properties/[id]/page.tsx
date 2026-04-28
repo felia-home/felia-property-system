@@ -1194,11 +1194,21 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
       console.log("🔍 enrich result:", enrichData);
 
       // enrichData に学校情報があればフォームに即時反映（loadProperty より先に反映）
-      if (enrichData.schools?.elementary) {
-        setForm(f => ({ ...f, school_elementary: enrichData.schools.elementary }));
+      // UI入力欄は env_elementary_school / env_junior_high_school にバインド
+      const schoolData = enrichData.schools ?? enrichData.results?.school;
+      if (schoolData?.elementary) {
+        setForm(f => ({
+          ...f,
+          school_elementary:     schoolData.elementary,
+          env_elementary_school: f.env_elementary_school || schoolData.elementary,
+        }));
       }
-      if (enrichData.schools?.juniorHigh) {
-        setForm(f => ({ ...f, school_junior_high: enrichData.schools.juniorHigh }));
+      if (schoolData?.juniorHigh) {
+        setForm(f => ({
+          ...f,
+          school_junior_high:     schoolData.juniorHigh,
+          env_junior_high_school: f.env_junior_high_school || schoolData.juniorHigh,
+        }));
       }
 
       // Step 5: DB から再取得してフォームをリロード

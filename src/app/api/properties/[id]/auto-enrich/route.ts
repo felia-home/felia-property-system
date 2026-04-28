@@ -131,8 +131,13 @@ out body;`;
   const RAIL_ROUTE_TYPES = new Set(["train", "subway", "monorail", "tram", "light_rail", "railway"]);
   const routeRelations = relElements.filter(e => {
     if (e.type !== "relation") return false;
-    const route = (e.tags?.route ?? "") as string;
-    return RAIL_ROUTE_TYPES.has(route);
+    const tags = e.tags ?? {};
+    const route = String(tags.route ?? "");
+    // route タグがある場合は鉄道系のみ
+    if (route) return RAIL_ROUTE_TYPES.has(route);
+    // route タグがない場合は name タグから鉄道らしさを判定
+    const name = String(tags["name:ja"] || tags.name || "");
+    return name.includes("線") || /Line/i.test(name);
   });
   console.log("[auto-enrich] route relations:", routeRelations.length,
     routeRelations.slice(0, 3).map(r => r.tags?.["name:ja"] || r.tags?.name).join(", "));
@@ -143,6 +148,10 @@ out body;`;
     const lineName =
       rel.tags?.["name:ja"] ||
       rel.tags?.["name"] ||
+      rel.tags?.["official_name:ja"] ||
+      rel.tags?.["official_name"] ||
+      rel.tags?.["operator"] ||
+      rel.tags?.["network"] ||
       rel.tags?.["ref"] ||
       "";
     if (!lineName || !rel.members) continue;
@@ -255,6 +264,8 @@ export async function POST(
       station_walk3: true,
       school_elementary: true,
       school_junior_high: true,
+      env_elementary_school: true,
+      env_junior_high_school: true,
     },
   });
 
@@ -315,6 +326,14 @@ export async function POST(
   if (!property.school_junior_high && schools.juniorHigh) {
     updateData.school_junior_high = schools.juniorHigh;
     enriched.push(`中学校区: ${schools.juniorHigh}`);
+  }
+
+  // UI 入力欄が参照している env_elementary_school / env_junior_high_school にも反映（空の場合のみ）
+  if (!property.env_elementary_school && schools.elementary) {
+    updateData.env_elementary_school = schools.elementary;
+  }
+  if (!property.env_junior_high_school && schools.juniorHigh) {
+    updateData.env_junior_high_school = schools.juniorHigh;
   }
 
   // ---- 周辺環境写真のリンク（半径500m以内）----
