@@ -1,5 +1,37 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+
+// 動的にSheetJSを読み込む（クライアントサイドのみ）
+const parseExcelFile = async (file: File): Promise<unknown[][]> => {
+  const XLSX = await import("xlsx");
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array" });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }) as unknown[][];
+};
+
+const parseCsvFile = async (file: File): Promise<unknown[][]> => {
+  const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target?.result as ArrayBuffer);
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+
+  // Shift-JIS優先で試し、文字化けしたらUTF-8で再試行
+  let text = new TextDecoder("shift-jis").decode(buffer);
+  if (text.includes("�")) {
+    text = new TextDecoder("utf-8").decode(buffer);
+  }
+
+  return text.split(/\r?\n/).map(line =>
+    line.split(",").map(cell => {
+      const v = cell.trim().replace(/^"|"$/g, "");
+      return v === "" ? null : v;
+    })
+  );
+};
 
 interface ReinsProperty {
   id: string;
@@ -53,6 +85,19 @@ export default function ReinsPage() {
   } | null>(null);
   const [showStats, setShowStats] = useState(false);
 
+  // インポート
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    source_type: string;
+    inserted: number;
+    skipped: number;
+    errors: number;
+    total: number;
+  } | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
+
   // 重複除去
   type DedupSample = {
     source_type: string;
@@ -98,17 +143,17 @@ export default function ReinsPage() {
   useEffect(() => { load(); }, [load]);
 
   // 統計取得
-  useEffect(() => {
-    void (async () => {
-      try {
-        const res = await fetch("/api/reins/stats");
-        if (res.ok) {
-          const data = await res.json();
-          setStats(data);
-        }
-      } catch { /* noop */ }
-    })();
+  const loadStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/reins/stats");
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+      }
+    } catch { /* noop */ }
   }, []);
+
+  useEffect(() => { void loadStats(); }, [loadStats]);
 
   // 重複確認（ドライラン）
   const handleCheckDuplicates = async () => {
@@ -142,6 +187,75 @@ export default function ReinsPage() {
     }
   };
 
+  // インポート実行
+  const handleImport = async () => {
+    if (!importFile) return;
+    setImporting(true);
+    setImportResult(null);
+
+    try {
+      let rows: unknown[][];
+      if (importFile.name.toLowerCase().endsWith(".csv")) {
+        rows = await parseCsvFile(importFile);
+      } else {
+        rows = await parseExcelFile(importFile);
+      }
+
+      // 連番が数値の有効行のみ
+      const validRows = rows.filter(row =>
+        Array.isArray(row) && row.length > 2 && row[0] !== null && !isNaN(Number(row[0]))
+      );
+
+      if (validRows.length === 0) {
+        alert("有効なデータ行がありません");
+        return;
+      }
+
+      const BATCH = 1000;
+      let totalInserted = 0;
+      let totalSkipped = 0;
+      let totalErrors = 0;
+      let sourceType = "";
+
+      for (let i = 0; i < validRows.length; i += BATCH) {
+        const batch = validRows.slice(i, i + BATCH);
+        const res = await fetch("/api/reins/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rows: batch }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          totalInserted += data.inserted;
+          totalSkipped  += data.skipped;
+          totalErrors   += data.errors;
+          sourceType     = data.source_type;
+        } else {
+          alert(`バッチ${i / BATCH + 1}でエラー: ${data.error ?? "不明"}`);
+          break;
+        }
+      }
+
+      setImportResult({
+        source_type: sourceType,
+        inserted:    totalInserted,
+        skipped:     totalSkipped,
+        errors:      totalErrors,
+        total:       validRows.length,
+      });
+
+      await loadStats();
+      await load();
+    } catch (err) {
+      console.error(err);
+      alert("インポートに失敗しました");
+    } finally {
+      setImporting(false);
+      setImportFile(null);
+      if (importRef.current) importRef.current.value = "";
+    }
+  };
+
   const totalPages = Math.ceil(total / 50);
 
   return (
@@ -155,8 +269,22 @@ export default function ReinsPage() {
           </p>
         </div>
 
-        {/* 重複除去セクション */}
+        {/* 重複除去・インポートセクション */}
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() => setShowImport(v => !v)}
+            style={{
+              padding: "7px 14px", borderRadius: 6, fontSize: 13,
+              border: "1px solid #d1d5db",
+              background: showImport ? "#f3f4f6" : "#fff",
+              color: "#374151", fontWeight: "bold",
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            📥 インポート
+          </button>
+
           <button
             type="button"
             onClick={handleCheckDuplicates}
@@ -272,6 +400,78 @@ export default function ReinsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* インポートパネル */}
+      {showImport && (
+        <div style={{
+          marginBottom: 16, padding: 20,
+          background: "#f9fafb", border: "1px solid #e5e7eb",
+          borderRadius: 8,
+        }}>
+          <div style={{ fontSize: 14, fontWeight: "bold", color: "#374151", marginBottom: 12 }}>
+            レインズデータのインポート
+          </div>
+          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
+            整形前の Excel（.xlsx）または CSV（.csv）ファイルをアップロードしてください。<br />
+            マンション・戸建て・土地は自動判別されます。重複データはスキップされます。
+          </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <label style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              padding: "8px 16px", borderRadius: 6, fontSize: 13,
+              background: "#fff", border: "2px dashed #d1d5db",
+              cursor: "pointer", color: "#374151",
+            }}>
+              📂 {importFile ? importFile.name : "ファイルを選択"}
+              <input
+                ref={importRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                style={{ display: "none" }}
+                onChange={e => setImportFile(e.target.files?.[0] ?? null)}
+              />
+            </label>
+
+            {importFile && (
+              <button
+                type="button"
+                onClick={handleImport}
+                disabled={importing}
+                style={{
+                  padding: "8px 20px", borderRadius: 6, border: "none",
+                  background: importing ? "#e5e7eb" : "#5BAD52",
+                  color: importing ? "#9ca3af" : "#fff",
+                  fontSize: 13, fontWeight: "bold",
+                  cursor: importing ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {importing ? "インポート中..." : "インポート実行"}
+              </button>
+            )}
+          </div>
+
+          {importResult && (
+            <div style={{
+              marginTop: 14, padding: "12px 16px",
+              background: "#f0fdf4", border: "1px solid #86efac",
+              borderRadius: 6, fontSize: 13,
+            }}>
+              <div style={{ fontWeight: "bold", color: "#166534", marginBottom: 6 }}>
+                ✅ インポート完了（{importResult.source_type === "MANSION" ? "マンション"
+                  : importResult.source_type === "HOUSE" ? "戸建て" : "土地"}）
+              </div>
+              <div style={{ color: "#374151", lineHeight: 1.8 }}>
+                処理件数: {importResult.total.toLocaleString()}件<br />
+                新規登録: <strong>{importResult.inserted.toLocaleString()}件</strong><br />
+                スキップ（重複）: {importResult.skipped.toLocaleString()}件<br />
+                エラー: {importResult.errors}件
+              </div>
+            </div>
+          )}
         </div>
       )}
 
