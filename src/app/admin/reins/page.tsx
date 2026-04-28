@@ -42,8 +42,16 @@ export default function ReinsPage() {
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
   const [sourceType, setSourceType] = useState("");
+  const [areaFilter, setAreaFilter] = useState("");
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
+
+  // 統計
+  const [stats, setStats] = useState<{
+    byType: Record<string, { area: string; count: number }[]>;
+    totals: { MANSION: number; HOUSE: number; LAND: number; total: number };
+  } | null>(null);
+  const [showStats, setShowStats] = useState(false);
 
   // 重複除去
   type DedupSample = {
@@ -73,6 +81,7 @@ export default function ReinsPage() {
       const params = new URLSearchParams();
       if (q) params.set("q", q);
       if (sourceType) params.set("source_type", sourceType);
+      if (areaFilter) params.set("area", areaFilter);
       if (priceMin) params.set("price_min", priceMin);
       if (priceMax) params.set("price_max", priceMax);
       params.set("page", String(page));
@@ -84,9 +93,22 @@ export default function ReinsPage() {
     } finally {
       setLoading(false);
     }
-  }, [q, sourceType, priceMin, priceMax, page]);
+  }, [q, sourceType, areaFilter, priceMin, priceMax, page]);
 
   useEffect(() => { load(); }, [load]);
+
+  // 統計取得
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/reins/stats");
+        if (res.ok) {
+          const data = await res.json();
+          setStats(data);
+        }
+      } catch { /* noop */ }
+    })();
+  }, []);
 
   // 重複確認（ドライラン）
   const handleCheckDuplicates = async () => {
@@ -253,6 +275,127 @@ export default function ReinsPage() {
         </div>
       )}
 
+      {/* 統計サマリー */}
+      {stats && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
+            {[
+              { key: "MANSION", label: "マンション", color: "#eff6ff", border: "#bfdbfe", text: "#1d4ed8" },
+              { key: "HOUSE",   label: "戸建て",     color: "#f0fdf4", border: "#86efac", text: "#166534" },
+              { key: "LAND",    label: "土地",       color: "#fefce8", border: "#fde68a", text: "#92400e" },
+            ].map(({ key, label, color, border, text }) => (
+              <div key={key} style={{
+                padding: "10px 16px", borderRadius: 8,
+                background: color, border: `1px solid ${border}`,
+                minWidth: 140,
+              }}>
+                <div style={{ fontSize: 11, color: text, fontWeight: "bold", marginBottom: 2 }}>{label}</div>
+                <div style={{ fontSize: 22, fontWeight: "bold", color: text }}>
+                  {stats.totals[key as keyof typeof stats.totals].toLocaleString()}
+                  <span style={{ fontSize: 12, fontWeight: "normal", marginLeft: 2 }}>件</span>
+                </div>
+              </div>
+            ))}
+            <div style={{
+              padding: "10px 16px", borderRadius: 8,
+              background: "#f9fafb", border: "1px solid #e5e7eb",
+              minWidth: 140,
+            }}>
+              <div style={{ fontSize: 11, color: "#6b7280", fontWeight: "bold", marginBottom: 2 }}>合計</div>
+              <div style={{ fontSize: 22, fontWeight: "bold", color: "#374151" }}>
+                {stats.totals.total.toLocaleString()}
+                <span style={{ fontSize: 12, fontWeight: "normal", marginLeft: 2 }}>件</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowStats(v => !v)}
+              style={{
+                padding: "8px 14px", borderRadius: 6, fontSize: 12,
+                border: "1px solid #d1d5db", background: "#fff",
+                cursor: "pointer", alignSelf: "center",
+                color: "#374151", fontFamily: "inherit",
+              }}
+            >
+              {showStats ? "▲ 区別内訳を閉じる" : "▼ 区別内訳を見る"}
+            </button>
+
+            {areaFilter && (
+              <div style={{
+                padding: "6px 12px", borderRadius: 16,
+                background: "#fff7ed", border: "1px solid #fdba74",
+                fontSize: 12, color: "#9a3412",
+                display: "flex", alignItems: "center", gap: 6,
+              }}>
+                絞込中: <strong>{areaFilter}</strong>
+                <button
+                  type="button"
+                  onClick={() => { setAreaFilter(""); setPage(1); }}
+                  style={{ background: "none", border: "none", color: "#9a3412", cursor: "pointer", fontSize: 14, padding: 0, fontFamily: "inherit" }}
+                  aria-label="区フィルタを解除"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+          </div>
+
+          {showStats && (
+            <div style={{
+              display: "grid", gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 12, padding: 16,
+              background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8,
+            }}>
+              {[
+                { key: "MANSION", label: "マンション", color: "#1d4ed8" },
+                { key: "HOUSE",   label: "戸建て",     color: "#166534" },
+                { key: "LAND",    label: "土地",       color: "#92400e" },
+              ].map(({ key, label, color }) => (
+                <div key={key}>
+                  <div style={{
+                    fontSize: 12, fontWeight: "bold", color,
+                    marginBottom: 8, paddingBottom: 4,
+                    borderBottom: `2px solid ${color}`,
+                  }}>
+                    {label}（{stats.totals[key as keyof typeof stats.totals].toLocaleString()}件）
+                  </div>
+                  <div style={{ maxHeight: 300, overflowY: "auto" }}>
+                    {stats.byType[key]?.map(({ area, count }) => (
+                      <div key={area} style={{
+                        display: "flex", justifyContent: "space-between",
+                        padding: "3px 0", fontSize: 12,
+                        borderBottom: "1px solid #f3f4f6",
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAreaFilter(area);
+                            setPage(1);
+                            setShowStats(false);
+                          }}
+                          style={{
+                            background: "none", border: "none",
+                            color: "#374151", cursor: "pointer",
+                            fontSize: 12, padding: 0, textAlign: "left",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          {area}
+                        </button>
+                        <span style={{ color: "#6b7280", fontWeight: "bold" }}>
+                          {count.toLocaleString()}件
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 検索フィルタ */}
       <div style={{
         display: "flex", gap: 10, flexWrap: "wrap",
@@ -293,7 +436,7 @@ export default function ReinsPage() {
           style={{ padding: "7px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, width: 130 }}
         />
         <button
-          onClick={() => { setQ(""); setSourceType(""); setPriceMin(""); setPriceMax(""); setPage(1); }}
+          onClick={() => { setQ(""); setSourceType(""); setAreaFilter(""); setPriceMin(""); setPriceMax(""); setPage(1); }}
           style={{ padding: "7px 14px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, background: "#fff", cursor: "pointer" }}
         >
           リセット
