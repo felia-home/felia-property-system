@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   const price_min   = searchParams.get("price_min") ? Number(searchParams.get("price_min")) : null;
   const price_max   = searchParams.get("price_max") ? Number(searchParams.get("price_max")) : null;
   const page        = Math.max(1, Number(searchParams.get("page") ?? "1"));
-  const limit       = Math.min(50, Number(searchParams.get("limit") ?? "20"));
+  const limit       = Math.min(500, Number(searchParams.get("limit") ?? "20"));
 
   const where: Record<string, unknown> = { is_active: true };
   if (source_type) where["source_type"] = source_type;
