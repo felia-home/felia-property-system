@@ -1,6 +1,33 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ImageUploader from "@/components/admin/ImageUploader";
+
+// Google Maps の型は @types/google.maps 未導入のため最小限の宣言
+/* eslint-disable @typescript-eslint/no-explicit-any */
+declare global {
+  interface Window {
+    google?: any;
+  }
+}
+
+const loadGoogleMaps = (apiKey: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (typeof window !== "undefined" && window.google?.maps) { resolve(); return; }
+    const existing = document.querySelector<HTMLScriptElement>("script[data-google-maps]");
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", reject);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+    script.async = true;
+    script.dataset.googleMaps = "1";
+    script.onload = () => resolve();
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+};
 
 interface Staff {
   id: string;
@@ -26,6 +53,8 @@ interface SaleResult {
   floor_plan_image_url: string | null;
   staff_id: string | null;
   staff: Staff | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 const NOW = new Date();
@@ -81,6 +110,16 @@ export default function SaleResultsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  // 地図表示・ジオコーディング
+  const [showMap, setShowMap] = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeResult, setGeocodeResult] = useState<{
+    success: number; failed: number; total: number;
+  } | null>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<any>(null);
+  const markers = useRef<any[]>([]);
 
   const load = async () => {
     setLoading(true);
@@ -190,23 +229,148 @@ export default function SaleResultsPage() {
     await load();
   };
 
+  // 地図初期化
+  const initMap = async (saleResults: SaleResult[]) => {
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey || !mapRef.current) return;
+
+    try {
+      await loadGoogleMaps(apiKey);
+    } catch (e) {
+      console.error("Google Maps の読み込みに失敗:", e);
+      return;
+    }
+    if (!window.google?.maps) return;
+
+    const g = window.google;
+    mapInstance.current = new g.maps.Map(mapRef.current, {
+      center: { lat: 35.689, lng: 139.692 },
+      zoom: 11,
+    });
+
+    markers.current.forEach(m => m.setMap(null));
+    markers.current = [];
+
+    const withCoords = saleResults.filter(r => r.latitude != null && r.longitude != null);
+
+    withCoords.forEach(r => {
+      const marker = new g.maps.Marker({
+        position: { lat: r.latitude!, lng: r.longitude! },
+        map: mapInstance.current,
+        title: `${r.area_ward ?? r.area}${r.area_town ?? ""} ${r.property_type}`,
+        icon: {
+          path: g.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: "#5BAD52",
+          fillOpacity: 0.9,
+          strokeColor: "#fff",
+          strokeWeight: 2,
+        },
+      });
+
+      const infoWindow = new g.maps.InfoWindow({
+        content: `
+          <div style="padding:8px;font-size:13px;min-width:160px;">
+            <div style="font-weight:bold;color:#374151;">${(r.area_ward ?? r.area) ?? ""}${r.area_town ?? ""}</div>
+            <div style="color:#6b7280;margin-top:4px;">${r.property_type} | ${displayPeriod(r)}</div>
+            ${r.comment ? `<div style="margin-top:6px;font-size:12px;color:#374151;">${r.comment.slice(0, 60)}${r.comment.length > 60 ? "..." : ""}</div>` : ""}
+          </div>
+        `,
+      });
+
+      marker.addListener("click", () => {
+        infoWindow.open(mapInstance.current, marker);
+      });
+
+      markers.current.push(marker);
+    });
+  };
+
+  const handleGeocode = async () => {
+    setGeocoding(true);
+    try {
+      const res = await fetch("/api/admin/sale-results/geocode", { method: "POST" });
+      const data = await res.json();
+      setGeocodeResult(data);
+      await load();
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
   if (loading) return <div style={{ padding: 32, color: "#aaa" }}>読み込み中...</div>;
 
   return (
     <div style={{ padding: 32, maxWidth: 960 }}>
       {/* ヘッダー */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a", margin: 0 }}>売却実績管理</h1>
           <p style={{ fontSize: 13, color: "#888", marginTop: 4, margin: "4px 0 0" }}>HPに掲載する売却実績を管理します。</p>
         </div>
-        <button onClick={openAdd} style={{
-          padding: "10px 20px", background: "#5BAD52", color: "#fff",
-          border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 700, fontFamily: "inherit",
-        }}>
-          + 新規追加
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setShowMap(v => {
+                if (!v) setTimeout(() => initMap(items), 100);
+                return !v;
+              });
+            }}
+            style={{
+              padding: "7px 14px", borderRadius: 6, fontSize: 13,
+              border: "1px solid #d1d5db",
+              background: showMap ? "#5BAD52" : "#fff",
+              color: showMap ? "#fff" : "#374151",
+              fontWeight: "bold", cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            🗺️ {showMap ? "地図を閉じる" : "地図で見る"}
+          </button>
+          <button
+            type="button"
+            onClick={handleGeocode}
+            disabled={geocoding}
+            style={{
+              padding: "7px 14px", borderRadius: 6, fontSize: 13,
+              border: "1px solid #bfdbfe", background: "#eff6ff",
+              color: "#1d4ed8", fontWeight: "bold",
+              cursor: geocoding ? "not-allowed" : "pointer", fontFamily: "inherit",
+            }}
+          >
+            {geocoding ? "取得中..." : "📍 住所から座標取得"}
+          </button>
+          {geocodeResult && (
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              ✅ {geocodeResult.success}件取得 / {geocodeResult.failed}件失敗
+            </span>
+          )}
+          <button onClick={openAdd} style={{
+            padding: "10px 20px", background: "#5BAD52", color: "#fff",
+            border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 700, fontFamily: "inherit",
+          }}>
+            + 新規追加
+          </button>
+        </div>
       </div>
+
+      {/* 地図エリア */}
+      {showMap && (
+        <div style={{
+          marginBottom: 20, border: "1px solid #e5e7eb",
+          borderRadius: 8, overflow: "hidden",
+        }}>
+          <div ref={mapRef} style={{ width: "100%", height: 500 }} />
+          <div style={{
+            padding: "8px 12px", background: "#f9fafb",
+            fontSize: 12, color: "#6b7280",
+            borderTop: "1px solid #e5e7eb",
+          }}>
+            📍 {items.filter(r => r.latitude != null).length}件の売却実績を表示中
+            （座標未取得: {items.filter(r => r.latitude == null).length}件）
+          </div>
+        </div>
+      )}
 
       {/* 一覧テーブル */}
       {items.length === 0 ? (

@@ -21,6 +21,8 @@ export async function GET() {
         image_url_1: true,
         comment: true,
         sort_order: true,
+        latitude: true,
+        longitude: true,
         staff: {
           select: {
             id: true,
@@ -41,6 +43,8 @@ export async function GET() {
       floor_plan_image_url: r.floor_plan_image_url ?? r.image_url_1 ?? null,
       comment: r.comment,
       sort_order: r.sort_order,
+      latitude: r.latitude,
+      longitude: r.longitude,
       staff: r.staff
         ? { id: r.staff.id, name: r.staff.name, photo_url: r.staff.photo_url }
         : null,

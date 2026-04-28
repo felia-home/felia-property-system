@@ -1347,6 +1347,10 @@ model SaleResult {
   staff_id             String?
   property_id          String?
 
+  // 地図表示用
+  latitude             Float?
+  longitude            Float?
+
   staff    Staff?    @relation(fields: [staff_id], references: [id], onDelete: SetNull)
   property Property? @relation("SaleResultProperty", fields: [property_id], references: [id], onDelete: SetNull)
 

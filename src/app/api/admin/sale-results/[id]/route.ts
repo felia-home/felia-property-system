@@ -28,6 +28,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       ...(body.floor_plan_image_url !== undefined && { floor_plan_image_url: body.floor_plan_image_url ? String(body.floor_plan_image_url) : null }),
       ...(body.staff_id !== undefined && { staff_id: body.staff_id ? String(body.staff_id) : null }),
       ...(body.property_id !== undefined && { property_id: body.property_id ? String(body.property_id) : null }),
+      ...(body.latitude !== undefined  && { latitude:  body.latitude  != null && body.latitude  !== "" ? Number(body.latitude)  : null }),
+      ...(body.longitude !== undefined && { longitude: body.longitude != null && body.longitude !== "" ? Number(body.longitude) : null }),
     },
     include: {
       staff: { select: { id: true, name: true, photo_url: true } },
