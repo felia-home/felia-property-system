@@ -178,10 +178,7 @@ out body;`;
     if (!lineName || !rel.members) continue;
     for (const member of rel.members) {
       if (member.type !== "node") continue;
-      // role: "stop" / "stop_entry_only" / "stop_exit_only" / "" のみ採用（platform などは除外）
-      const role = member.role ?? "";
-      if (role && !role.startsWith("stop")) continue;
-
+      // role を問わず全ノードを対象（stop, platform, halt など）
       const existing = nodeLineMap.get(member.ref) ?? [];
       if (!existing.includes(lineName)) existing.push(lineName);
       nodeLineMap.set(member.ref, existing);
@@ -192,6 +189,8 @@ out body;`;
     Array.from(nodeLineMap.entries()).slice(0, 5)
       .map(([id, lines]) => `${id}: ${lines.join(",")}`).join(" | ")
   );
+  console.log("[auto-enrich] station node ids:", stationNodes.map(n => n.id));
+  console.log("[auto-enrich] nodeLineMap keys:", Array.from(nodeLineMap.keys()));
 
   return stationNodes
     .map((node) => {
@@ -203,20 +202,31 @@ out body;`;
 
       // 路線名: リレーションから取得 > ノードの line/operator タグ（フォールバック）
       const linesFromRel = nodeLineMap.get(node.id) ?? [];
-      const operatorRaw =
+      const operator =
         node.tags?.["line"] ||
         node.tags?.["railway:line"] ||
         node.tags?.["operator"] ||
-        node.tags?.["network"] ||
         "";
+      const network = node.tags?.["network"] || "";
       const operatorMap: Record<string, string> = {
         "東日本旅客鉄道":         "JR東日本",
         "東日本旅客鉄道株式会社": "JR東日本",
         "東京地下鉄":             "東京メトロ",
         "東京地下鉄株式会社":     "東京メトロ",
         "東京都交通局":           "都営",
+        "JR東日本":               "JR東日本",
       };
-      const lineFromTag = operatorMap[operatorRaw] ?? operatorRaw;
+      const networkMap: Record<string, string> = {
+        "JR東日本":   "JR東日本",
+        "東京メトロ": "東京メトロ",
+        "都営地下鉄": "都営",
+      };
+      const lineFromTag =
+        operatorMap[operator] ||
+        networkMap[network] ||
+        operator ||
+        network ||
+        "";
       const line = linesFromRel.length > 0 ? linesFromRel[0] : lineFromTag;
 
       return { name, line, walk_minutes: distanceToWalkMinutes(distKm), distKm };
