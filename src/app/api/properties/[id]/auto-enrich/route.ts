@@ -142,55 +142,57 @@ out body;`;
   // レート制限対策: Step1 → Step2 間に待機
   await new Promise(r => setTimeout(r, 1500));
 
-  // Step2: 駅ノードIDを指定してリレーションを取得（正規表現なし・コード側でフィルタ）
-  const nodeIds = stationNodes.map(n => n.id).join(",");
-  const relQuery = `[out:json][timeout:20];
-node(id:${nodeIds});
-rel(bn);
+  // Step2: 周辺エリア(2000m)の鉄道ルートリレーションを直接取得
+  // 駅ノードのIDをキーにしたrel(bn)では、wayメンバー登録の駅が拾えないため、
+  // 中心座標近傍の路線リレーションをそのまま取得し、メンバーNodeIDを横断的に集める
+  const relQuery = `[out:json][timeout:25];
+rel["route"~"train|subway|monorail|tram|light_rail"](around:2000,${lat},${lng});
 out body;`;
 
   const relElements = await queryOverpassRaw(relQuery);
 
-  // フィルタ前: 全 route タグ値をデバッグ出力
   const allRouteTypes = relElements
     .filter(e => e.type === "relation")
     .map(e => e.tags?.route ?? "(no route tag)");
   console.log("[auto-enrich] all route types:", [...new Set(allRouteTypes)]);
 
-  const RAIL_ROUTE_TYPES = new Set(["train", "subway", "monorail", "tram", "light_rail", "railway"]);
-  const routeRelations = relElements.filter(e => {
-    if (e.type !== "relation") return false;
-    const tags = e.tags ?? {};
-    const route = String(tags.route ?? "");
-    // route タグがある場合は鉄道系のみ
-    if (route) return RAIL_ROUTE_TYPES.has(route);
-    // route タグがない場合は name タグから鉄道らしさを判定
-    const name = String(tags["name:ja"] || tags.name || "");
-    return name.includes("線") || /Line/i.test(name);
-  });
-  console.log("[auto-enrich] route relations:", routeRelations.length,
-    routeRelations.slice(0, 3).map(r => r.tags?.["name:ja"] || r.tags?.name).join(", "));
+  const routeRelations = relElements.filter(e => e.type === "relation");
+  console.log("[auto-enrich] route relations found:", routeRelations.length);
 
-  // リレーション members から nodeId → 路線名リスト のマップを構築
-  const nodeLineMap = new Map<number, string[]>();
+  // 路線情報リスト（各路線名 + メンバーNodeID集合）
+  const lineInfos: { lineName: string; memberNodeIds: Set<number> }[] = [];
   for (const rel of routeRelations) {
     const lineName = extractLineName(rel.tags ?? {});
-    if (!lineName || !rel.members) continue;
-    for (const member of rel.members) {
-      if (member.type !== "node") continue;
-      // role を問わず全ノードを対象（stop, platform, halt など）
-      const existing = nodeLineMap.get(member.ref) ?? [];
-      if (!existing.includes(lineName)) existing.push(lineName);
-      nodeLineMap.set(member.ref, existing);
+    if (!lineName) continue;
+    const memberNodeIds = new Set<number>();
+    for (const member of rel.members ?? []) {
+      if (member.type === "node") memberNodeIds.add(member.ref);
     }
+    lineInfos.push({ lineName, memberNodeIds });
+  }
+  console.log("[auto-enrich] line infos:",
+    lineInfos.map(l => `${l.lineName}(${l.memberNodeIds.size}nodes)`).join(", ")
+  );
+
+  // 駅ノードID → 路線名リスト のマップを構築
+  const nodeLineMap = new Map<number, string[]>();
+  for (const node of stationNodes) {
+    const matched: string[] = [];
+    for (const info of lineInfos) {
+      if (info.memberNodeIds.has(node.id) && !matched.includes(info.lineName)) {
+        matched.push(info.lineName);
+      }
+    }
+    if (matched.length > 0) nodeLineMap.set(node.id, matched);
   }
   console.log("[auto-enrich] nodeLineMap size:", nodeLineMap.size);
-  console.log("[auto-enrich] sample mappings:",
-    Array.from(nodeLineMap.entries()).slice(0, 5)
-      .map(([id, lines]) => `${id}: ${lines.join(",")}`).join(" | ")
+  console.log("[auto-enrich] station line mapping:",
+    stationNodes.slice(0, 8).map(n => {
+      const nm = n.tags?.["name:ja"] || n.tags?.name || "";
+      const lines = nodeLineMap.get(n.id) ?? [];
+      return `${nm}→${lines.join("/") || "(none)"}`;
+    }).join(", ")
   );
-  console.log("[auto-enrich] station node ids:", stationNodes.map(n => n.id));
-  console.log("[auto-enrich] nodeLineMap keys:", Array.from(nodeLineMap.keys()));
 
   return stationNodes
     .map((node) => {
