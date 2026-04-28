@@ -941,6 +941,20 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
   }[]>([]);
   const [docUploading, setDocUploading] = useState(false);
 
+  // PDF画像抽出
+  const [pdfImageExtracting, setPdfImageExtracting] = useState(false);
+  const [pdfImages, setPdfImages] = useState<{
+    index: number;
+    type: string;
+    type_ja: string;
+    description: string;
+    page: number;
+    quality: string;
+    recommended: boolean;
+  }[]>([]);
+  const [showPdfImageModal, setShowPdfImageModal] = useState(false);
+  const [pdfImageSourceUrl, setPdfImageSourceUrl] = useState<string | null>(null);
+
   const loadDocuments = async (propId: string) => {
     try {
       const res = await fetch(`/api/properties/${propId}/documents`);
@@ -1017,6 +1031,39 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
     } catch (err) {
       console.error("document delete error:", err);
       setMsg({ text: "削除に失敗しました", ok: false });
+    }
+  };
+
+  const handleExtractPdfImages = async () => {
+    const adFile = property?.ad_confirmation_file ? String(property.ad_confirmation_file) : null;
+    const pdfDoc = documents.find(d => d.file_type === "pdf");
+    const pdfUrl = adFile ?? pdfDoc?.url ?? null;
+
+    if (!pdfUrl) {
+      alert("先にPDFをアップロードしてください");
+      return;
+    }
+
+    setPdfImageExtracting(true);
+    setPdfImages([]);
+    setPdfImageSourceUrl(pdfUrl);
+    try {
+      const res = await fetch(`/api/properties/${params.id}/extract-pdf-images`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pdf_url: pdfUrl }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setPdfImages(data.images ?? []);
+        setShowPdfImageModal(true);
+      } else {
+        alert(data.error ?? "PDF解析に失敗しました");
+      }
+    } catch {
+      alert("エラーが発生しました");
+    } finally {
+      setPdfImageExtracting(false);
     }
   };
 
@@ -1419,23 +1466,42 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
                 <span style={{ fontSize: 14, fontWeight: 700, color: "#374151" }}>
                   📎 資料・ドキュメント
                 </span>
-                <label style={{
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  padding: "6px 14px", borderRadius: 6, fontSize: 12,
-                  background: docUploading ? "#e5e7eb" : "#f0fdf4",
-                  border: "1px solid #86efac", color: "#166534",
-                  fontWeight: 700, cursor: docUploading ? "not-allowed" : "pointer",
-                  fontFamily: "inherit",
-                }}>
-                  {docUploading ? "アップロード中..." : "＋ 資料を追加"}
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp"
-                    style={{ display: "none" }}
-                    disabled={docUploading}
-                    onChange={handleDocumentUpload}
-                  />
-                </label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={handleExtractPdfImages}
+                    disabled={pdfImageExtracting}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                      padding: "6px 14px", borderRadius: 6, fontSize: 12,
+                      background: pdfImageExtracting ? "#e5e7eb" : "#fef9c3",
+                      border: "1px solid #fde68a",
+                      color: pdfImageExtracting ? "#9ca3af" : "#92400e",
+                      fontWeight: 700,
+                      cursor: pdfImageExtracting ? "not-allowed" : "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    {pdfImageExtracting ? "🔍 解析中..." : "🖼️ PDFから画像を抽出"}
+                  </button>
+                  <label style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    padding: "6px 14px", borderRadius: 6, fontSize: 12,
+                    background: docUploading ? "#e5e7eb" : "#f0fdf4",
+                    border: "1px solid #86efac", color: "#166534",
+                    fontWeight: 700, cursor: docUploading ? "not-allowed" : "pointer",
+                    fontFamily: "inherit",
+                  }}>
+                    {docUploading ? "アップロード中..." : "＋ 資料を追加"}
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp"
+                      style={{ display: "none" }}
+                      disabled={docUploading}
+                      onChange={handleDocumentUpload}
+                    />
+                  </label>
+                </div>
               </div>
 
               {/* 広告確認PDF（既存） */}
@@ -1813,6 +1879,132 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
           </div>
         )}
       </div>
+
+      {/* PDF画像抽出結果モーダル */}
+      {showPdfImageModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(0,0,0,0.6)",
+          display: "flex", alignItems: "flex-start", justifyContent: "center",
+          overflowY: "auto", padding: "40px 16px",
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: 12,
+            width: "100%", maxWidth: 700,
+            padding: 32, margin: "auto",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h2 style={{ fontSize: 16, fontWeight: "bold", color: "#374151", margin: 0 }}>
+                📄 PDF内の画像一覧（{pdfImages.length}件）
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowPdfImageModal(false)}
+                style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280", fontFamily: "inherit" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {pdfImages.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 40, color: "#9ca3af" }}>
+                PDFから画像を検出できませんでした
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {pdfImages.map(img => (
+                  <div key={img.index} style={{
+                    display: "flex", gap: 12, padding: 12,
+                    border: "1px solid #e5e7eb", borderRadius: 8,
+                    background: img.recommended ? "#f0fdf4" : "#fff",
+                  }}>
+                    <div style={{ minWidth: 80, textAlign: "center" }}>
+                      <div style={{ fontSize: 22, marginBottom: 4 }}>
+                        {img.type === "floorplan" ? "📐"
+                          : img.type === "exterior" ? "🏠"
+                          : img.type === "interior" ? "🛋️"
+                          : img.type === "map" ? "🗺️" : "📎"}
+                      </div>
+                      <div style={{
+                        fontSize: 10, padding: "2px 6px", borderRadius: 8,
+                        background: "#eff6ff", color: "#1d4ed8", fontWeight: "bold",
+                        display: "inline-block",
+                      }}>
+                        {img.type_ja}
+                      </div>
+                      <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 4 }}>
+                        {img.page}ページ
+                      </div>
+                    </div>
+
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, color: "#374151", marginBottom: 6, lineHeight: 1.5 }}>
+                        {img.description}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, fontSize: 11, flexWrap: "wrap" }}>
+                        <span style={{
+                          padding: "1px 6px", borderRadius: 8,
+                          background: img.quality === "high" ? "#dcfce7"
+                            : img.quality === "medium" ? "#fef9c3" : "#fee2e2",
+                          color: img.quality === "high" ? "#166534"
+                            : img.quality === "medium" ? "#92400e" : "#991b1b",
+                        }}>
+                          画質: {img.quality === "high" ? "高" : img.quality === "medium" ? "中" : "低"}
+                        </span>
+                        {img.recommended && (
+                          <span style={{
+                            padding: "1px 6px", borderRadius: 8,
+                            background: "#dcfce7", color: "#166534",
+                          }}>
+                            ✅ 掲載推奨
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {pdfImageSourceUrl && (
+                      <div style={{ display: "flex", alignItems: "center" }}>
+                        <a
+                          href={`${pdfImageSourceUrl}#page=${img.page}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            fontSize: 12, padding: "6px 12px", borderRadius: 6,
+                            background: "#eff6ff", color: "#1d4ed8",
+                            border: "1px solid #bfdbfe", textDecoration: "none",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          PDFで確認
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ marginTop: 16, padding: 12, background: "#fef9c3", borderRadius: 6, fontSize: 12, color: "#92400e", lineHeight: 1.6 }}>
+              💡 PDFビューアーで該当ページを開いてスクリーンショットを撮り、「写真管理」タブからアップロードしてください。
+              高解像度での抽出はブラウザの印刷機能（PDF→画像保存）も利用できます。
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+              <button
+                type="button"
+                onClick={() => setShowPdfImageModal(false)}
+                style={{
+                  padding: "8px 20px", borderRadius: 6,
+                  border: "1px solid #d1d5db", background: "#fff",
+                  fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

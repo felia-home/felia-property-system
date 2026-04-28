@@ -492,8 +492,22 @@ interface UseZoneRow { zone: string; bcr: string; far: string; area_pct: string 
 
 function UseZoneEditor({ form, setForm }: { form: Record<string, string>; setForm: SetForm }) {
   const parseRows = (): UseZoneRow[] => {
-    try { const v = JSON.parse(form.use_zones ?? "[]"); return Array.isArray(v) ? v : []; }
-    catch { return []; }
+    try {
+      const v = JSON.parse(form.use_zones ?? "[]");
+      const arr = Array.isArray(v) ? v : [];
+      // 空のときはデフォルト1行を表示
+      if (arr.length === 0) {
+        return [{
+          zone:     form.use_zone ?? "",
+          bcr:      form.bcr ?? "",
+          far:      form.far ?? "",
+          area_pct: "",
+        }];
+      }
+      return arr;
+    } catch {
+      return [{ zone: "", bcr: "", far: "", area_pct: "" }];
+    }
   };
   const rows = parseRows();
 
@@ -542,13 +556,6 @@ function UseZoneEditor({ form, setForm }: { form: Record<string, string>; setFor
         </button>
       </div>
 
-      {rows.length === 0 && (
-        <button type="button" onClick={addRow}
-          style={{ width: "100%", padding: "8px", border: "2px dashed #d0cec8", borderRadius: 7, background: "none", color: "#706e68", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
-          用途地域を追加
-        </button>
-      )}
-
       {rows.map((row, i) => (
         <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 80px 90px 80px 28px", gap: 6, marginBottom: 6, alignItems: "flex-end" }}>
           <div style={rowSt}>
@@ -596,8 +603,28 @@ interface RoadRow { direction: string; width: string; type: string; contact: str
 
 function RoadEditor({ form, setForm }: { form: Record<string, string>; setForm: SetForm }) {
   const parseRows = (): RoadRow[] => {
-    try { const v = JSON.parse(form.roads ?? "[]"); return Array.isArray(v) ? v : []; }
-    catch { return []; }
+    try {
+      const v = JSON.parse(form.roads ?? "[]");
+      const arr = Array.isArray(v) ? v : [];
+      // 空のときはデフォルト2行を表示（うち1行目に既存の単一値を移植）
+      if (arr.length === 0) {
+        return [
+          {
+            direction: form.road_direction ?? "",
+            width:     form.road_width ?? "",
+            type:      form.road_type ?? "公道",
+            contact:   form.road_contact ?? "",
+          },
+          { direction: "", width: "", type: "公道", contact: "" },
+        ];
+      }
+      return arr;
+    } catch {
+      return [
+        { direction: "", width: "", type: "公道", contact: "" },
+        { direction: "", width: "", type: "公道", contact: "" },
+      ];
+    }
   };
   const rows = parseRows();
 
@@ -631,13 +658,6 @@ function RoadEditor({ form, setForm }: { form: Record<string, string>; setForm: 
           ＋ 接道を追加
         </button>
       </div>
-
-      {rows.length === 0 && (
-        <button type="button" onClick={addRow}
-          style={{ width: "100%", padding: "8px", border: "2px dashed #d0cec8", borderRadius: 7, background: "none", color: "#706e68", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
-          接道を追加
-        </button>
-      )}
 
       {rows.map((row, i) => (
         <div key={i} style={{ display: "grid", gridTemplateColumns: "90px 80px 100px 1fr 28px", gap: 6, marginBottom: 6, alignItems: "flex-end" }}>
