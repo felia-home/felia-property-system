@@ -93,6 +93,35 @@ function formatLineName(line: string): string {
   return line;
 }
 
+// リレーションの name タグから路線名のみを抽出
+// 例: "四ツ谷 (東京メトロ南北線)" → "東京メトロ南北線"
+//     "東京メトロ丸ノ内線" → "東京メトロ丸ノ内線"
+//     "信濃町駅" → "" （駅名のみは路線名ではない）
+function extractLineName(tags: Record<string, string>): string {
+  const candidates = [
+    tags["name:ja"],
+    tags.name,
+    tags["official_name:ja"],
+    tags.official_name,
+  ].filter(Boolean) as string[];
+
+  for (const raw of candidates) {
+    // 「駅名 (路線名)」形式 → 括弧内に「線」「Line」を含む場合は採用
+    const m = raw.match(/[（(]([^）)]+)[）)]/);
+    if (m) {
+      const inner = m[1].trim();
+      if (inner.includes("線") || /Line/i.test(inner)) return inner;
+    }
+    // 駅名のみ（"...駅" / "... station"）はスキップ
+    if (raw.endsWith("駅") || /station\s*$/i.test(raw)) continue;
+    // それ以外はそのまま
+    if (raw) return raw;
+  }
+
+  // 最後のフォールバック
+  return tags.operator || tags.network || tags.ref || "";
+}
+
 // ---- 最寄り駅（上位3件）— 2リクエスト方式でリレーションから路線名を取得 ----
 async function findNearbyStations(
   lat: number, lng: number, radiusM = 1500
@@ -145,24 +174,24 @@ out body;`;
   // リレーション members から nodeId → 路線名リスト のマップを構築
   const nodeLineMap = new Map<number, string[]>();
   for (const rel of routeRelations) {
-    const lineName =
-      rel.tags?.["name:ja"] ||
-      rel.tags?.["name"] ||
-      rel.tags?.["official_name:ja"] ||
-      rel.tags?.["official_name"] ||
-      rel.tags?.["operator"] ||
-      rel.tags?.["network"] ||
-      rel.tags?.["ref"] ||
-      "";
+    const lineName = extractLineName(rel.tags ?? {});
     if (!lineName || !rel.members) continue;
     for (const member of rel.members) {
-      if (member.type === "node") {
-        const existing = nodeLineMap.get(member.ref) ?? [];
-        if (!existing.includes(lineName)) existing.push(lineName);
-        nodeLineMap.set(member.ref, existing);
-      }
+      if (member.type !== "node") continue;
+      // role: "stop" / "stop_entry_only" / "stop_exit_only" / "" のみ採用（platform などは除外）
+      const role = member.role ?? "";
+      if (role && !role.startsWith("stop")) continue;
+
+      const existing = nodeLineMap.get(member.ref) ?? [];
+      if (!existing.includes(lineName)) existing.push(lineName);
+      nodeLineMap.set(member.ref, existing);
     }
   }
+  console.log("[auto-enrich] nodeLineMap size:", nodeLineMap.size);
+  console.log("[auto-enrich] sample mappings:",
+    Array.from(nodeLineMap.entries()).slice(0, 5)
+      .map(([id, lines]) => `${id}: ${lines.join(",")}`).join(" | ")
+  );
 
   return stationNodes
     .map((node) => {
@@ -174,12 +203,20 @@ out body;`;
 
       // 路線名: リレーションから取得 > ノードの line/operator タグ（フォールバック）
       const linesFromRel = nodeLineMap.get(node.id) ?? [];
-      const lineFromTag =
+      const operatorRaw =
         node.tags?.["line"] ||
         node.tags?.["railway:line"] ||
         node.tags?.["operator"] ||
         node.tags?.["network"] ||
         "";
+      const operatorMap: Record<string, string> = {
+        "東日本旅客鉄道":         "JR東日本",
+        "東日本旅客鉄道株式会社": "JR東日本",
+        "東京地下鉄":             "東京メトロ",
+        "東京地下鉄株式会社":     "東京メトロ",
+        "東京都交通局":           "都営",
+      };
+      const lineFromTag = operatorMap[operatorRaw] ?? operatorRaw;
       const line = linesFromRel.length > 0 ? linesFromRel[0] : lineFromTag;
 
       return { name, line, walk_minutes: distanceToWalkMinutes(distKm), distKm };
