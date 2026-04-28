@@ -93,6 +93,26 @@ function formatLineName(line: string): string {
   return line;
 }
 
+// 路線名を短縮・正規化
+//   "東京メトロ丸ノ内線 : 池袋→荻窪" → "東京メトロ丸ノ内線"
+//   "JR中央・総武緩行線"             → "JR中央・総武線"
+//   "JR中央線快速"                   → "JR中央線"
+//   "JR中央線JC"                     → "JR中央線"
+function cleanLineName(name: string): string {
+  let clean = name.trim();
+  // ' : 池袋→荻窪' のような区間表示を除去
+  clean = clean.replace(/\s*[：:]\s*.+$/, "");
+  // ' (上り)' '（外回り）' '（方向）' のような方向表示を除去
+  clean = clean.replace(/\s*[（(][^）)]*(方向|回り|上り|下り)[^）)]*[）)]\s*$/, "");
+  // '=>' '→' '＝＞' 以降を除去（区間名）
+  clean = clean.replace(/\s*(=>|→|＝＞|⇒).+$/, "");
+  // JR系の正規化
+  clean = clean.replace("総武緩行線", "総武線");
+  clean = clean.replace("線快速", "線");
+  clean = clean.replace(/線[A-Z]+$/, "線");
+  return clean.trim();
+}
+
 // リレーションの name タグから路線名のみを抽出
 // 例: "四ツ谷 (東京メトロ南北線)" → "東京メトロ南北線"
 //     "東京メトロ丸ノ内線" → "東京メトロ丸ノ内線"
@@ -110,16 +130,16 @@ function extractLineName(tags: Record<string, string>): string {
     const m = raw.match(/[（(]([^）)]+)[）)]/);
     if (m) {
       const inner = m[1].trim();
-      if (inner.includes("線") || /Line/i.test(inner)) return inner;
+      if (inner.includes("線") || /Line/i.test(inner)) return cleanLineName(inner);
     }
     // 駅名のみ（"...駅" / "... station"）はスキップ
     if (raw.endsWith("駅") || /station\s*$/i.test(raw)) continue;
-    // それ以外はそのまま
-    if (raw) return raw;
+    // それ以外はそのまま（短縮処理を適用）
+    if (raw) return cleanLineName(raw);
   }
 
   // 最後のフォールバック
-  return tags.operator || tags.network || tags.ref || "";
+  return cleanLineName(tags.operator || tags.network || tags.ref || "");
 }
 
 // ---- 最寄り駅（上位3件）— 2リクエスト方式でリレーションから路線名を取得 ----
@@ -377,22 +397,29 @@ export async function POST(
   const top3 = await findNearbyStations(lat, lng);
   console.log("[auto-enrich] nearby stations:", top3.length, top3.map(s => `${s.name}(${s.line})`).join(", "));
 
-  // 駅名・路線名ともに存在する場合のみ保存（片方だけの場合は保存しない）
-  if (!property.station_line1 && !property.station_name1 && top3[0]?.name && top3[0]?.line) {
+  // 既存の路線名が「JR」「東京メトロ」のような operator 単独表記の場合は上書きする
+  // （既存値が具体路線名 = 「線」を含む場合は手動入力とみなして保護）
+  const isGenericOperator = (v: string | null | undefined) =>
+    !v || (!v.includes("線") && !/Line/i.test(v));
+
+  if ((!property.station_line1 || isGenericOperator(property.station_line1)) &&
+      !property.station_name1 && top3[0]?.name && top3[0]?.line) {
     updateData.station_line1 = top3[0].line;
     updateData.station_name1 = top3[0].name;
     updateData.station_walk1 = top3[0].walk_minutes;
     enriched.push(`交通1: ${top3[0].name}（${top3[0].walk_minutes}分）`);
   }
 
-  if (!property.station_line2 && !property.station_name2 && top3[1]?.name && top3[1]?.line) {
+  if ((!property.station_line2 || isGenericOperator(property.station_line2)) &&
+      !property.station_name2 && top3[1]?.name && top3[1]?.line) {
     updateData.station_line2 = top3[1].line;
     updateData.station_name2 = top3[1].name;
     updateData.station_walk2 = top3[1].walk_minutes;
     enriched.push(`交通2: ${top3[1].name}（${top3[1].walk_minutes}分）`);
   }
 
-  if (!property.station_line3 && !property.station_name3 && top3[2]?.name && top3[2]?.line) {
+  if ((!property.station_line3 || isGenericOperator(property.station_line3)) &&
+      !property.station_name3 && top3[2]?.name && top3[2]?.line) {
     updateData.station_line3 = top3[2].line;
     updateData.station_name3 = top3[2].name;
     updateData.station_walk3 = top3[2].walk_minutes;
