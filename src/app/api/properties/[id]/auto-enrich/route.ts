@@ -140,30 +140,61 @@ out body;`;
   if (stationNodes.length === 0) return [];
 
   // レート制限対策: Step1 → Step2 間に待機
-  await new Promise(r => setTimeout(r, 800));
+  await new Promise(r => setTimeout(r, 1000));
 
-  // Step2: 駅ノードを直接含む鉄道way（線路）を取得し、wayのタグから路線名を得る
-  // route relation 経由は members の格納形式に依存して取りこぼすため、way 直接取得が確実
-  const nodeIds = stationNodes.map(n => n.id).join(",");
-  const wayQuery = `[out:json][timeout:25];
-node(id:${nodeIds});
-way["railway"~"rail|subway|tram|light_rail|monorail"](bn);
-out tags;`;
+  // Step2: stop_position（路線リレーションが直接参照するノード）と
+  // それを member に持つ路線リレーションをまとめて取得する。
+  // route relation は railway=station ノードではなく
+  // public_transport=stop_position / railway=stop ノードを参照する。
+  const stopQuery = `[out:json][timeout:30];
+(
+  node["public_transport"="stop_position"](around:1500,${lat},${lng});
+  node["railway"="stop"](around:1500,${lat},${lng});
+)->.stops;
+rel["route"~"train|subway|monorail|tram|light_rail"](bn.stops);
+out body;
+.stops out body;`;
 
-  const wayElements = await queryOverpassRaw(wayQuery);
-  const ways = wayElements.filter(e => e.type === "way");
-  console.log("[auto-enrich] railway ways found:", ways.length);
+  const stopElements = await queryOverpassRaw(stopQuery);
+  const stopNodes = stopElements.filter(e => e.type === "node");
+  const stopRelations = stopElements.filter(e => e.type === "relation");
+  console.log("[auto-enrich] stop nodes:", stopNodes.length, "stop relations:", stopRelations.length);
 
-  // 全wayの路線名候補を抽出（重複除外）
-  const wayLineNames = [...new Set(
-    ways.map(w => {
-      const t = w.tags ?? {};
-      return t["name:ja"] || t.name || t["railway:name"] || t.ref || "";
-    }).filter(Boolean)
-  )];
-  console.log("[auto-enrich] way line names:", wayLineNames.join(", "));
+  // stop_position node ID → 路線名リスト
+  const stopNodeLineMap = new Map<number, string[]>();
+  for (const rel of stopRelations) {
+    const lineName = extractLineName(rel.tags ?? {});
+    if (!lineName || !rel.members) continue;
+    for (const member of rel.members) {
+      if (member.type !== "node") continue;
+      const lines = stopNodeLineMap.get(member.ref) ?? [];
+      if (!lines.includes(lineName)) lines.push(lineName);
+      stopNodeLineMap.set(member.ref, lines);
+    }
+  }
 
-  // operator マッピング
+  // stop_position 名前 → 路線名リスト（駅名で突合できるように集約）
+  const stopNameLineMap = new Map<string, string[]>();
+  for (const stopNode of stopNodes) {
+    const tags = stopNode.tags ?? {};
+    const name = tags["name:ja"] || tags.name || "";
+    if (!name) continue;
+    const lines = stopNodeLineMap.get(stopNode.id) ?? [];
+    if (lines.length === 0) continue;
+
+    const existing = stopNameLineMap.get(name) ?? [];
+    for (const line of lines) {
+      if (!existing.includes(line)) existing.push(line);
+    }
+    stopNameLineMap.set(name, existing);
+  }
+  console.log("[auto-enrich] stop name line map:",
+    Array.from(stopNameLineMap.entries())
+      .slice(0, 10)
+      .map(([n, lines]) => `${n}:${lines.join(",")}`).join(" | ")
+  );
+
+  // 共通マッピング（フォールバック用）
   const operatorMap: Record<string, string> = {
     "東日本旅客鉄道":         "JR東日本",
     "東日本旅客鉄道株式会社": "JR東日本",
@@ -186,13 +217,20 @@ out tags;`;
     "都営地下鉄": "都営",
   };
 
-  // 駅ノードID → 路線名 のマップを構築（駅自体のタグ + wayの路線名から推定）
+  // 駅ノードID → 路線名（先頭1件、複数列挙したい場合は別途）
   const nodeLineMap = new Map<number, string>();
   for (const node of stationNodes) {
     const tags = node.tags ?? {};
     const stationName = tags["name:ja"] || tags.name || "";
 
-    // 1. 駅ノード自体のタグ
+    // 1. stop_position 名で駅名と突合
+    const matchedLines = stopNameLineMap.get(stationName) ?? [];
+    if (matchedLines.length > 0) {
+      nodeLineMap.set(node.id, matchedLines[0]);
+      continue;
+    }
+
+    // 2. 駅ノード自身のタグ
     const lineFromTags =
       tags["railway:line"] ||
       tags.line ||
@@ -203,20 +241,7 @@ out tags;`;
       continue;
     }
 
-    // 2. wayの路線名から駅名と紐づくものを探す（駅名や駅名の一部を含む路線名）
-    const baseStation = stationName.replace(/駅$/, "");
-    const matchingWayLine = wayLineNames.find(name =>
-      typeof name === "string" && (
-        name.includes(stationName) ||
-        (baseStation && name.includes(baseStation))
-      )
-    );
-    if (matchingWayLine) {
-      nodeLineMap.set(node.id, matchingWayLine);
-      continue;
-    }
-
-    // 3. 駅自体の operator/network から推定
+    // 3. operator / network から推定
     const operator = tags.operator || "";
     const network = tags.network || "";
     const inferred =
