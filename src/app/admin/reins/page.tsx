@@ -46,10 +46,20 @@ export default function ReinsPage() {
   const [priceMax, setPriceMax] = useState("");
 
   // 重複除去
+  type DedupSample = {
+    source_type: string;
+    address: string;
+    building_name?: string | null;
+    floor?: number | null;
+    area_m2?: number | null;
+    area_build_m2?: number | null;
+    area_land_m2?: number | null;
+    count: number;
+  };
   const [dedupInfo, setDedupInfo] = useState<{
     duplicate_groups: number;
     total_to_remove: number;
-    samples: { address: string; price: number; count: number }[];
+    samples: DedupSample[];
   } | null>(null);
   const [dedupLoading, setDedupLoading] = useState(false);
   const [dedupResult, setDedupResult] = useState<{
@@ -186,25 +196,52 @@ export default function ReinsPage() {
         <div style={{
           marginBottom: 16, padding: 12,
           background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 8,
-          fontSize: 12,
         }}>
-          <div style={{ fontWeight: "bold", color: "#92400e", marginBottom: 8 }}>
-            重複物件の例（上位10件）
+          <div style={{ fontWeight: "bold", color: "#92400e", marginBottom: 8, fontSize: 13 }}>
+            重複物件の例（上位30件）
           </div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
-              <tr style={{ color: "#6b7280" }}>
+              <tr style={{ color: "#6b7280", borderBottom: "1px solid #fde68a" }}>
+                <th style={{ textAlign: "left", padding: "4px 8px" }}>種別</th>
                 <th style={{ textAlign: "left", padding: "4px 8px" }}>住所</th>
-                <th style={{ textAlign: "right", padding: "4px 8px" }}>価格</th>
+                <th style={{ textAlign: "left", padding: "4px 8px" }}>マンション名</th>
+                <th style={{ textAlign: "center", padding: "4px 8px" }}>階</th>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>面積</th>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>建物面積</th>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>土地面積</th>
                 <th style={{ textAlign: "center", padding: "4px 8px" }}>重複数</th>
               </tr>
             </thead>
             <tbody>
               {dedupInfo.samples.map((s, i) => (
                 <tr key={i} style={{ borderTop: "1px solid #fde68a" }}>
+                  <td style={{ padding: "4px 8px" }}>
+                    <span style={{
+                      fontSize: 10, padding: "1px 6px", borderRadius: 8, fontWeight: "bold",
+                      background: s.source_type === "MANSION" ? "#eff6ff"
+                        : s.source_type === "HOUSE" ? "#f0fdf4" : "#fefce8",
+                      color: "#374151",
+                    }}>
+                      {s.source_type === "MANSION" ? "マンション"
+                        : s.source_type === "HOUSE" ? "戸建て" : "土地"}
+                    </span>
+                  </td>
                   <td style={{ padding: "4px 8px" }}>{s.address}</td>
+                  <td style={{ padding: "4px 8px", color: s.building_name ? "#374151" : "#9ca3af" }}>
+                    {s.building_name ?? "（名称なし）"}
+                  </td>
+                  <td style={{ padding: "4px 8px", textAlign: "center" }}>
+                    {s.floor != null ? `${s.floor}階` : "—"}
+                  </td>
                   <td style={{ padding: "4px 8px", textAlign: "right" }}>
-                    {s.price.toLocaleString()}万円
+                    {s.area_m2 != null ? `${s.area_m2}㎡` : "—"}
+                  </td>
+                  <td style={{ padding: "4px 8px", textAlign: "right" }}>
+                    {s.area_build_m2 != null ? `${s.area_build_m2}㎡` : "—"}
+                  </td>
+                  <td style={{ padding: "4px 8px", textAlign: "right" }}>
+                    {s.area_land_m2 != null ? `${s.area_land_m2}㎡` : "—"}
                   </td>
                   <td style={{ padding: "4px 8px", textAlign: "center", color: "#ef4444", fontWeight: "bold" }}>
                     {s.count}件
