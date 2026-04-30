@@ -743,9 +743,19 @@ export default function EnvironmentImagesPage() {
                     {img.caption ?? img.ai_caption}
                   </div>
                 )}
-                {img.city && <div style={{ fontSize: 10, color: "#b0ae9c", marginTop: 3 }}>{img.city}</div>}
+                {img.city && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 3 }}>{img.city}</div>}
+                {img.address && (
+                  <div style={{
+                    fontSize: 11, color: "#9ca3af", marginTop: 2,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    📍 {img.address}
+                  </div>
+                )}
                 {img.latitude && img.longitude && (
-                  <div style={{ fontSize: 10, color: "#b0ae9c" }}>📍 {img.latitude.toFixed(4)}, {img.longitude.toFixed(4)}</div>
+                  <div style={{ fontSize: 10, color: "#d1d5db", marginTop: 2 }}>
+                    {img.latitude.toFixed(4)}, {img.longitude.toFixed(4)}
+                  </div>
                 )}
               </div>
               <div style={{ display: "flex", gap: 6, padding: "0 10px 6px" }}>
