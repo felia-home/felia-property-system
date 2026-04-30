@@ -18,7 +18,11 @@ function normalizeMediaType(s: string | null): ImageMediaType {
 }
 
 // POST /api/environment-images/[id]/analyze
-// 画像を Claude で解析し、facility_name / facility_type / city を更新
+//
+// 動作:
+// - 施設名が未設定 → AIで解析して入力
+// - 施設名が既にある → AIで上書きしない（手動入力を尊重）
+// - 緯度経度が未設定 → 施設名から国土地理院APIで自動取得
 export async function POST(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -31,110 +35,109 @@ export async function POST(
   });
   if (!image) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  try {
-    const imgRes = await fetch(image.url);
-    if (!imgRes.ok) {
-      return NextResponse.json({ error: "画像の取得に失敗しました" }, { status: 400 });
-    }
-    const imgBuffer = await imgRes.arrayBuffer();
-    const imgBase64 = Buffer.from(imgBuffer).toString("base64");
-    const mediaType = normalizeMediaType(imgRes.headers.get("content-type"));
+  const updateData: Record<string, unknown> = {};
 
-    const client = new Anthropic();
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 500,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: {
-                type:       "base64",
-                media_type: mediaType,
-                data:       imgBase64,
-              },
-            },
-            {
-              type: "text",
-              text: `この写真を分析して、以下の情報をJSONで返してください。
+  // 施設名が未設定の場合のみ AI で解析
+  if (!image.facility_name) {
+    try {
+      const imgRes = await fetch(image.url);
+      if (imgRes.ok) {
+        const imgBuffer = await imgRes.arrayBuffer();
+        const imgBase64 = Buffer.from(imgBuffer).toString("base64");
+        const mediaType = normalizeMediaType(imgRes.headers.get("content-type"));
 
+        const client = new Anthropic();
+        const response = await client.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 300,
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "image",
+                  source: { type: "base64", media_type: mediaType, data: imgBase64 },
+                },
+                {
+                  type: "text",
+                  text: `この写真の施設名と種別をJSONで返してください。
 {
-  "facility_name": "施設名（例: セブンイレブン四谷店、新宿区立四谷小学校、四ツ谷駅）",
-  "facility_type": "施設種別（SUPERMARKET/SCHOOL/PARK/HOSPITAL/STATION/CONVENIENCE/BANK/LIBRARY/OTHER のいずれか）",
-  "area": "エリア（区名 例: 新宿区、中野区）※写真から読み取れる場合のみ",
-  "description": "施設の簡単な説明（20文字以内）"
+  "facility_name": "施設名",
+  "facility_type": "SUPERMARKET/SCHOOL/PARK/HOSPITAL/STATION/CONVENIENCE/BANK/LIBRARY/OTHER",
+  "city": "区名（例: 新宿区）"
 }
-
-施設名が読み取れない場合は「不明」ではなく施設の種類を記載してください。
-例: 「近隣スーパー」「近隣公園」「最寄り駅」など。
 JSONのみ返してください。`,
+                },
+              ],
             },
           ],
-        },
-      ],
-    });
+        });
 
-    const text = response.content
-      .filter(b => b.type === "text")
-      .map(b => (b as { type: "text"; text: string }).text)
-      .join("");
+        const text = response.content
+          .filter(b => b.type === "text")
+          .map(b => (b as { type: "text"; text: string }).text)
+          .join("");
 
-    let analyzed: {
-      facility_name?: string;
-      facility_type?: string;
-      area?: string;
-      description?: string;
-      latitude?: number;
-      longitude?: number;
-    } = {};
-
-    try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) analyzed = JSON.parse(jsonMatch[0]);
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const analyzed = JSON.parse(jsonMatch[0]) as {
+            facility_name?: string;
+            facility_type?: string;
+            city?: string;
+          };
+          if (analyzed.facility_name) updateData.facility_name = analyzed.facility_name;
+          if (analyzed.facility_type) updateData.facility_type = analyzed.facility_type;
+          if (analyzed.city && !image.city) updateData.city = analyzed.city;
+        }
+      }
     } catch (e) {
-      console.error("analyze JSON parse error:", e, "text:", text);
-      analyzed = {};
+      console.error("env-images analyze AI error:", e);
+      // AI 解析失敗は無視
     }
+  }
 
-    // 緯度経度が未設定なら国土地理院で施設名から自動取得
-    if (analyzed.facility_name && (image.latitude == null || image.longitude == null)) {
+  // 緯度経度が未設定の場合は施設名から国土地理院 AddressSearch で取得
+  if (image.latitude == null || image.longitude == null) {
+    const nameForGeo = image.facility_name || (updateData.facility_name as string | undefined);
+    if (nameForGeo) {
       try {
-        const geoUrl = `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(analyzed.facility_name)}`;
+        const query = encodeURIComponent("東京都 " + nameForGeo);
+        const geoUrl = `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${query}`;
         const geoRes = await fetch(geoUrl, { signal: AbortSignal.timeout(5000) });
         if (geoRes.ok) {
           const geoData = await geoRes.json() as { geometry?: { coordinates?: [number, number] } }[];
           if (Array.isArray(geoData) && geoData.length > 0 && geoData[0]?.geometry?.coordinates) {
             const [lng, lat] = geoData[0].geometry.coordinates;
-            analyzed.latitude  = lat;
-            analyzed.longitude = lng;
+            updateData.latitude  = lat;
+            updateData.longitude = lng;
           }
         }
-      } catch {
+      } catch (e) {
+        console.error("env-images geocode error:", e);
         // ジオコード失敗は無視
       }
     }
-
-    // PropertyEnvironmentImage には area カラムが無いため city にマップ
-    const data: Record<string, unknown> = {};
-    if (analyzed.facility_name) data.facility_name = analyzed.facility_name;
-    if (analyzed.facility_type) data.facility_type = analyzed.facility_type;
-    if (analyzed.area)          data.city          = analyzed.area;
-    if (analyzed.description)   data.ai_caption    = analyzed.description;
-    if (analyzed.latitude  != null) data.latitude  = analyzed.latitude;
-    if (analyzed.longitude != null) data.longitude = analyzed.longitude;
-
-    const updated = Object.keys(data).length > 0
-      ? await prisma.propertyEnvironmentImage.update({
-          where: { id: params.id },
-          data,
-        })
-      : image;
-
-    return NextResponse.json({ ok: true, analyzed, image: updated });
-  } catch (error) {
-    console.error("analyze error:", error);
-    return NextResponse.json({ error: "AI解析に失敗しました" }, { status: 500 });
   }
+
+  let updated = image;
+  if (Object.keys(updateData).length > 0) {
+    updated = await prisma.propertyEnvironmentImage.update({
+      where: { id: params.id },
+      data:  updateData,
+    });
+  }
+
+  return NextResponse.json({
+    ok:        true,
+    skipped:   Object.keys(updateData).length === 0,
+    updated,
+    image:     updated,
+    analyzed: {
+      facility_name: updateData.facility_name as string | undefined,
+      facility_type: updateData.facility_type as string | undefined,
+      city:          updateData.city as string | undefined,
+      latitude:      updateData.latitude as number | undefined,
+      longitude:     updateData.longitude as number | undefined,
+    },
+  });
 }
