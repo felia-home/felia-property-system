@@ -350,6 +350,7 @@ model Property {
   check_logs            PropertyCheckLog[]
   env_image_links       PropertyEnvImageLink[]
   documents             PropertyDocument[]
+  favorites             MemberFavorite[]
   @@map("properties")
 }
 
@@ -984,8 +985,21 @@ model Member {
   search_conditions     MemberSearchCondition[]
   notification_schedule MemberNotificationSchedule?
   notification_logs     MemberNotificationLog[]
+  favorites             MemberFavorite[]
 
   @@map("members")
+}
+
+model MemberFavorite {
+  id          String   @id @default(cuid())
+  member_id   String
+  property_id String
+  member      Member   @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  property    Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  created_at  DateTime @default(now())
+
+  @@unique([member_id, property_id])
+  @@map("member_favorites")
 }
 
 model MemberInquiry {
