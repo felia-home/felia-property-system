@@ -42,8 +42,20 @@ function splitStation(stationStr: string | null): { line: string | null; name: s
 // 築年を数値に変換
 function parseBuiltYear(text: string | null): number | null {
   if (!text) return null;
+  // 数値のみ（Excelシリアル値）はスキップ
+  if (/^\d+$/.test(String(text))) return null;
   const match = String(text).match(/(\d{4})年/);
   return match ? parseInt(match[1]) : null;
+}
+
+// built_year_text のバリデーション
+// 数値のみ（Excelシリアル値）や「年」を含まない値は null にする
+function toBuiltYearText(v: unknown): string | null {
+  const s = toStr(v);
+  if (!s) return null;
+  if (/^\d+$/.test(s)) return null;
+  if (!s.includes("年")) return null;
+  return s;
 }
 
 // null安全な数値変換
@@ -105,7 +117,7 @@ function rowToRecord(row: unknown[], sourceType: "MANSION" | "HOUSE" | "LAND"): 
       walk_minutes:     toInt(row[15]),
       agent:            toStr(row[16]),
       built_year:       parseBuiltYear(toStr(row[17])),
-      built_year_text:  toStr(row[17]),
+      built_year_text:  toBuiltYearText(row[17]),
       dedup_key:        makeDedup(address, price, areaM2),
     };
   }
@@ -136,7 +148,7 @@ function rowToRecord(row: unknown[], sourceType: "MANSION" | "HOUSE" | "LAND"): 
       direction:        toStr(row[13]),
       agent:            toStr(row[14]),
       built_year:       parseBuiltYear(toStr(row[15])),
-      built_year_text:  toStr(row[15]),
+      built_year_text:  toBuiltYearText(row[15]),
       dedup_key:        makeDedup(address, price, areaLand),
     };
   }
