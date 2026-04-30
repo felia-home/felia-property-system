@@ -96,25 +96,35 @@ JSONのみ返してください。`,
     }
   }
 
-  // 緯度経度が未設定の場合は施設名から国土地理院 AddressSearch で取得
+  // 緯度経度が未設定の場合は「区名+施設名」「施設名のみ」「東京都+施設名」の
+  // 順で国土地理院 AddressSearch を試行
   if (image.latitude == null || image.longitude == null) {
     const nameForGeo = image.facility_name || (updateData.facility_name as string | undefined);
+    const cityForGeo = image.city          || (updateData.city          as string | undefined);
     if (nameForGeo) {
-      try {
-        const query = encodeURIComponent("東京都 " + nameForGeo);
-        const geoUrl = `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${query}`;
-        const geoRes = await fetch(geoUrl, { signal: AbortSignal.timeout(5000) });
-        if (geoRes.ok) {
+      const candidates = [
+        cityForGeo ? `${cityForGeo}${nameForGeo}` : null,
+        nameForGeo,
+        `東京都${nameForGeo}`,
+      ].filter(Boolean) as string[];
+
+      for (const term of candidates) {
+        try {
+          const geoUrl = `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(term)}`;
+          const geoRes = await fetch(geoUrl, { signal: AbortSignal.timeout(5000) });
+          if (!geoRes.ok) continue;
           const geoData = await geoRes.json() as { geometry?: { coordinates?: [number, number] } }[];
           if (Array.isArray(geoData) && geoData.length > 0 && geoData[0]?.geometry?.coordinates) {
             const [lng, lat] = geoData[0].geometry.coordinates;
             updateData.latitude  = lat;
             updateData.longitude = lng;
+            console.log(`[env-image analyze] geocoded "${term}" → ${lat},${lng}`);
+            break;
           }
+        } catch (e) {
+          console.error(`[env-image analyze] geocode failed for "${term}":`, e);
+          continue;
         }
-      } catch (e) {
-        console.error("env-images geocode error:", e);
-        // ジオコード失敗は無視
       }
     }
   }

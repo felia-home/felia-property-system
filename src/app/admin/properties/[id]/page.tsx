@@ -1269,6 +1269,29 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
     return null;
   };
 
+  // 住所変更時に自動でジオコード（緯度経度が未設定の場合のみ）
+  // 800ms debounce、city/town/address のいずれかが変化したら発火
+  useEffect(() => {
+    if (form.latitude && form.longitude) return; // 既に座標があれば自動取得しない
+    if (!form.city || (form.city.length < 2)) return;
+
+    const timer = setTimeout(async () => {
+      const queries = buildAddressQueries();
+      if (queries.length === 0 || !queries[0]) return;
+      const result = await tryGeocode(queries);
+      if (result) {
+        setForm(f => {
+          if (f.latitude && f.longitude) return f; // 取得中に手動入力された場合は上書きしない
+          return { ...f, latitude: String(result.lat), longitude: String(result.lng) };
+        });
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+    // buildAddressQueries / tryGeocode は安定なため deps に含めない
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.city, form.town, form.address]);
+
   const handleGeocodeAndEnrich = async () => {
     const queries = buildAddressQueries();
     console.log("🔍 geocode queries:", queries);
