@@ -90,9 +90,64 @@ export default function EnvironmentImagesPage() {
 
     setGeocodingEdit(true);
     try {
+      // 検索の中心座標（市区町村があれば GSI で大まかに取得）
+      let searchLat = "35.689";
+      let searchLng = "139.692";
+      if (editTarget.city) {
+        try {
+          const areaRes = await fetch(
+            `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent("東京都" + editTarget.city)}`,
+            { signal: AbortSignal.timeout(5000) }
+          );
+          const areaData = await areaRes.json() as { geometry?: { coordinates?: [number, number] } }[];
+          if (Array.isArray(areaData) && areaData.length > 0 && areaData[0]?.geometry?.coordinates) {
+            searchLng = String(areaData[0].geometry.coordinates[0]);
+            searchLat = String(areaData[0].geometry.coordinates[1]);
+          }
+        } catch { /* 失敗は無視 */ }
+      }
+
+      // Step1: 既存の /api/places/search (Overpass) で施設候補検索
+      const placeRes = await fetch(
+        `/api/places/search?name=${encodeURIComponent(editTarget.facility_name)}&lat=${searchLat}&lng=${searchLng}`
+      );
+      const placeData = await placeRes.json() as {
+        candidates?: { name: string; category: string; lat: number; lng: number }[];
+      };
+      const candidates = placeData.candidates ?? [];
+
+      if (candidates.length > 0) {
+        // 施設名にマッチするものを優先、無ければ先頭
+        const best = candidates.find(c => c.name.includes(editTarget.facility_name)) ?? candidates[0];
+
+        setEditTarget(prev => prev ? {
+          ...prev,
+          latitude:  String(best.lat),
+          longitude: String(best.lng),
+        } : null);
+
+        // Step2: 座標から住所を逆引き（GSI ReverseGeocoder）
+        try {
+          const revRes = await fetch(
+            `https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${best.lat}&lon=${best.lng}`,
+            { signal: AbortSignal.timeout(5000) }
+          );
+          const revData = await revRes.json() as { results?: { lv01Nm?: string } };
+          const lv01Nm = revData.results?.lv01Nm;
+          if (lv01Nm) {
+            setEditTarget(prev => prev ? {
+              ...prev,
+              address: (editTarget.city || "") + lv01Nm,
+            } : null);
+          }
+        } catch { /* 住所逆引き失敗は無視 */ }
+
+        return;
+      }
+
+      // Step3: Overpass で見つからなければ GSI 施設名検索でフォールバック
       const queries = [
         editTarget.city ? `${editTarget.city}${editTarget.facility_name}` : null,
-        editTarget.facility_name,
         `東京都${editTarget.facility_name}`,
       ].filter(Boolean) as string[];
 
@@ -109,24 +164,23 @@ export default function EnvironmentImagesPage() {
           }[];
           if (Array.isArray(data) && data.length > 0 && data[0]?.geometry?.coordinates) {
             const [lng, lat] = data[0].geometry.coordinates;
-            const addressText = data[0].properties?.title || q;
+            const title = data[0].properties?.title || q;
             setEditTarget(prev => prev ? {
               ...prev,
-              address:   addressText,
+              address:   title,
               latitude:  String(lat),
               longitude: String(lng),
             } : null);
             found = true;
             break;
           }
-        } catch {
-          continue;
-        }
+        } catch { continue; }
       }
-
       if (!found) {
         alert("住所・座標を取得できませんでした。\n施設名・エリアを確認してください。");
       }
+    } catch {
+      alert("エラーが発生しました");
     } finally {
       setGeocodingEdit(false);
     }
@@ -829,13 +883,55 @@ export default function EnvironmentImagesPage() {
               <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
                 住所
               </label>
-              <input
-                type="text"
-                value={editTarget.address}
-                onChange={e => setEditTarget(prev => prev ? { ...prev, address: e.target.value } : null)}
-                placeholder="例: 新宿区四谷1-1"
-                style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
-              />
+              <div style={{ display: "flex", gap: 6 }}>
+                <input
+                  type="text"
+                  value={editTarget.address}
+                  onChange={e => setEditTarget(prev => prev ? { ...prev, address: e.target.value } : null)}
+                  placeholder="例: 文京区柳町5-33-19"
+                  style={{ flex: 1, padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!editTarget?.address) { alert("住所を入力してください"); return; }
+                    setGeocodingEdit(true);
+                    try {
+                      const q = encodeURIComponent("東京都" + editTarget.address);
+                      const res = await fetch(
+                        `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${q}`,
+                        { signal: AbortSignal.timeout(5000) }
+                      );
+                      const data = await res.json() as { geometry?: { coordinates?: [number, number] } }[];
+                      if (Array.isArray(data) && data.length > 0 && data[0]?.geometry?.coordinates) {
+                        const [lng, lat] = data[0].geometry.coordinates;
+                        setEditTarget(prev => prev ? {
+                          ...prev,
+                          latitude:  String(lat),
+                          longitude: String(lng),
+                        } : null);
+                      } else {
+                        alert("座標を取得できませんでした");
+                      }
+                    } catch {
+                      alert("エラーが発生しました");
+                    } finally {
+                      setGeocodingEdit(false);
+                    }
+                  }}
+                  disabled={geocodingEdit}
+                  style={{
+                    padding: "8px 12px", borderRadius: 6, fontSize: 13,
+                    border: "1px solid #bfdbfe",
+                    background: geocodingEdit ? "#e5e7eb" : "#eff6ff",
+                    color: geocodingEdit ? "#9ca3af" : "#1d4ed8",
+                    cursor: geocodingEdit ? "not-allowed" : "pointer",
+                    whiteSpace: "nowrap", fontFamily: "inherit",
+                  }}
+                >
+                  📍 座標取得
+                </button>
+              </div>
             </div>
 
             <div style={{ marginBottom: 14 }}>
