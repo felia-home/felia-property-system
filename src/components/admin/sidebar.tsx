@@ -52,6 +52,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { href: "/admin/hp/sale-results",   label: "売却実績管理",         icon: "🏆" },
       { href: "/admin/hp/testimonials",   label: "お客様の声管理",       icon: "💬" },
       { href: "/admin/hp/web-flyers",     label: "WEBチラシ管理",        icon: "📋" },
+      { href: "/admin/hp/area-columns",   label: "エリアコラム",         icon: "📝" },
     ],
   },
   {

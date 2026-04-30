@@ -285,6 +285,7 @@ export async function POST(request: NextRequest) {
         store_id:        b.store_id        ? String(b.store_id)        : null,
         property_number: propertyNumber,
         internal_memo:   b.internal_memo   ? String(b.internal_memo)   : null,
+        tour_url:        b.tour_url        ? String(b.tour_url)        : null,
         source:          b.source          ? String(b.source)          : null,
       },
     });

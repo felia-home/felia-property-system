@@ -56,7 +56,7 @@ const STRING_FIELDS = new Set([
   "delivery_timing","delivery_status","reins_number","reins_status","delivery_condition",
   "seller_company","seller_phone","seller_contact","seller_agent","seller_fax","seller_transaction_type","seller_brokerage_type",
   "suumo_id","athome_id","yahoo_id","homes_id",
-  "property_number","internal_memo","source",
+  "property_number","internal_memo","source","tour_url",
   // agent_id / store_id / successor_agent_id はリレーションIDのため connect/disconnect で処理
   "ad_confirmation_method","ad_confirmed_by","ad_confirmation_file",
   "last_confirmed_by","last_check_result",

@@ -71,6 +71,7 @@ export const INITIAL_FORM: Record<string, string> = {
   seller_transaction_type: "", seller_brokerage_type: "",
   purchase_price: "", purchase_date: "",
   internal_memo: "", source: "", store_id: "", property_number: "",
+  tour_url: "",
   // タブ3: 所在地
   address_display_level: "town",
   address_display_custom: "",
@@ -863,6 +864,16 @@ export function PropertyFormTabs({ tab, setTab, form, setForm, onGenerateContent
             <FI label="仕入れ経路" name="source" form={form} setForm={setForm} placeholder="売主直接・業者紹介等" />
           </div>
           <StoreStaffSelector form={form} setForm={setForm} />
+          <div style={rowSt}>
+            <label style={labelSt}>360度ツアーURL</label>
+            <input
+              type="url"
+              value={form.tour_url ?? ""}
+              onChange={e => setForm(f => ({ ...f, tour_url: e.target.value }))}
+              placeholder="https://..."
+              style={inputSt}
+            />
+          </div>
           <div style={rowSt}>
             <label style={labelSt}>社内メモ（非公開）</label>
             <textarea value={form.internal_memo ?? ""} rows={5}

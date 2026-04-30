@@ -316,6 +316,9 @@ model Property {
   internal_memo         String?
   source                String?
 
+  // 360度ツアーURL（外部サービスへの埋め込みリンク）
+  tour_url              String?
+
   // 広告承諾（売主からの広告承諾取得記録）
   ad_approval_contact   String?   // 承諾取得先担当者名
   ad_approval_method    String?   // EMAIL | PHONE | SELF
@@ -1460,4 +1463,20 @@ model ReinsProperty {
   imported_at       DateTime @default(now())
 
   @@map("reins_properties")
+}
+
+// エリアコラム（区ごとの紹介記事）
+model AreaColumn {
+  id           String    @id @default(cuid())
+  area         String
+  title        String
+  content      String?
+  image_url    String?
+  is_active    Boolean   @default(true)
+  published_at DateTime?
+  sort_order   Int       @default(0)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  @@map("area_columns")
 }
