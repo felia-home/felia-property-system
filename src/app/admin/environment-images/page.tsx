@@ -109,6 +109,44 @@ export default function EnvironmentImagesPage() {
     await load();
   };
 
+  // キャプション自動生成: 「市区町村 + 施設名」
+  const autoCaption = () => {
+    if (!editTarget) return;
+    const area = editTarget.city || "";
+    const name = editTarget.facility_name || "";
+    if (!area && !name) return;
+    setEditTarget(prev => prev ? { ...prev, caption: `${area}${name}` } : null);
+  };
+
+  // 緯度経度の再取得（国土地理院 AddressSearch）
+  const handleReGeocode = async () => {
+    if (!editTarget) return;
+    if (!editTarget.facility_name) {
+      alert("施設名を入力してください");
+      return;
+    }
+    const query = `東京都 ${editTarget.city ?? ""} ${editTarget.facility_name}`.trim();
+    try {
+      const res = await fetch(
+        `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(query)}`,
+        { signal: AbortSignal.timeout(5000) }
+      );
+      const data = await res.json() as { geometry?: { coordinates?: [number, number] } }[];
+      if (Array.isArray(data) && data.length > 0 && data[0]?.geometry?.coordinates) {
+        const [lng, lat] = data[0].geometry.coordinates;
+        setEditTarget(prev => prev ? {
+          ...prev,
+          latitude:  String(lat),
+          longitude: String(lng),
+        } : null);
+      } else {
+        alert("座標を取得できませんでした。施設名・エリアを確認してください。");
+      }
+    } catch {
+      alert("座標取得に失敗しました");
+    }
+  };
+
   const handleEditSave = async () => {
     if (!editTarget) return;
     await fetch(`/api/environment-images/${editTarget.id}`, {
@@ -592,9 +630,9 @@ export default function EnvironmentImagesPage() {
                   </span>
                 </div>
                 {img.facility_name && <div style={{ fontSize: 12, fontWeight: 500 }}>{img.facility_name}</div>}
-                {(img.ai_caption || img.caption) && (
+                {(img.caption || img.ai_caption) && (
                   <div style={{ fontSize: 11, color: "#706e68", marginTop: 2, lineHeight: 1.4 }}>
-                    {img.ai_caption ?? img.caption}
+                    {img.caption ?? img.ai_caption}
                   </div>
                 )}
                 {img.city && <div style={{ fontSize: 10, color: "#b0ae9c", marginTop: 3 }}>{img.city}</div>}
@@ -725,11 +763,24 @@ export default function EnvironmentImagesPage() {
               />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
-                  緯度
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <label style={{ fontSize: 12, fontWeight: "bold", color: "#6b7280" }}>
+                  緯度・経度
                 </label>
+                <button
+                  type="button"
+                  onClick={handleReGeocode}
+                  style={{
+                    fontSize: 11, padding: "2px 8px", borderRadius: 4,
+                    border: "1px solid #bfdbfe", background: "#eff6ff",
+                    cursor: "pointer", color: "#1d4ed8", fontFamily: "inherit",
+                  }}
+                >
+                  📍 エリア＋名称から再取得
+                </button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <input
                   type="text"
                   value={editTarget.latitude}
@@ -737,11 +788,6 @@ export default function EnvironmentImagesPage() {
                   placeholder="35.6895"
                   style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
                 />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
-                  経度
-                </label>
                 <input
                   type="text"
                   value={editTarget.longitude}
@@ -753,14 +799,27 @@ export default function EnvironmentImagesPage() {
             </div>
 
             <div style={{ marginBottom: 20 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
-                キャプション
-              </label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <label style={{ fontSize: 12, fontWeight: "bold", color: "#6b7280" }}>
+                  キャプション
+                </label>
+                <button
+                  type="button"
+                  onClick={autoCaption}
+                  style={{
+                    fontSize: 11, padding: "2px 8px", borderRadius: 4,
+                    border: "1px solid #d1d5db", background: "#f9fafb",
+                    cursor: "pointer", color: "#6b7280", fontFamily: "inherit",
+                  }}
+                >
+                  エリア＋名称で自動生成
+                </button>
+              </div>
               <input
                 type="text"
                 value={editTarget.caption}
                 onChange={e => setEditTarget(prev => prev ? { ...prev, caption: e.target.value } : null)}
-                placeholder="徒歩5分・24時間営業 等"
+                placeholder="例: 文京区柳町小学校"
                 style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
               />
             </div>
