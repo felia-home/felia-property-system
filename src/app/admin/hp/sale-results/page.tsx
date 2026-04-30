@@ -121,6 +121,15 @@ export default function SaleResultsPage() {
   const mapInstance = useRef<any>(null);
   const markers = useRef<any[]>([]);
 
+  // CSVインポート
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    inserted: number; skipped: number; errors: number; total: number;
+  } | null>(null);
+  const importRef = useRef<HTMLInputElement>(null);
+
   const load = async () => {
     setLoading(true);
     const r = await fetch("/api/admin/sale-results");
@@ -298,6 +307,52 @@ export default function SaleResultsPage() {
     }
   };
 
+  // CSV パース（Shift-JIS優先、UTF-8 フォールバック）
+  const parseCsv = async (file: File): Promise<string[][]> => {
+    const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target?.result as ArrayBuffer);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+    let text = new TextDecoder("shift-jis").decode(buffer);
+    if (text.includes("�") || text.includes("�")) {
+      text = new TextDecoder("utf-8").decode(buffer);
+    }
+    return text.split(/\r?\n/)
+      .filter(line => line.trim())
+      .map(line =>
+        line.split(",").map(cell => cell.trim().replace(/^["']|["']$/g, ""))
+      );
+  };
+
+  const handleImport = async () => {
+    if (!importFile) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const rows = await parseCsv(importFile);
+      const res = await fetch("/api/admin/sale-results/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setImportResult(data);
+        await load();
+      } else {
+        alert("インポートに失敗しました: " + (data.error ?? ""));
+      }
+    } catch {
+      alert("エラーが発生しました");
+    } finally {
+      setImporting(false);
+      setImportFile(null);
+      if (importRef.current) importRef.current.value = "";
+    }
+  };
+
   if (loading) return <div style={{ padding: 32, color: "#aaa" }}>読み込み中...</div>;
 
   return (
@@ -340,6 +395,19 @@ export default function SaleResultsPage() {
           >
             {geocoding ? "取得中..." : "📍 住所から座標取得"}
           </button>
+          <button
+            type="button"
+            onClick={() => setShowImport(v => !v)}
+            style={{
+              padding: "7px 14px", borderRadius: 6, fontSize: 13,
+              border: "1px solid #d1d5db",
+              background: showImport ? "#f3f4f6" : "#fff",
+              color: "#374151", fontWeight: "bold",
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            📥 CSVインポート
+          </button>
           {geocodeResult && (
             <span style={{ fontSize: 12, color: "#6b7280" }}>
               ✅ {geocodeResult.success}件取得 / {geocodeResult.failed}件失敗
@@ -353,6 +421,81 @@ export default function SaleResultsPage() {
           </button>
         </div>
       </div>
+
+      {/* CSV インポートパネル */}
+      {showImport && (
+        <div style={{
+          marginBottom: 16, padding: 20,
+          background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8,
+        }}>
+          <div style={{ fontSize: 14, fontWeight: "bold", marginBottom: 8 }}>
+            売却実績CSVインポート
+          </div>
+          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12, lineHeight: 1.7 }}>
+            CSVフォーマット（ヘッダー行あり）:<br />
+            <code style={{ background: "#e5e7eb", padding: "2px 6px", borderRadius: 4 }}>
+              公開日,年月,物件種類,住所
+            </code><br />
+            例: <code style={{ background: "#e5e7eb", padding: "2px 6px", borderRadius: 4 }}>
+              2026-04-01,2026年4月,中古マンション,新宿区四谷1丁目
+            </code><br />
+            ※ 住所は丁目レベルまで記載（自動で座標取得します）
+          </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <label style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              padding: "8px 16px", borderRadius: 6, fontSize: 13,
+              background: "#fff", border: "2px dashed #d1d5db",
+              cursor: "pointer", color: "#374151",
+            }}>
+              📂 {importFile ? importFile.name : "CSVファイルを選択"}
+              <input
+                ref={importRef}
+                type="file"
+                accept=".csv"
+                style={{ display: "none" }}
+                onChange={e => setImportFile(e.target.files?.[0] ?? null)}
+              />
+            </label>
+
+            {importFile && (
+              <button
+                type="button"
+                onClick={handleImport}
+                disabled={importing}
+                style={{
+                  padding: "8px 20px", borderRadius: 6, border: "none",
+                  background: importing ? "#e5e7eb" : "#5BAD52",
+                  color: importing ? "#9ca3af" : "#fff",
+                  fontSize: 13, fontWeight: "bold",
+                  cursor: importing ? "not-allowed" : "pointer", fontFamily: "inherit",
+                }}
+              >
+                {importing ? "⏳ インポート中（座標取得に時間がかかります）..." : "インポート実行"}
+              </button>
+            )}
+          </div>
+
+          {importResult && (
+            <div style={{
+              marginTop: 12, padding: "12px 16px",
+              background: "#f0fdf4", border: "1px solid #86efac",
+              borderRadius: 6, fontSize: 13,
+            }}>
+              <div style={{ fontWeight: "bold", color: "#166534", marginBottom: 4 }}>
+                ✅ インポート完了
+              </div>
+              <div style={{ color: "#374151", lineHeight: 1.8 }}>
+                処理件数: {importResult.total}件 /
+                新規登録: <strong>{importResult.inserted}件</strong> /
+                スキップ: {importResult.skipped}件 /
+                エラー: {importResult.errors}件
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 地図エリア */}
       {showMap && (
