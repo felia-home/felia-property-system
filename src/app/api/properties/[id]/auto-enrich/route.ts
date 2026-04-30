@@ -397,33 +397,30 @@ export async function POST(
   const top3 = await findNearbyStations(lat, lng);
   console.log("[auto-enrich] nearby stations:", top3.length, top3.map(s => `${s.name}(${s.line})`).join(", "));
 
-  // 既存の路線名が「JR」「東京メトロ」のような operator 単独表記の場合は上書きする
-  // （既存値が具体路線名 = 「線」を含む場合は手動入力とみなして保護）
-  const isGenericOperator = (v: string | null | undefined) =>
-    !v || (!v.includes("線") && !/Line/i.test(v));
-
-  if ((!property.station_line1 || isGenericOperator(property.station_line1)) &&
-      !property.station_name1 && top3[0]?.name && top3[0]?.line) {
-    updateData.station_line1 = top3[0].line;
-    updateData.station_name1 = top3[0].name;
-    updateData.station_walk1 = top3[0].walk_minutes;
+  // 「住所から自動取得」操作なので、既存の駅情報は常に上書きする
+  // （誤った既存データを最新の OSM 結果で修正するため）
+  if (top3[0]) {
+    updateData.station_line1 = top3[0].line || null;
+    updateData.station_name1 = top3[0].name || null;
+    updateData.station_walk1 = top3[0].walk_minutes ?? null;
     enriched.push(`交通1: ${top3[0].name}（${top3[0].walk_minutes}分）`);
   }
-
-  if ((!property.station_line2 || isGenericOperator(property.station_line2)) &&
-      !property.station_name2 && top3[1]?.name && top3[1]?.line) {
-    updateData.station_line2 = top3[1].line;
-    updateData.station_name2 = top3[1].name;
-    updateData.station_walk2 = top3[1].walk_minutes;
+  if (top3[1]) {
+    updateData.station_line2 = top3[1].line || null;
+    updateData.station_name2 = top3[1].name || null;
+    updateData.station_walk2 = top3[1].walk_minutes ?? null;
     enriched.push(`交通2: ${top3[1].name}（${top3[1].walk_minutes}分）`);
   }
-
-  if ((!property.station_line3 || isGenericOperator(property.station_line3)) &&
-      !property.station_name3 && top3[2]?.name && top3[2]?.line) {
-    updateData.station_line3 = top3[2].line;
-    updateData.station_name3 = top3[2].name;
-    updateData.station_walk3 = top3[2].walk_minutes;
+  if (top3[2]) {
+    updateData.station_line3 = top3[2].line || null;
+    updateData.station_name3 = top3[2].name || null;
+    updateData.station_walk3 = top3[2].walk_minutes ?? null;
     enriched.push(`交通3: ${top3[2].name}（${top3[2].walk_minutes}分）`);
+  } else {
+    // 取得結果が3件未満のときは既存3件目をクリア
+    updateData.station_line3 = null;
+    updateData.station_name3 = null;
+    updateData.station_walk3 = null;
   }
 
   // レート制限対策: 駅クエリ（2リクエスト）完了後、学校クエリ前に待機

@@ -1332,6 +1332,24 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
         }));
       }
 
+      // 駅情報を常に上書き反映（誤った既存データを最新の自動取得結果で更新）
+      const stationData: { line?: string; name?: string; walk_minutes?: number }[] =
+        enrichData.stations ?? enrichData.results?.stations ?? [];
+      if (Array.isArray(stationData) && stationData.length > 0) {
+        setForm(f => ({
+          ...f,
+          station_line1: stationData[0]?.line ?? "",
+          station_name1: stationData[0]?.name ?? "",
+          station_walk1: stationData[0]?.walk_minutes != null ? String(stationData[0].walk_minutes) : "",
+          station_line2: stationData[1]?.line ?? "",
+          station_name2: stationData[1]?.name ?? "",
+          station_walk2: stationData[1]?.walk_minutes != null ? String(stationData[1].walk_minutes) : "",
+          station_line3: stationData[2]?.line ?? "",
+          station_name3: stationData[2]?.name ?? "",
+          station_walk3: stationData[2]?.walk_minutes != null ? String(stationData[2].walk_minutes) : "",
+        }));
+      }
+
       // Step 5: DB から再取得してフォームをリロード
       await loadProperty();
 
