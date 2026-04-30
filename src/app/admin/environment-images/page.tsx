@@ -81,6 +81,10 @@ export default function EnvironmentImagesPage() {
   // 編集モーダル内ジオコード
   const [geocodingEdit, setGeocodingEdit] = useState(false);
 
+  // 東京都内の座標かチェック（緯度35.4〜35.95、経度138.9〜140.0）
+  const isTokyoCoords = (lat: number, lng: number): boolean =>
+    lat >= 35.4 && lat <= 35.95 && lng >= 138.9 && lng <= 140.0;
+
   const handleEditGeocode = async () => {
     if (!editTarget) return;
     if (!editTarget.facility_name) {
@@ -117,6 +121,9 @@ export default function EnvironmentImagesPage() {
           if (Array.isArray(data) && data.length > 0 && data[0]?.geometry?.coordinates) {
             const [lng, lat] = data[0].geometry.coordinates;
             const title = data[0].properties?.title || "";
+
+            // 東京都外の座標はスキップ
+            if (!isTokyoCoords(lat, lng)) continue;
 
             // 市区町村が指定されていてタイトルが一致しない場合は次の候補へ
             // ただし最後の候補なら採用（fallback）
@@ -205,6 +212,10 @@ export default function EnvironmentImagesPage() {
       const data = await res.json() as { geometry?: { coordinates?: [number, number] } }[];
       if (Array.isArray(data) && data.length > 0 && data[0]?.geometry?.coordinates) {
         const [lng, lat] = data[0].geometry.coordinates;
+        if (!isTokyoCoords(lat, lng)) {
+          alert("東京都外の座標が返されました。施設名・エリアを確認してください。");
+          return;
+        }
         setEditTarget(prev => prev ? {
           ...prev,
           latitude:  String(lat),
@@ -878,6 +889,10 @@ export default function EnvironmentImagesPage() {
                       const data = await res.json() as { geometry?: { coordinates?: [number, number] } }[];
                       if (Array.isArray(data) && data.length > 0 && data[0]?.geometry?.coordinates) {
                         const [lng, lat] = data[0].geometry.coordinates;
+                        if (!isTokyoCoords(lat, lng)) {
+                          alert("東京都外の座標が返されました。住所を確認してください。");
+                          return;
+                        }
                         setEditTarget(prev => prev ? {
                           ...prev,
                           latitude:  String(lat),

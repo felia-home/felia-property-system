@@ -17,6 +17,11 @@ function normalizeMediaType(s: string | null): ImageMediaType {
   return "image/jpeg";
 }
 
+// 東京都内の座標かチェック（緯度35.4〜35.95、経度138.9〜140.0）
+function isTokyoCoords(lat: number, lng: number): boolean {
+  return lat >= 35.4 && lat <= 35.95 && lng >= 138.9 && lng <= 140.0;
+}
+
 // POST /api/environment-images/[id]/analyze
 //
 // 動作:
@@ -116,6 +121,10 @@ JSONのみ返してください。`,
           const geoData = await geoRes.json() as { geometry?: { coordinates?: [number, number] } }[];
           if (Array.isArray(geoData) && geoData.length > 0 && geoData[0]?.geometry?.coordinates) {
             const [lng, lat] = geoData[0].geometry.coordinates;
+            if (!isTokyoCoords(lat, lng)) {
+              console.log(`[env-image analyze] skipped non-Tokyo coords for "${term}": ${lat},${lng}`);
+              continue; // 東京都外はスキップ
+            }
             updateData.latitude  = lat;
             updateData.longitude = lng;
             console.log(`[env-image analyze] geocoded "${term}" → ${lat},${lng}`);
