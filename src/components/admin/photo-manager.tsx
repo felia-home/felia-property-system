@@ -212,18 +212,17 @@ function EnvironmentSuggestions({
               <button
                 type="button"
                 onClick={() => onUse(img)}
-                disabled={linkedIds.has(img.id)}
                 style={{
                   marginTop: 3, width: "100%", fontSize: 10, padding: "2px 0",
-                  border: linkedIds.has(img.id) ? "1px solid #d1d5db" : "1px solid #234f35",
+                  border: linkedIds.has(img.id) ? "1px solid #fca5a5" : "1px solid #234f35",
                   borderRadius: 4,
-                  background: linkedIds.has(img.id) ? "#f3f4f6" : "#fff",
-                  color: linkedIds.has(img.id) ? "#9ca3af" : "#234f35",
-                  cursor: linkedIds.has(img.id) ? "not-allowed" : "pointer",
+                  background: linkedIds.has(img.id) ? "#fee2e2" : "#fff",
+                  color: linkedIds.has(img.id) ? "#ef4444" : "#234f35",
+                  cursor: "pointer",
                   fontFamily: "inherit",
                 }}
               >
-                {linkedIds.has(img.id) ? "✅ 登録済み" : "この写真を使用"}
+                {linkedIds.has(img.id) ? "✅ 登録済み（解除）" : "この写真を使用"}
               </button>
             </div>
           ))}
@@ -683,7 +682,31 @@ export default function PhotoManager({
         lng={lng ?? null}
         linkedIds={linkedEnvImageIds}
         onUse={async (img) => {
-          // 周辺環境写真を物件にリンク（既存 EnvironmentImage の URL で env-images JSON POST）
+          const isLinked = linkedEnvImageIds.has(img.id);
+          if (isLinked) {
+            // 解除
+            try {
+              const res = await fetch(
+                `/api/properties/${propertyId}/env-images?env_image_id=${img.id}`,
+                { method: "DELETE" }
+              );
+              if (res.ok) {
+                setLinkedEnvImageIds(prev => {
+                  const next = new Set(prev);
+                  next.delete(img.id);
+                  return next;
+                });
+              } else {
+                const data = await res.json().catch(() => ({}));
+                alert("解除に失敗しました: " + (data.error ?? res.statusText));
+              }
+            } catch {
+              alert("エラーが発生しました");
+            }
+            return;
+          }
+
+          // 登録
           try {
             const res = await fetch(`/api/properties/${propertyId}/env-images`, {
               method: "POST",
@@ -692,6 +715,7 @@ export default function PhotoManager({
                 url:           img.url,
                 facility_name: img.facility_name ?? "",
                 facility_type: img.facility_type ?? "OTHER",
+                env_image_id:  img.id,
               }),
             });
             if (res.ok) {

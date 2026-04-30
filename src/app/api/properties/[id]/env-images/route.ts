@@ -126,20 +126,50 @@ export async function POST(
 }
 
 // GET /api/properties/[id]/env-images
-// 物件にリンクされた周辺環境写真の一覧
+// 物件にリンクされた周辺環境写真の一覧（HP側からも参照するため認証なし）
 export async function GET(
   _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const links = await prisma.propertyEnvImageLink.findMany({
+    where: { property_id: params.id },
+    include: { env_image: true },
+    orderBy: { created_at: "asc" },
+  });
+
+  const images = links.map(l => ({
+    id:            l.env_image.id,
+    url:           l.env_image.url,
+    facility_name: l.env_image.facility_name,
+    facility_type: l.env_image.facility_type,
+    caption:       l.env_image.caption ?? l.env_image.ai_caption,
+    address:       l.env_image.address,
+    latitude:      l.env_image.latitude,
+    longitude:     l.env_image.longitude,
+    city:          l.env_image.city,
+    walk_minutes:  l.walk_minutes,
+  }));
+  return NextResponse.json({ images });
+}
+
+// DELETE /api/properties/[id]/env-images?env_image_id=xxx
+// 物件と環境写真の紐付けを解除
+export async function DELETE(
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const links = await prisma.propertyEnvImageLink.findMany({
-    where: { property_id: params.id },
-    include: { env_image: true },
-    orderBy: { created_at: "desc" },
+  const { searchParams } = new URL(req.url);
+  const env_image_id = searchParams.get("env_image_id");
+  if (!env_image_id) {
+    return NextResponse.json({ error: "env_image_id required" }, { status: 400 });
+  }
+
+  await prisma.propertyEnvImageLink.deleteMany({
+    where: { property_id: params.id, image_id: env_image_id },
   });
 
-  const images = links.map(l => l.env_image);
-  return NextResponse.json({ images });
+  return NextResponse.json({ ok: true });
 }
