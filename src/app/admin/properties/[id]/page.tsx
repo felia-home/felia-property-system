@@ -955,6 +955,127 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
   const [showPdfImageModal, setShowPdfImageModal] = useState(false);
   const [pdfImageSourceUrl, setPdfImageSourceUrl] = useState<string | null>(null);
 
+  // 周辺環境写真 一括アップロード
+  type PlaceCandidate = { name: string; category: string; lat: number; lng: number };
+  type EnvImageItem = {
+    file: File;
+    previewUrl: string;
+    facilityName: string;
+    searchName: string;
+    candidates: PlaceCandidate[];
+    selectedCandidate: PlaceCandidate | null;
+    searching: boolean;
+    uploading: boolean;
+    uploaded: boolean;
+    error: string | null;
+  };
+  const [envImageItems, setEnvImageItems] = useState<EnvImageItem[]>([]);
+  const [bulkEnvUploading, setBulkEnvUploading] = useState(false);
+
+  const extractFacilityName = (filename: string): string => {
+    let n = filename.replace(/\.[^.]+$/, "");
+    n = n.replace(/^[\d_\-\s]+/, "");
+    n = n.replace(/[\d_\-\s]+$/, "");
+    return n.trim();
+  };
+
+  const searchPlaceCandidates = async (
+    name: string,
+    lat: number | string,
+    lng: number | string
+  ): Promise<PlaceCandidate[]> => {
+    if (!name || !lat || !lng) return [];
+    try {
+      const res = await fetch(
+        `/api/places/search?name=${encodeURIComponent(name)}&lat=${lat}&lng=${lng}`
+      );
+      const data = await res.json();
+      return data.candidates ?? [];
+    } catch {
+      return [];
+    }
+  };
+
+  const handleEnvImageFiles = async (files: FileList) => {
+    const items: EnvImageItem[] = Array.from(files).map(file => ({
+      file,
+      previewUrl:        URL.createObjectURL(file),
+      facilityName:      extractFacilityName(file.name),
+      searchName:        extractFacilityName(file.name),
+      candidates:        [],
+      selectedCandidate: null,
+      searching:         false,
+      uploading:         false,
+      uploaded:          false,
+      error:             null,
+    }));
+    setEnvImageItems(prev => [...prev, ...items]);
+
+    if (!property?.latitude || !property?.longitude) return;
+
+    for (const item of items) {
+      if (!item.searchName) continue;
+      setEnvImageItems(prev => prev.map(p =>
+        p.file === item.file ? { ...p, searching: true } : p
+      ));
+      const candidates = await searchPlaceCandidates(
+        item.searchName,
+        String(property.latitude),
+        String(property.longitude)
+      );
+      setEnvImageItems(prev => prev.map(p =>
+        p.file === item.file
+          ? {
+              ...p,
+              searching: false,
+              candidates,
+              selectedCandidate: candidates.find(c => c.name === item.searchName) ?? null,
+            }
+          : p
+      ));
+      await new Promise(r => setTimeout(r, 500));
+    }
+  };
+
+  const handleBulkEnvUpload = async () => {
+    setBulkEnvUploading(true);
+    try {
+      for (const item of envImageItems) {
+        if (item.uploaded) continue;
+
+        setEnvImageItems(prev => prev.map(p =>
+          p.file === item.file ? { ...p, uploading: true, error: null } : p
+        ));
+
+        try {
+          const candidate = item.selectedCandidate;
+          const fd = new FormData();
+          fd.append("file", item.file);
+          fd.append("facility_name", candidate?.name || item.facilityName);
+          if (candidate?.lat) fd.append("latitude", String(candidate.lat));
+          if (candidate?.lng) fd.append("longitude", String(candidate.lng));
+
+          const res = await fetch(`/api/properties/${params.id}/env-images`, {
+            method: "POST",
+            body: fd,
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+          setEnvImageItems(prev => prev.map(p =>
+            p.file === item.file ? { ...p, uploading: false, uploaded: true } : p
+          ));
+        } catch (err) {
+          console.error("env image upload failed:", err);
+          setEnvImageItems(prev => prev.map(p =>
+            p.file === item.file ? { ...p, uploading: false, error: "失敗" } : p
+          ));
+        }
+      }
+    } finally {
+      setBulkEnvUploading(false);
+    }
+  };
+
   const loadDocuments = async (propId: string) => {
     try {
       const res = await fetch(`/api/properties/${propId}/documents`);
@@ -1590,6 +1711,186 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
                   border: "1px dashed #e5e7eb", borderRadius: 6,
                 }}>
                   資料が登録されていません。「＋ 資料を追加」からPDFや画像をアップロードできます。
+                </div>
+              )}
+            </div>
+
+            {/* 周辺環境写真 一括アップロード */}
+            <div style={{ marginTop: 28, borderTop: "1px solid #e5e7eb", paddingTop: 22 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#374151" }}>
+                  🏙️ 周辺環境写真（一括アップロード）
+                </span>
+                <label style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "6px 14px", borderRadius: 6, fontSize: 12,
+                  background: "#f0fdf4", border: "1px solid #86efac",
+                  color: "#166534", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                }}>
+                  ＋ 複数枚を選択
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    style={{ display: "none" }}
+                    onChange={e => e.target.files && handleEnvImageFiles(e.target.files)}
+                  />
+                </label>
+              </div>
+
+              {(!property.latitude || !property.longitude) && envImageItems.length > 0 && (
+                <div style={{
+                  padding: 10, marginBottom: 10, borderRadius: 6,
+                  background: "#fffbeb", border: "1px solid #fde68a",
+                  fontSize: 12, color: "#92400e",
+                }}>
+                  ⚠ 物件の緯度経度が未設定です。先に「住所から緯度経度を取得」で座標を取得してください。
+                </div>
+              )}
+
+              {envImageItems.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
+                  {envImageItems.map((item, idx) => (
+                    <div key={idx} style={{
+                      display: "flex", gap: 12, padding: 12,
+                      border: `1px solid ${item.uploaded ? "#86efac" : "#e5e7eb"}`,
+                      borderRadius: 8,
+                      background: item.uploaded ? "#f0fdf4" : "#fff",
+                    }}>
+                      <img
+                        src={item.previewUrl}
+                        alt=""
+                        style={{ width: 80, height: 60, objectFit: "cover", borderRadius: 6 }}
+                      />
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                          <input
+                            type="text"
+                            value={item.searchName}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setEnvImageItems(prev => prev.map((p, i) =>
+                                i === idx ? { ...p, searchName: val } : p
+                              ));
+                            }}
+                            placeholder="施設名"
+                            style={{
+                              flex: 1, padding: "5px 8px",
+                              border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13,
+                              fontFamily: "inherit", boxSizing: "border-box",
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!property.latitude || !property.longitude) return;
+                              setEnvImageItems(prev => prev.map((p, i) =>
+                                i === idx ? { ...p, searching: true, candidates: [] } : p
+                              ));
+                              const candidates = await searchPlaceCandidates(
+                                item.searchName,
+                                String(property.latitude),
+                                String(property.longitude)
+                              );
+                              setEnvImageItems(prev => prev.map((p, i) =>
+                                i === idx ? { ...p, searching: false, candidates } : p
+                              ));
+                            }}
+                            disabled={item.searching}
+                            style={{
+                              padding: "5px 10px", borderRadius: 6, fontSize: 12,
+                              border: "1px solid #d1d5db", background: "#fff",
+                              cursor: item.searching ? "not-allowed" : "pointer",
+                              fontFamily: "inherit",
+                            }}
+                          >
+                            {item.searching ? "🔍..." : "🔍 再検索"}
+                          </button>
+                        </div>
+
+                        {item.candidates.length > 0 && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                            {item.candidates.map((c, ci) => (
+                              <button
+                                key={ci}
+                                type="button"
+                                onClick={() => setEnvImageItems(prev => prev.map((p, i) =>
+                                  i === idx ? { ...p, selectedCandidate: c } : p
+                                ))}
+                                style={{
+                                  padding: "3px 10px", borderRadius: 12, fontSize: 11,
+                                  border: `1px solid ${item.selectedCandidate?.name === c.name ? "#86efac" : "#e5e7eb"}`,
+                                  background: item.selectedCandidate?.name === c.name ? "#f0fdf4" : "#f9fafb",
+                                  color: "#374151", cursor: "pointer",
+                                  fontWeight: item.selectedCandidate?.name === c.name ? "bold" : "normal",
+                                  fontFamily: "inherit",
+                                }}
+                              >
+                                {c.name}
+                                {c.category && <span style={{ color: "#9ca3af", marginLeft: 4 }}>({c.category})</span>}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {item.candidates.length === 0 && !item.searching && item.searchName && (
+                          <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                            候補なし — 施設名を変更して再検索してください
+                          </div>
+                        )}
+
+                        {item.selectedCandidate && (
+                          <div style={{ fontSize: 11, color: "#166534", marginTop: 4 }}>
+                            ✅ {item.selectedCandidate.name}（座標取得済み）
+                          </div>
+                        )}
+
+                        {item.error && (
+                          <div style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>
+                            ❌ {item.error}
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", minWidth: 60, justifyContent: "center" }}>
+                        {item.uploaded
+                          ? <span style={{ fontSize: 20 }}>✅</span>
+                          : item.uploading
+                            ? <span style={{ fontSize: 12, color: "#9ca3af" }}>送信中...</span>
+                            : <button
+                                type="button"
+                                onClick={() => setEnvImageItems(prev => prev.filter((_, i) => i !== idx))}
+                                style={{
+                                  background: "none", border: "none",
+                                  color: "#9ca3af", cursor: "pointer", fontSize: 18,
+                                  fontFamily: "inherit",
+                                }}
+                              >✕</button>
+                        }
+                      </div>
+                    </div>
+                  ))}
+
+                  {envImageItems.some(i => !i.uploaded) && (
+                    <button
+                      type="button"
+                      onClick={handleBulkEnvUpload}
+                      disabled={bulkEnvUploading}
+                      style={{
+                        padding: "10px 20px", borderRadius: 6, border: "none",
+                        background: bulkEnvUploading ? "#e5e7eb" : "#5BAD52",
+                        color: bulkEnvUploading ? "#9ca3af" : "#fff",
+                        fontSize: 13, fontWeight: "bold",
+                        cursor: bulkEnvUploading ? "not-allowed" : "pointer",
+                        alignSelf: "flex-end", fontFamily: "inherit",
+                      }}
+                    >
+                      {bulkEnvUploading
+                        ? "アップロード中..."
+                        : `📤 ${envImageItems.filter(i => !i.uploaded).length}件をまとめて登録`}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
