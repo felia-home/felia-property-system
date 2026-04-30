@@ -82,17 +82,35 @@ export async function POST(
   }
 
   try {
-    const envImage = await prisma.propertyEnvironmentImage.create({
-      data: {
-        url,
-        filename,
-        facility_type,
-        facility_name,
-        city:      property.city ?? null,
-        latitude,
-        longitude,
-      },
+    // 同一URLの既存レコードがあれば再利用（メタデータを更新）
+    // PropertyEnvironmentImage.url には @unique が無いため findFirst で代用
+    const existing = await prisma.propertyEnvironmentImage.findFirst({
+      where: { url },
+      select: { id: true },
     });
+
+    const envImage = existing
+      ? await prisma.propertyEnvironmentImage.update({
+          where: { id: existing.id },
+          data: {
+            facility_type,
+            facility_name,
+            city:      property.city ?? null,
+            latitude,
+            longitude,
+          },
+        })
+      : await prisma.propertyEnvironmentImage.create({
+          data: {
+            url,
+            filename,
+            facility_type,
+            facility_name,
+            city:      property.city ?? null,
+            latitude,
+            longitude,
+          },
+        });
 
     await prisma.propertyEnvImageLink.upsert({
       where: { property_id_env_image_id: { property_id: params.id, env_image_id: envImage.id } },
@@ -100,7 +118,7 @@ export async function POST(
       update: {},
     });
 
-    return NextResponse.json({ image: envImage }, { status: 201 });
+    return NextResponse.json({ image: envImage }, { status: existing ? 200 : 201 });
   } catch (e) {
     console.error("env-images create error:", e);
     return NextResponse.json({ error: "登録に失敗しました" }, { status: 500 });
