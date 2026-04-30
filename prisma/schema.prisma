@@ -1478,5 +1478,29 @@ model AreaColumn {
   created_at   DateTime  @default(now())
   updated_at   DateTime  @updatedAt
 
+  stations     AreaColumnStation[]
+
   @@map("area_columns")
+}
+
+model ColumnStation {
+  id           String   @id @default(cuid())
+  station_line String
+  station_name String
+  area         String?
+  created_at   DateTime @default(now())
+  columns      AreaColumnStation[]
+
+  @@unique([station_line, station_name])
+  @@map("column_stations")
+}
+
+model AreaColumnStation {
+  column_id  String
+  station_id String
+  column     AreaColumn    @relation(fields: [column_id], references: [id], onDelete: Cascade)
+  station    ColumnStation @relation(fields: [station_id], references: [id], onDelete: Cascade)
+
+  @@id([column_id, station_id])
+  @@map("area_column_stations")
 }

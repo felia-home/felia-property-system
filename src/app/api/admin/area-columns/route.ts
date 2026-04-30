@@ -10,6 +10,9 @@ export async function GET(_req: NextRequest) {
 
   const columns = await prisma.areaColumn.findMany({
     orderBy: [{ area: "asc" }, { sort_order: "asc" }],
+    include: {
+      stations: { include: { station: true } },
+    },
   });
   return NextResponse.json({ columns });
 }
@@ -20,6 +23,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json() as Record<string, unknown>;
+  const station_ids = Array.isArray(body.station_ids) ? body.station_ids as string[] : [];
 
   const data = {
     area:         String(body.area ?? ""),
@@ -29,12 +33,20 @@ export async function POST(req: NextRequest) {
     is_active:    body.is_active !== false,
     sort_order:   body.sort_order != null ? Number(body.sort_order) : 0,
     published_at: body.published_at ? new Date(String(body.published_at)) : null,
+    stations: {
+      create: station_ids.map((sid) => ({
+        station: { connect: { id: sid } },
+      })),
+    },
   };
 
-  if (!data.area || !data.title) {
-    return NextResponse.json({ error: "area と title は必須です" }, { status: 400 });
+  if (!data.title) {
+    return NextResponse.json({ error: "title は必須です" }, { status: 400 });
   }
 
-  const column = await prisma.areaColumn.create({ data });
+  const column = await prisma.areaColumn.create({
+    data,
+    include: { stations: { include: { station: true } } },
+  });
   return NextResponse.json({ column });
 }
