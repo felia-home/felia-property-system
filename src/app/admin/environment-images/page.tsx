@@ -72,6 +72,10 @@ export default function EnvironmentImagesPage() {
     facility_name: string;
     facility_type: string;
     city: string;
+    address: string;
+    latitude: string;
+    longitude: string;
+    caption: string;
   } | null>(null);
 
   // AI解析
@@ -111,9 +115,13 @@ export default function EnvironmentImagesPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        facility_name: editTarget.facility_name,
-        facility_type: editTarget.facility_type,
-        city:          editTarget.city,
+        facility_name: editTarget.facility_name || null,
+        facility_type: editTarget.facility_type || null,
+        city:          editTarget.city || null,
+        address:       editTarget.address || null,
+        latitude:      editTarget.latitude  ? parseFloat(editTarget.latitude)  : null,
+        longitude:     editTarget.longitude ? parseFloat(editTarget.longitude) : null,
+        caption:       editTarget.caption || null,
       }),
     });
     setEditTarget(null);
@@ -618,6 +626,10 @@ export default function EnvironmentImagesPage() {
                     facility_name: img.facility_name ?? "",
                     facility_type: img.facility_type ?? "",
                     city:          img.city ?? "",
+                    address:       img.address ?? "",
+                    latitude:      img.latitude  != null ? String(img.latitude)  : "",
+                    longitude:     img.longitude != null ? String(img.longitude) : "",
+                    caption:       img.caption ?? img.ai_caption ?? "",
                   })}
                   style={{
                     flex: 1, padding: "5px 0", borderRadius: 6, fontSize: 12,
@@ -687,15 +699,68 @@ export default function EnvironmentImagesPage() {
               </select>
             </div>
 
-            <div style={{ marginBottom: 20 }}>
+            <div style={{ marginBottom: 14 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
-                エリア（区名）
+                市区町村
               </label>
               <input
                 type="text"
                 value={editTarget.city}
                 onChange={e => setEditTarget(prev => prev ? { ...prev, city: e.target.value } : null)}
                 placeholder="例: 新宿区"
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
+                住所
+              </label>
+              <input
+                type="text"
+                value={editTarget.address}
+                onChange={e => setEditTarget(prev => prev ? { ...prev, address: e.target.value } : null)}
+                placeholder="例: 新宿区四谷1-1"
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
+                  緯度
+                </label>
+                <input
+                  type="text"
+                  value={editTarget.latitude}
+                  onChange={e => setEditTarget(prev => prev ? { ...prev, latitude: e.target.value } : null)}
+                  placeholder="35.6895"
+                  style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
+                  経度
+                </label>
+                <input
+                  type="text"
+                  value={editTarget.longitude}
+                  onChange={e => setEditTarget(prev => prev ? { ...prev, longitude: e.target.value } : null)}
+                  placeholder="139.6917"
+                  style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
+                キャプション
+              </label>
+              <input
+                type="text"
+                value={editTarget.caption}
+                onChange={e => setEditTarget(prev => prev ? { ...prev, caption: e.target.value } : null)}
+                placeholder="徒歩5分・24時間営業 等"
                 style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
               />
             </div>

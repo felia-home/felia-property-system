@@ -86,6 +86,8 @@ JSONのみ返してください。`,
       facility_type?: string;
       area?: string;
       description?: string;
+      latitude?: number;
+      longitude?: number;
     } = {};
 
     try {
@@ -96,12 +98,32 @@ JSONのみ返してください。`,
       analyzed = {};
     }
 
+    // 緯度経度が未設定なら国土地理院で施設名から自動取得
+    if (analyzed.facility_name && (image.latitude == null || image.longitude == null)) {
+      try {
+        const geoUrl = `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(analyzed.facility_name)}`;
+        const geoRes = await fetch(geoUrl, { signal: AbortSignal.timeout(5000) });
+        if (geoRes.ok) {
+          const geoData = await geoRes.json() as { geometry?: { coordinates?: [number, number] } }[];
+          if (Array.isArray(geoData) && geoData.length > 0 && geoData[0]?.geometry?.coordinates) {
+            const [lng, lat] = geoData[0].geometry.coordinates;
+            analyzed.latitude  = lat;
+            analyzed.longitude = lng;
+          }
+        }
+      } catch {
+        // ジオコード失敗は無視
+      }
+    }
+
     // PropertyEnvironmentImage には area カラムが無いため city にマップ
     const data: Record<string, unknown> = {};
     if (analyzed.facility_name) data.facility_name = analyzed.facility_name;
     if (analyzed.facility_type) data.facility_type = analyzed.facility_type;
     if (analyzed.area)          data.city          = analyzed.area;
     if (analyzed.description)   data.ai_caption    = analyzed.description;
+    if (analyzed.latitude  != null) data.latitude  = analyzed.latitude;
+    if (analyzed.longitude != null) data.longitude = analyzed.longitude;
 
     const updated = Object.keys(data).length > 0
       ? await prisma.propertyEnvironmentImage.update({

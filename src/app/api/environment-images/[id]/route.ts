@@ -34,6 +34,16 @@ export async function PATCH(
   if (body.caption !== undefined) {
     data.caption = body.caption ? String(body.caption) : null;
   }
+  if (body.latitude !== undefined) {
+    data.latitude = body.latitude == null || body.latitude === ""
+      ? null
+      : Number(body.latitude);
+  }
+  if (body.longitude !== undefined) {
+    data.longitude = body.longitude == null || body.longitude === ""
+      ? null
+      : Number(body.longitude);
+  }
 
   const image = await prisma.propertyEnvironmentImage.update({
     where: { id: params.id },
