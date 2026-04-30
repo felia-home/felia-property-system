@@ -65,6 +65,35 @@ export default function EnvironmentImagesPage() {
   const [centerLat, setCenterLat]       = useState("35.689");
   const [centerLng, setCenterLng]       = useState("139.692");
 
+  // 編集
+  const [editTarget, setEditTarget] = useState<{
+    id: string;
+    facility_name: string;
+    facility_type: string;
+    city: string;
+  } | null>(null);
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`「${name}」を削除しますか？`)) return;
+    await fetch(`/api/environment-images/${id}`, { method: "DELETE" });
+    await load();
+  };
+
+  const handleEditSave = async () => {
+    if (!editTarget) return;
+    await fetch(`/api/environment-images/${editTarget.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        facility_name: editTarget.facility_name,
+        facility_type: editTarget.facility_type,
+        city:          editTarget.city,
+      }),
+    });
+    setEditTarget(null);
+    await load();
+  };
+
   const extractFacilityName = (filename: string): string => {
     let n = filename.replace(/\.[^.]+$/, "");
     n = n.replace(/^[\d_\-\s]+/, "");
@@ -485,8 +514,113 @@ export default function EnvironmentImagesPage() {
                   <div style={{ fontSize: 10, color: "#b0ae9c" }}>📍 {img.latitude.toFixed(4)}, {img.longitude.toFixed(4)}</div>
                 )}
               </div>
+              <div style={{ display: "flex", gap: 6, padding: "0 10px 10px" }}>
+                <button
+                  type="button"
+                  onClick={() => setEditTarget({
+                    id:            img.id,
+                    facility_name: img.facility_name ?? "",
+                    facility_type: img.facility_type ?? "",
+                    city:          img.city ?? "",
+                  })}
+                  style={{
+                    flex: 1, padding: "5px 0", borderRadius: 6, fontSize: 12,
+                    border: "1px solid #d1d5db", background: "#fff",
+                    color: "#374151", cursor: "pointer", fontFamily: "inherit",
+                  }}
+                >
+                  ✏️ 編集
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(img.id, img.facility_name ?? "名称未設定")}
+                  style={{
+                    flex: 1, padding: "5px 0", borderRadius: 6, fontSize: 12,
+                    border: "1px solid #fca5a5", background: "#fff",
+                    color: "#ef4444", cursor: "pointer", fontFamily: "inherit",
+                  }}
+                >
+                  🗑️ 削除
+                </button>
+              </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 編集モーダル */}
+      {editTarget && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: 12,
+            padding: 28, width: "100%", maxWidth: 440,
+          }}>
+            <h3 style={{ fontSize: 15, fontWeight: "bold", marginBottom: 16, margin: "0 0 16px" }}>
+              ✏️ 写真情報を編集
+            </h3>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
+                施設名
+              </label>
+              <input
+                type="text"
+                value={editTarget.facility_name}
+                onChange={e => setEditTarget(prev => prev ? { ...prev, facility_name: e.target.value } : null)}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
+                施設種別
+              </label>
+              <select
+                value={editTarget.facility_type}
+                onChange={e => setEditTarget(prev => prev ? { ...prev, facility_type: e.target.value } : null)}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, fontFamily: "inherit" }}
+              >
+                <option value="">その他</option>
+                {Object.entries(FACILITY_TYPES).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
+                エリア（区名）
+              </label>
+              <input
+                type="text"
+                value={editTarget.city}
+                onChange={e => setEditTarget(prev => prev ? { ...prev, city: e.target.value } : null)}
+                placeholder="例: 新宿区"
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setEditTarget(null)}
+                style={{ padding: "8px 20px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={handleEditSave}
+                style={{ padding: "8px 20px", borderRadius: 6, border: "none", background: "#5BAD52", color: "#fff", fontSize: 13, fontWeight: "bold", cursor: "pointer", fontFamily: "inherit" }}
+              >
+                保存
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
