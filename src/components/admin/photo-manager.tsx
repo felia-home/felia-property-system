@@ -159,11 +159,13 @@ function EnvironmentSuggestions({
   lat,
   lng,
   onUse,
+  linkedIds,
 }: {
   propertyId: string;
   lat: number | null;
   lng: number | null;
   onUse: (img: EnvImage) => void;
+  linkedIds: Set<string>;
 }) {
   const [images, setImages] = useState<EnvImage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -208,13 +210,21 @@ function EnvironmentSuggestions({
                 {img.facility_name && ` · ${img.facility_name}`}
               </div>
               <button
+                type="button"
                 onClick={() => onUse(img)}
+                disabled={linkedIds.has(img.id)}
                 style={{
                   marginTop: 3, width: "100%", fontSize: 10, padding: "2px 0",
-                  border: "1px solid #234f35", borderRadius: 4, background: "#fff",
-                  color: "#234f35", cursor: "pointer", fontFamily: "inherit",
+                  border: linkedIds.has(img.id) ? "1px solid #d1d5db" : "1px solid #234f35",
+                  borderRadius: 4,
+                  background: linkedIds.has(img.id) ? "#f3f4f6" : "#fff",
+                  color: linkedIds.has(img.id) ? "#9ca3af" : "#234f35",
+                  cursor: linkedIds.has(img.id) ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
                 }}
-              >この写真を使用</button>
+              >
+                {linkedIds.has(img.id) ? "✅ 登録済み" : "この写真を使用"}
+              </button>
             </div>
           ))}
         </div>
@@ -250,6 +260,7 @@ export default function PhotoManager({
   const [editRoomType, setEditRoomType] = useState<string>("");
   const [mansionName, setMansionName] = useState("");
   const [mansionSelected, setMansionSelected] = useState<MansionSuggestion | null>(null);
+  const [linkedEnvImageIds, setLinkedEnvImageIds] = useState<Set<string>>(new Set());
   const fileInput = useRef<HTMLInputElement>(null);
   const isMansion = propertyType === "MANSION" || propertyType === "NEW_MANSION";
 
@@ -670,15 +681,28 @@ export default function PhotoManager({
         propertyId={propertyId}
         lat={lat ?? null}
         lng={lng ?? null}
+        linkedIds={linkedEnvImageIds}
         onUse={async (img) => {
-          // Add environment image to property's image list by creating a PropertyImage record
-          await fetch(`/api/properties/${propertyId}/images`, {
-            method: "POST",
-            // We need to re-upload or reference — for env images, POST a JSON reference
-            // Actually use a separate env image approach via FormData re-upload
-          });
-          // Simplified: just reload images after add
-          await loadImages();
+          // 周辺環境写真を物件にリンク（既存 EnvironmentImage の URL で env-images JSON POST）
+          try {
+            const res = await fetch(`/api/properties/${propertyId}/env-images`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                url:           img.url,
+                facility_name: img.facility_name ?? "",
+                facility_type: img.facility_type ?? "OTHER",
+              }),
+            });
+            if (res.ok) {
+              setLinkedEnvImageIds(prev => new Set(prev).add(img.id));
+            } else {
+              const data = await res.json().catch(() => ({}));
+              alert("登録に失敗しました: " + (data.error ?? res.statusText));
+            }
+          } catch {
+            alert("エラーが発生しました");
+          }
         }}
       />
     </div>
