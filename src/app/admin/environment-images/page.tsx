@@ -90,69 +90,21 @@ export default function EnvironmentImagesPage() {
 
     setGeocodingEdit(true);
     try {
-      // 検索の中心座標（市区町村があれば GSI で大まかに取得）
-      let searchLat = "35.689";
-      let searchLng = "139.692";
-      if (editTarget.city) {
-        try {
-          const areaRes = await fetch(
-            `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent("東京都" + editTarget.city)}`,
-            { signal: AbortSignal.timeout(5000) }
-          );
-          const areaData = await areaRes.json() as { geometry?: { coordinates?: [number, number] } }[];
-          if (Array.isArray(areaData) && areaData.length > 0 && areaData[0]?.geometry?.coordinates) {
-            searchLng = String(areaData[0].geometry.coordinates[0]);
-            searchLat = String(areaData[0].geometry.coordinates[1]);
-          }
-        } catch { /* 失敗は無視 */ }
-      }
-
-      // Step1: 既存の /api/places/search (Overpass) で施設候補検索
-      const placeRes = await fetch(
-        `/api/places/search?name=${encodeURIComponent(editTarget.facility_name)}&lat=${searchLat}&lng=${searchLng}`
-      );
-      const placeData = await placeRes.json() as {
-        candidates?: { name: string; category: string; lat: number; lng: number }[];
-      };
-      const candidates = placeData.candidates ?? [];
-
-      if (candidates.length > 0) {
-        // 施設名にマッチするものを優先、無ければ先頭
-        const best = candidates.find(c => c.name.includes(editTarget.facility_name)) ?? candidates[0];
-
-        setEditTarget(prev => prev ? {
-          ...prev,
-          latitude:  String(best.lat),
-          longitude: String(best.lng),
-        } : null);
-
-        // Step2: 座標から住所を逆引き（GSI ReverseGeocoder）
-        try {
-          const revRes = await fetch(
-            `https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${best.lat}&lon=${best.lng}`,
-            { signal: AbortSignal.timeout(5000) }
-          );
-          const revData = await revRes.json() as { results?: { lv01Nm?: string } };
-          const lv01Nm = revData.results?.lv01Nm;
-          if (lv01Nm) {
-            setEditTarget(prev => prev ? {
-              ...prev,
-              address: (editTarget.city || "") + lv01Nm,
-            } : null);
-          }
-        } catch { /* 住所逆引き失敗は無視 */ }
-
-        return;
-      }
-
-      // Step3: Overpass で見つからなければ GSI 施設名検索でフォールバック
+      // GSI AddressSearch のみで検索（Overpass は使わない）
       const queries = [
         editTarget.city ? `${editTarget.city}${editTarget.facility_name}` : null,
         `東京都${editTarget.facility_name}`,
+        editTarget.facility_name,
       ].filter(Boolean) as string[];
 
+      // 「○○区」→「○○」（市区町村 suffix 除去でタイトルマッチに使う）
+      const cityCore = editTarget.city
+        ? editTarget.city.replace(/区$|市$|町$|村$/, "")
+        : "";
+
       let found = false;
-      for (const q of queries) {
+      for (let i = 0; i < queries.length; i++) {
+        const q = queries[i];
         try {
           const res = await fetch(
             `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(q)}`,
@@ -164,7 +116,15 @@ export default function EnvironmentImagesPage() {
           }[];
           if (Array.isArray(data) && data.length > 0 && data[0]?.geometry?.coordinates) {
             const [lng, lat] = data[0].geometry.coordinates;
-            const title = data[0].properties?.title || q;
+            const title = data[0].properties?.title || "";
+
+            // 市区町村が指定されていてタイトルが一致しない場合は次の候補へ
+            // ただし最後の候補なら採用（fallback）
+            const isLastCandidate = i === queries.length - 1;
+            if (cityCore && title && !title.includes(cityCore) && !isLastCandidate) {
+              continue;
+            }
+
             setEditTarget(prev => prev ? {
               ...prev,
               address:   title,
@@ -174,8 +134,11 @@ export default function EnvironmentImagesPage() {
             found = true;
             break;
           }
-        } catch { continue; }
+        } catch {
+          continue;
+        }
       }
+
       if (!found) {
         alert("住所・座標を取得できませんでした。\n施設名・エリアを確認してください。");
       }
