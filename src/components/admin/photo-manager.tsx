@@ -637,8 +637,8 @@ export default function PhotoManager({
                   </div>
                 </div>
               ) : (
-                <div style={{ marginTop: 4, fontSize: 11, color: img.caption ? "#1c1b18" : "#b0ae9c" }}>
-                  {img.caption ?? "キャプションなし"}
+                <div style={{ marginTop: 4, fontSize: 11, color: img.caption ? "#1c1b18" : img.ai_caption ? "#6b7280" : "#b0ae9c" }}>
+                  {img.caption ?? img.ai_caption ?? "キャプションなし"}
                 </div>
               )}
             </div>

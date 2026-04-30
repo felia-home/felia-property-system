@@ -54,10 +54,15 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const images = await prisma.propertyImage.findMany({
+    const rawImages = await prisma.propertyImage.findMany({
       where: { property_id: params.id },
       orderBy: [{ order: "asc" }, { created_at: "asc" }],
     });
+    // caption が空の場合は ai_caption をフォールバックとして caption に格納
+    const images = rawImages.map(img => ({
+      ...img,
+      caption: img.caption || img.ai_caption || null,
+    }));
     return NextResponse.json({ images });
   } catch (error) {
     console.error("GET /api/properties/[id]/images error:", error);
