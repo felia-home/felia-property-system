@@ -45,6 +45,114 @@ export default function EnvironmentImagesPage() {
   const [upCaption, setUpCaption] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // 一括アップロード
+  type PlaceCandidate = { name: string; category: string; lat: number; lng: number };
+  type BulkItem = {
+    file: File;
+    previewUrl: string;
+    facilityName: string;
+    searchName: string;
+    candidates: PlaceCandidate[];
+    selectedCandidate: PlaceCandidate | null;
+    searching: boolean;
+    uploading: boolean;
+    uploaded: boolean;
+    error: string | null;
+  };
+  const [bulkItems, setBulkItems]       = useState<BulkItem[]>([]);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [showBulk, setShowBulk]         = useState(false);
+  const [centerLat, setCenterLat]       = useState("35.689");
+  const [centerLng, setCenterLng]       = useState("139.692");
+
+  const extractFacilityName = (filename: string): string => {
+    let n = filename.replace(/\.[^.]+$/, "");
+    n = n.replace(/^[\d_\-\s]+/, "");
+    n = n.replace(/[\d_\-\s]+$/, "");
+    return n.trim();
+  };
+
+  const handleBulkFiles = async (files: FileList) => {
+    const items: BulkItem[] = Array.from(files).map(file => ({
+      file,
+      previewUrl:        URL.createObjectURL(file),
+      facilityName:      extractFacilityName(file.name),
+      searchName:        extractFacilityName(file.name),
+      candidates:        [],
+      selectedCandidate: null,
+      searching:         false,
+      uploading:         false,
+      uploaded:          false,
+      error:             null,
+    }));
+    setBulkItems(prev => [...prev, ...items]);
+
+    for (const item of items) {
+      if (!item.searchName) continue;
+      setBulkItems(prev => prev.map(p =>
+        p.file === item.file ? { ...p, searching: true } : p
+      ));
+      try {
+        const res = await fetch(
+          `/api/places/search?name=${encodeURIComponent(item.searchName)}&lat=${centerLat}&lng=${centerLng}`
+        );
+        const data = await res.json();
+        const candidates: PlaceCandidate[] = data.candidates ?? [];
+        setBulkItems(prev => prev.map(p =>
+          p.file === item.file
+            ? {
+                ...p,
+                searching: false,
+                candidates,
+                selectedCandidate: candidates.find(c => c.name === item.searchName) ?? null,
+              }
+            : p
+        ));
+      } catch {
+        setBulkItems(prev => prev.map(p =>
+          p.file === item.file ? { ...p, searching: false } : p
+        ));
+      }
+      await new Promise(r => setTimeout(r, 500));
+    }
+  };
+
+  const handleBulkUpload = async () => {
+    setBulkUploading(true);
+    try {
+      for (const item of bulkItems) {
+        if (item.uploaded) continue;
+        setBulkItems(prev => prev.map(p =>
+          p.file === item.file ? { ...p, uploading: true, error: null } : p
+        ));
+        try {
+          const candidate = item.selectedCandidate;
+          const fd = new FormData();
+          fd.append("file", item.file);
+          fd.append("facility_name", candidate?.name || item.facilityName);
+          fd.append("facility_type", "OTHER");
+          if (candidate?.lat) fd.append("latitude",  String(candidate.lat));
+          if (candidate?.lng) fd.append("longitude", String(candidate.lng));
+
+          const res = await fetch("/api/environment-images", { method: "POST", body: fd });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+          setBulkItems(prev => prev.map(p =>
+            p.file === item.file ? { ...p, uploading: false, uploaded: true } : p
+          ));
+        } catch (err) {
+          console.error("bulk env upload failed:", err);
+          setBulkItems(prev => prev.map(p =>
+            p.file === item.file ? { ...p, uploading: false, error: "失敗" } : p
+          ));
+        }
+      }
+      await load();
+    } finally {
+      setBulkUploading(false);
+    }
+  };
+
   const load = async () => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -90,13 +198,183 @@ export default function EnvironmentImagesPage() {
           <h1 style={{ fontSize: 20, fontWeight: 500 }}>周辺環境写真</h1>
           <p style={{ fontSize: 12, color: "#706e68", marginTop: 4 }}>複数物件で共有できる周辺施設写真のマスタ管理</p>
         </div>
-        <button
-          onClick={() => setShowUpload(!showUpload)}
-          style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-        >
-          + 写真を追加
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setShowBulk(v => !v)}
+            style={{
+              padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700,
+              border: "1px solid #86efac",
+              background: showBulk ? "#dcfce7" : "#f0fdf4",
+              color: "#166534", cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            📤 一括アップロード
+          </button>
+          <button
+            onClick={() => setShowUpload(!showUpload)}
+            style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: "#234f35", color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+          >
+            + 写真を追加
+          </button>
+        </div>
       </div>
+
+      {/* 一括アップロードパネル */}
+      {showBulk && (
+        <div style={{
+          marginBottom: 20, padding: 20,
+          background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8,
+        }}>
+          <div style={{ fontSize: 14, fontWeight: "bold", marginBottom: 12 }}>
+            📤 周辺環境写真 一括アップロード
+          </div>
+
+          <div style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
+              施設検索の中心座標:
+            </span>
+            <input
+              type="text" value={centerLat}
+              onChange={e => setCenterLat(e.target.value)}
+              placeholder="緯度"
+              style={{ width: 110, padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, fontFamily: "inherit" }}
+            />
+            <input
+              type="text" value={centerLng}
+              onChange={e => setCenterLng(e.target.value)}
+              placeholder="経度"
+              style={{ width: 110, padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, fontFamily: "inherit" }}
+            />
+            <span style={{ fontSize: 11, color: "#9ca3af" }}>
+              物件の緯度経度を入力すると候補精度が上がります
+            </span>
+          </div>
+
+          <label style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            padding: "8px 16px", borderRadius: 6, fontSize: 13,
+            background: "#fff", border: "2px dashed #d1d5db",
+            cursor: "pointer", color: "#374151", marginBottom: 16,
+          }}>
+            📂 複数ファイルを選択
+            <input
+              type="file" accept="image/*" multiple
+              style={{ display: "none" }}
+              onChange={e => e.target.files && handleBulkFiles(e.target.files)}
+            />
+          </label>
+
+          {bulkItems.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+              {bulkItems.map((item, idx) => (
+                <div key={idx} style={{
+                  display: "flex", gap: 10, padding: 10,
+                  border: `1px solid ${item.uploaded ? "#86efac" : item.error ? "#fca5a5" : "#e5e7eb"}`,
+                  borderRadius: 8,
+                  background: item.uploaded ? "#f0fdf4" : "#fff",
+                }}>
+                  <img
+                    src={item.previewUrl} alt=""
+                    style={{ width: 72, height: 54, objectFit: "cover", borderRadius: 6 }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
+                      <input
+                        type="text" value={item.searchName}
+                        onChange={e => setBulkItems(prev => prev.map((p, i) =>
+                          i === idx ? { ...p, searchName: e.target.value } : p
+                        ))}
+                        placeholder="施設名"
+                        style={{ flex: 1, padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, fontFamily: "inherit", boxSizing: "border-box" }}
+                      />
+                      <button type="button"
+                        onClick={async () => {
+                          setBulkItems(prev => prev.map((p, i) => i === idx ? { ...p, searching: true, candidates: [] } : p));
+                          const res = await fetch(`/api/places/search?name=${encodeURIComponent(item.searchName)}&lat=${centerLat}&lng=${centerLng}`);
+                          const data = await res.json();
+                          setBulkItems(prev => prev.map((p, i) => i === idx ? { ...p, searching: false, candidates: data.candidates ?? [] } : p));
+                        }}
+                        disabled={item.searching}
+                        style={{
+                          padding: "4px 8px", borderRadius: 6, fontSize: 11,
+                          border: "1px solid #d1d5db", background: "#fff",
+                          cursor: item.searching ? "not-allowed" : "pointer",
+                          fontFamily: "inherit",
+                        }}>
+                        {item.searching ? "🔍..." : "🔍"}
+                      </button>
+                    </div>
+                    {item.candidates.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {item.candidates.map((c, ci) => (
+                          <button key={ci} type="button"
+                            onClick={() => setBulkItems(prev => prev.map((p, i) =>
+                              i === idx ? { ...p, selectedCandidate: c } : p
+                            ))}
+                            style={{
+                              padding: "2px 8px", borderRadius: 10, fontSize: 11, cursor: "pointer",
+                              border: `1px solid ${item.selectedCandidate?.name === c.name ? "#86efac" : "#e5e7eb"}`,
+                              background: item.selectedCandidate?.name === c.name ? "#f0fdf4" : "#f9fafb",
+                              fontFamily: "inherit",
+                            }}>
+                            {c.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {item.candidates.length === 0 && !item.searching && item.searchName && (
+                      <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                        候補なし — 施設名を変更して再検索してください
+                      </div>
+                    )}
+                    {item.selectedCandidate && (
+                      <div style={{ fontSize: 11, color: "#166534", marginTop: 3 }}>
+                        ✅ {item.selectedCandidate.name}
+                      </div>
+                    )}
+                    {item.error && (
+                      <div style={{ fontSize: 11, color: "#ef4444", marginTop: 3 }}>❌ {item.error}</div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", minWidth: 40, justifyContent: "center" }}>
+                    {item.uploaded
+                      ? <span>✅</span>
+                      : item.uploading
+                        ? <span style={{ fontSize: 11, color: "#9ca3af" }}>送信中</span>
+                        : <button type="button"
+                            onClick={() => setBulkItems(prev => prev.filter((_, i) => i !== idx))}
+                            style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: 16, fontFamily: "inherit" }}>✕</button>
+                    }
+                  </div>
+                </div>
+              ))}
+
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button type="button"
+                  onClick={() => setBulkItems([])}
+                  style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+                  クリア
+                </button>
+                {bulkItems.some(i => !i.uploaded) && (
+                  <button type="button" onClick={handleBulkUpload} disabled={bulkUploading}
+                    style={{
+                      padding: "8px 20px", borderRadius: 6, border: "none",
+                      background: bulkUploading ? "#e5e7eb" : "#5BAD52",
+                      color: bulkUploading ? "#9ca3af" : "#fff",
+                      fontSize: 13, fontWeight: "bold",
+                      cursor: bulkUploading ? "not-allowed" : "pointer",
+                      fontFamily: "inherit",
+                    }}>
+                    {bulkUploading
+                      ? "アップロード中..."
+                      : `📤 ${bulkItems.filter(i => !i.uploaded).length}件をまとめて登録`}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Upload form */}
       {showUpload && (
