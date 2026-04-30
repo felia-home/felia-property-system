@@ -57,6 +57,7 @@ export default function EnvironmentImagesPage() {
     searching: boolean;
     uploading: boolean;
     uploaded: boolean;
+    analyzing: boolean;
     error: string | null;
   };
   const [bulkItems, setBulkItems]       = useState<BulkItem[]>([]);
@@ -72,6 +73,31 @@ export default function EnvironmentImagesPage() {
     facility_type: string;
     city: string;
   } | null>(null);
+
+  // AI解析
+  const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
+
+  const handleAnalyze = async (id: string) => {
+    setAnalyzingIds(prev => new Set(prev).add(id));
+    try {
+      await fetch(`/api/environment-images/${id}/analyze`, { method: "POST" });
+      await load();
+    } finally {
+      setAnalyzingIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
+  const handleAnalyzeAll = async () => {
+    if (!confirm("全写真をAI解析します。1件ずつ処理するため時間がかかります。よろしいですか？")) return;
+    for (const image of images) {
+      await handleAnalyze(image.id);
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  };
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`「${name}」を削除しますか？`)) return;
@@ -112,6 +138,7 @@ export default function EnvironmentImagesPage() {
       searching:         false,
       uploading:         false,
       uploaded:          false,
+      analyzing:         false,
       error:             null,
     }));
     setBulkItems(prev => [...prev, ...items]);
@@ -165,10 +192,43 @@ export default function EnvironmentImagesPage() {
 
           const res = await fetch("/api/environment-images", { method: "POST", body: fd });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const uploadData = await res.json();
 
+          // アップロード成功
           setBulkItems(prev => prev.map(p =>
-            p.file === item.file ? { ...p, uploading: false, uploaded: true } : p
+            p.file === item.file
+              ? { ...p, uploading: false, uploaded: true, analyzing: !!uploadData.image?.id }
+              : p
           ));
+
+          // 後段でAI解析を発火（fire-and-forget。完了時にUIへ反映）
+          if (uploadData.image?.id) {
+            fetch(`/api/environment-images/${uploadData.image.id}/analyze`, { method: "POST" })
+              .then(async (r) => {
+                const data = await r.json();
+                if (data.ok) {
+                  setBulkItems(prev => prev.map(p =>
+                    p.file === item.file
+                      ? {
+                          ...p,
+                          analyzing:    false,
+                          facilityName: data.analyzed?.facility_name || p.facilityName,
+                          searchName:   data.analyzed?.facility_name || p.searchName,
+                        }
+                      : p
+                  ));
+                } else {
+                  setBulkItems(prev => prev.map(p =>
+                    p.file === item.file ? { ...p, analyzing: false } : p
+                  ));
+                }
+              })
+              .catch(() => {
+                setBulkItems(prev => prev.map(p =>
+                  p.file === item.file ? { ...p, analyzing: false } : p
+                ));
+              });
+          }
         } catch (err) {
           console.error("bulk env upload failed:", err);
           setBulkItems(prev => prev.map(p =>
@@ -176,7 +236,8 @@ export default function EnvironmentImagesPage() {
           ));
         }
       }
-      await load();
+      // 3秒後に一覧を再取得（AI解析が完了するのを待つ）
+      setTimeout(() => { void load(); }, 3000);
     } finally {
       setBulkUploading(false);
     }
@@ -227,7 +288,21 @@ export default function EnvironmentImagesPage() {
           <h1 style={{ fontSize: 20, fontWeight: 500 }}>周辺環境写真</h1>
           <p style={{ fontSize: 12, color: "#706e68", marginTop: 4 }}>複数物件で共有できる周辺施設写真のマスタ管理</p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            onClick={handleAnalyzeAll}
+            disabled={images.length === 0}
+            style={{
+              padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700,
+              border: "1px solid #e9d5ff",
+              background: images.length === 0 ? "#f3f4f6" : "#faf5ff",
+              color: images.length === 0 ? "#9ca3af" : "#7c3aed",
+              cursor: images.length === 0 ? "not-allowed" : "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            ✨ 全件AI解析
+          </button>
           <button
             onClick={() => setShowBulk(v => !v)}
             style={{
@@ -359,6 +434,11 @@ export default function EnvironmentImagesPage() {
                     {item.selectedCandidate && (
                       <div style={{ fontSize: 11, color: "#166534", marginTop: 3 }}>
                         ✅ {item.selectedCandidate.name}
+                      </div>
+                    )}
+                    {item.analyzing && (
+                      <div style={{ fontSize: 11, color: "#7c3aed", marginTop: 3 }}>
+                        ✨ AI解析中...
                       </div>
                     )}
                     {item.error && (
@@ -513,6 +593,22 @@ export default function EnvironmentImagesPage() {
                 {img.latitude && img.longitude && (
                   <div style={{ fontSize: 10, color: "#b0ae9c" }}>📍 {img.latitude.toFixed(4)}, {img.longitude.toFixed(4)}</div>
                 )}
+              </div>
+              <div style={{ display: "flex", gap: 6, padding: "0 10px 6px" }}>
+                <button
+                  type="button"
+                  onClick={() => handleAnalyze(img.id)}
+                  disabled={analyzingIds.has(img.id)}
+                  style={{
+                    flex: 1, padding: "5px 0", borderRadius: 6, fontSize: 12,
+                    border: "1px solid #e9d5ff", background: "#faf5ff",
+                    color: analyzingIds.has(img.id) ? "#9ca3af" : "#7c3aed",
+                    cursor: analyzingIds.has(img.id) ? "not-allowed" : "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  {analyzingIds.has(img.id) ? "✨ 解析中..." : "✨ AI解析"}
+                </button>
               </div>
               <div style={{ display: "flex", gap: 6, padding: "0 10px 10px" }}>
                 <button
