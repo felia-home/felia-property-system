@@ -213,7 +213,7 @@ export default function EnvironmentImagesPage() {
       if (Array.isArray(data) && data.length > 0 && data[0]?.geometry?.coordinates) {
         const [lng, lat] = data[0].geometry.coordinates;
         if (!isTokyoCoords(lat, lng)) {
-          alert("東京都外の座標が返されました。施設名・エリアを確認してください。");
+          alert(`東京都外の座標が返されました（${lat.toFixed(4)}, ${lng.toFixed(4)}）。\n施設名・エリアを確認してください。`);
           return;
         }
         setEditTarget(prev => prev ? {
@@ -890,7 +890,7 @@ export default function EnvironmentImagesPage() {
                       if (Array.isArray(data) && data.length > 0 && data[0]?.geometry?.coordinates) {
                         const [lng, lat] = data[0].geometry.coordinates;
                         if (!isTokyoCoords(lat, lng)) {
-                          alert("東京都外の座標が返されました。住所を確認してください。");
+                          alert(`東京都外の座標が返されました（${lat.toFixed(4)}, ${lng.toFixed(4)}）。\n住所を確認してください。`);
                           return;
                         }
                         setEditTarget(prev => prev ? {

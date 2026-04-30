@@ -174,7 +174,7 @@ function EnvironmentSuggestions({
     const params = new URLSearchParams();
     if (lat != null) params.set("lat", String(lat));
     if (lng != null) params.set("lng", String(lng));
-    params.set("radius", "500");
+    params.set("radius", "1200");
     const res = await fetch(`/api/environment-images?${params}`);
     const data = await res.json();
     setImages(data.images ?? []);
@@ -187,7 +187,7 @@ function EnvironmentSuggestions({
   return (
     <div style={{ marginTop: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-        <span style={{ fontSize: 12, fontWeight: 500, color: "#706e68" }}>周辺環境写真のサジェスト（500m以内）</span>
+        <span style={{ fontSize: 12, fontWeight: 500, color: "#706e68" }}>周辺環境写真のサジェスト（1200m以内）</span>
         {!loaded && (
           <button onClick={load} disabled={loading}
             style={{ fontSize: 11, padding: "3px 10px", border: "1px solid #e0deda", borderRadius: 6, background: "#f7f6f2", cursor: "pointer", fontFamily: "inherit" }}>
@@ -196,7 +196,7 @@ function EnvironmentSuggestions({
         )}
       </div>
       {loaded && images.length === 0 && (
-        <p style={{ fontSize: 12, color: "#706e68" }}>周辺500m以内の環境写真はありません</p>
+        <p style={{ fontSize: 12, color: "#706e68" }}>周辺1200m以内の環境写真はありません</p>
       )}
       {loaded && images.length > 0 && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

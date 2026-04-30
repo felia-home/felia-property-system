@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { uploadFile } from "@/lib/storage";
 import { analyzeEnvironmentImage } from "@/agents/image-analyzer";
 
-// GET /api/environment-images?lat=xxx&lng=xxx&radius=500&city=xxx&type=xxx
+// GET /api/environment-images?lat=xxx&lng=xxx&radius=1200&city=xxx&type=xxx
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     if (lat && lng) {
       const latN = parseFloat(lat);
       const lngN = parseFloat(lng);
-      const radiusKm = (parseFloat(radiusStr ?? "500") / 1000);
+      const radiusKm = (parseFloat(radiusStr ?? "1200") / 1000);
       const filtered = images.filter((img) => {
         if (img.latitude == null || img.longitude == null) return false;
         const dlat = img.latitude - latN;
