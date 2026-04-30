@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { TOKYO_TRAIN_LINES, TOKYO_LINE_KEYS } from "@/lib/tokyoStations";
 
 interface Station {
   id: string;
@@ -229,27 +230,48 @@ HTMLタグは使わず、段落で区切ってください。`;
           background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8,
         }}>
           <div style={{ fontSize: 14, fontWeight: "bold", marginBottom: 12 }}>🚉 駅マスタ管理</div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-            <input
-              value={newLine} onChange={e => setNewLine(e.target.value)}
-              placeholder="路線名（例: 東京メトロ丸ノ内線）"
-              style={{ padding: "7px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, width: 220 }}
-            />
-            <input
-              value={newStation} onChange={e => setNewStation(e.target.value)}
-              placeholder="駅名（例: 四谷三丁目）"
-              style={{ padding: "7px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, width: 160 }}
-            />
+          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+            <select
+              value={newLine}
+              onChange={e => { setNewLine(e.target.value); setNewStation(""); }}
+              style={{ padding: "7px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, width: 220, fontFamily: "inherit", background: "#fff" }}
+            >
+              <option value="">路線を選択</option>
+              {TOKYO_LINE_KEYS.map(line => (
+                <option key={line} value={line}>{line}</option>
+              ))}
+            </select>
+            <select
+              value={newStation}
+              onChange={e => setNewStation(e.target.value)}
+              disabled={!newLine}
+              style={{
+                padding: "7px 10px", border: "1px solid #d1d5db", borderRadius: 6,
+                fontSize: 13, width: 180, fontFamily: "inherit",
+                background: newLine ? "#fff" : "#f3f4f6",
+                cursor: newLine ? "pointer" : "not-allowed",
+              }}
+            >
+              <option value="">駅を選択</option>
+              {newLine && (TOKYO_TRAIN_LINES[newLine] ?? []).map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
             <input
               value={newArea} onChange={e => setNewArea(e.target.value)}
               placeholder="エリア（例: 新宿区）"
-              style={{ padding: "7px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, width: 120 }}
+              style={{ padding: "7px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, width: 120, fontFamily: "inherit" }}
             />
             <button
               type="button" onClick={handleAddStation}
+              disabled={!newLine || !newStation}
               style={{
                 padding: "7px 16px", borderRadius: 6, border: "none",
-                background: "#5BAD52", color: "#fff", fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                background: !newLine || !newStation ? "#e5e7eb" : "#5BAD52",
+                color: !newLine || !newStation ? "#9ca3af" : "#fff",
+                fontSize: 13,
+                cursor: !newLine || !newStation ? "not-allowed" : "pointer",
+                fontFamily: "inherit", fontWeight: "bold",
               }}
             >
               追加
