@@ -113,8 +113,8 @@ export async function POST(
         });
 
     await prisma.propertyEnvImageLink.upsert({
-      where: { property_id_env_image_id: { property_id: params.id, env_image_id: envImage.id } },
-      create: { property_id: params.id, env_image_id: envImage.id },
+      where: { property_id_image_id: { property_id: params.id, image_id: envImage.id } },
+      create: { property_id: params.id, image_id: envImage.id },
       update: {},
     });
 

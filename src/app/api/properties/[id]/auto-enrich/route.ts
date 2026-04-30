@@ -467,9 +467,9 @@ export async function POST(
     try {
       await prisma.propertyEnvImageLink.upsert({
         where: {
-          property_id_env_image_id: { property_id: params.id, env_image_id: img.id },
+          property_id_image_id: { property_id: params.id, image_id: img.id },
         },
-        create: { property_id: params.id, env_image_id: img.id },
+        create: { property_id: params.id, image_id: img.id },
         update: {},
       });
       linkedCount++;

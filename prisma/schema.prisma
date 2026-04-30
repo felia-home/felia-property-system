@@ -459,11 +459,12 @@ model PropertyEnvironmentImage {
 model PropertyEnvImageLink {
   id           String                   @id @default(cuid())
   property_id  String
-  env_image_id String
+  image_id     String
+  walk_minutes Int?
   property     Property                 @relation(fields: [property_id], references: [id], onDelete: Cascade)
-  env_image    PropertyEnvironmentImage @relation(fields: [env_image_id], references: [id], onDelete: Cascade)
+  env_image    PropertyEnvironmentImage @relation(fields: [image_id], references: [id], onDelete: Cascade)
   created_at   DateTime                 @default(now())
-  @@unique([property_id, env_image_id])
+  @@unique([property_id, image_id])
   @@map("property_env_image_links")
 }
 
