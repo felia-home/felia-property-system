@@ -78,6 +78,60 @@ export default function EnvironmentImagesPage() {
     caption: string;
   } | null>(null);
 
+  // 編集モーダル内ジオコード
+  const [geocodingEdit, setGeocodingEdit] = useState(false);
+
+  const handleEditGeocode = async () => {
+    if (!editTarget) return;
+    if (!editTarget.facility_name) {
+      alert("施設名を入力してください");
+      return;
+    }
+
+    setGeocodingEdit(true);
+    try {
+      const queries = [
+        editTarget.city ? `${editTarget.city}${editTarget.facility_name}` : null,
+        editTarget.facility_name,
+        `東京都${editTarget.facility_name}`,
+      ].filter(Boolean) as string[];
+
+      let found = false;
+      for (const q of queries) {
+        try {
+          const res = await fetch(
+            `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(q)}`,
+            { signal: AbortSignal.timeout(5000) }
+          );
+          const data = await res.json() as {
+            geometry?: { coordinates?: [number, number] };
+            properties?: { title?: string };
+          }[];
+          if (Array.isArray(data) && data.length > 0 && data[0]?.geometry?.coordinates) {
+            const [lng, lat] = data[0].geometry.coordinates;
+            const addressText = data[0].properties?.title || q;
+            setEditTarget(prev => prev ? {
+              ...prev,
+              address:   addressText,
+              latitude:  String(lat),
+              longitude: String(lng),
+            } : null);
+            found = true;
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      if (!found) {
+        alert("住所・座標を取得できませんでした。\n施設名・エリアを確認してください。");
+      }
+    } finally {
+      setGeocodingEdit(false);
+    }
+  };
+
   // AI解析
   const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
 
@@ -735,6 +789,27 @@ export default function EnvironmentImagesPage() {
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <button
+                type="button"
+                onClick={handleEditGeocode}
+                disabled={geocodingEdit}
+                style={{
+                  width: "100%", padding: "9px 0", borderRadius: 6, fontSize: 13,
+                  border: "1px solid #bfdbfe",
+                  background: geocodingEdit ? "#e5e7eb" : "#eff6ff",
+                  color: geocodingEdit ? "#9ca3af" : "#1d4ed8",
+                  fontWeight: "bold",
+                  cursor: geocodingEdit ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {geocodingEdit
+                  ? "🔍 検索中..."
+                  : "🔍 市区町村＋施設名から住所・座標を取得"}
+              </button>
             </div>
 
             <div style={{ marginBottom: 14 }}>
