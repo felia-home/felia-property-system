@@ -349,9 +349,10 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const { rows, default_agent_id } = await req.json() as {
+    const { rows, default_agent_id, skip_images = false } = await req.json() as {
       rows?: Record<string, unknown>[];
       default_agent_id?: string;
+      skip_images?: boolean;
     };
 
     if (!Array.isArray(rows) || rows.length === 0) {
@@ -526,7 +527,8 @@ export async function POST(req: NextRequest) {
         inserted++;
 
         // Yahoo!物件番号があれば画像も一緒にインポート（失敗しても続行）
-        if (yahooNo) {
+        // skip_images=true の場合は画像処理をスキップ（高速モード）
+        if (!skip_images && yahooNo) {
           try {
             await importPropertyImages(created.id, yahooNo, row);
           } catch (e) {

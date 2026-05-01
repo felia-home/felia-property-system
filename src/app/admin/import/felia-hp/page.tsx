@@ -11,6 +11,7 @@ type Store = "sendagaya" | "hatagaya";
 export default function FeliaHpImportPage() {
   const [file, setFile]           = useState<File | null>(null);
   const [store, setStore]         = useState<Store>("sendagaya");
+  const [skipImages, setSkipImages] = useState<boolean>(true); // デフォルトは高速モード
   const [importing, setImporting] = useState(false);
   const [result, setResult]       = useState<{
     inserted: number; skipped: number; errors: number; total: number;
@@ -117,7 +118,11 @@ export default function FeliaHpImportPage() {
       const res = await fetch("/api/import/felia-csv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows, default_agent_id: DEFAULT_AGENT[store] }),
+        body: JSON.stringify({
+          rows,
+          default_agent_id: DEFAULT_AGENT[store],
+          skip_images: skipImages,
+        }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -169,6 +174,35 @@ export default function FeliaHpImportPage() {
                 style={{ display: "none" }}
               />
               {store === opt.value ? "✅ " : ""}{opt.label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* インポートモード選択 */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 8 }}>
+          インポートモード
+        </label>
+        <div style={{ display: "flex", gap: 10 }}>
+          {[
+            { value: true,  label: "⚡ テキストのみ（高速・数秒）", desc: "画像は別途アップロード" },
+            { value: false, label: "🖼️ 画像も含む（低速・数分）",   desc: "旧システムから画像を自動取込" },
+          ].map(opt => (
+            <label key={String(opt.value)} style={{
+              flex: 1, padding: "10px 14px", borderRadius: 6, cursor: "pointer",
+              border: `2px solid ${skipImages === opt.value ? "#5BAD52" : "#e5e7eb"}`,
+              background: skipImages === opt.value ? "#f0fdf4" : "#fff",
+              fontSize: 13, fontFamily: "inherit",
+            }}>
+              <input
+                type="radio"
+                checked={skipImages === opt.value}
+                onChange={() => setSkipImages(opt.value)}
+                style={{ display: "none" }}
+              />
+              <div style={{ fontWeight: "bold" }}>{opt.label}</div>
+              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{opt.desc}</div>
             </label>
           ))}
         </div>
