@@ -3,6 +3,16 @@ import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { downloadAndUploadToR2 } from "@/lib/import-image";
+import { PROPERTY_FEATURES } from "@/lib/propertyFeatures";
+
+// ラベル → ID 変換マップ（旧HPの日本語ラベルを正規化IDに）
+const FEATURE_LABEL_TO_ID = (() => {
+  const m = new Map<string, string>();
+  for (const cat of PROPERTY_FEATURES) {
+    for (const item of cat.items) m.set(item.label, item.id);
+  }
+  return m;
+})();
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -196,11 +206,17 @@ function parseUseZones(row: Record<string, unknown>): string[] {
   return zones;
 }
 
-// 設備文字列（/区切り）→ 配列
+// 設備文字列（/区切り）→ 配列。ラベルが master にあれば id に正規化、無ければ label のまま
 function parseFeatures(v: unknown): string[] {
   const s = toStr(v);
   if (!s) return [];
-  return s.split("/").map(f => f.trim()).filter(Boolean);
+  const out: string[] = [];
+  for (const raw of s.split("/")) {
+    const f = raw.trim();
+    if (!f) continue;
+    out.push(FEATURE_LABEL_TO_ID.get(f) ?? f);
+  }
+  return out;
 }
 
 // 接道情報 → Prisma の Json 互換配列（Property.roads 用）

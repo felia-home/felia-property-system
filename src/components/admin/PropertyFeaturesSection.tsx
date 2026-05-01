@@ -15,10 +15,24 @@ const PORTAL_BG: Record<Portal, string> = {
 };
 
 export default function PropertyFeaturesSection({ selectedFeatures, onChange, readOnly }: Props) {
-  const toggle = (id: string) => {
+  // ラベル ⇔ ID マップ（旧データの日本語ラベルとの後方互換のため）
+  const labelToId = new Map<string, string>();
+  const idToLabel = new Map<string, string>();
+  for (const cat of PROPERTY_FEATURES) {
+    for (const item of cat.items) {
+      labelToId.set(item.label, item.id);
+      idToLabel.set(item.id, item.label);
+    }
+  }
+
+  const isChecked = (id: string, label: string): boolean =>
+    selectedFeatures.includes(id) || selectedFeatures.includes(label);
+
+  const toggle = (id: string, label: string) => {
     if (readOnly) return;
-    if (selectedFeatures.includes(id)) {
-      onChange(selectedFeatures.filter(f => f !== id));
+    if (isChecked(id, label)) {
+      // id とラベル両方を除外（古いデータ移行のため）
+      onChange(selectedFeatures.filter(f => f !== id && f !== label));
     } else {
       onChange([...selectedFeatures, id]);
     }
@@ -29,7 +43,15 @@ export default function PropertyFeaturesSection({ selectedFeatures, onChange, re
     onChange([]);
   };
 
-  const selectedCount = selectedFeatures.length;
+  // 重複カウント回避: id とラベルの両方含まれるケースは一方だけカウント
+  const selectedCount = (() => {
+    const seen = new Set<string>();
+    for (const f of selectedFeatures) {
+      const canonical = labelToId.get(f) ?? f;
+      seen.add(canonical);
+    }
+    return seen.size;
+  })();
 
   return (
     <div style={{ marginTop: 24 }}>
@@ -79,7 +101,7 @@ export default function PropertyFeaturesSection({ selectedFeatures, onChange, re
             gap: '6px 12px',
           }}>
             {category.items.map(item => {
-              const checked = selectedFeatures.includes(item.id);
+              const checked = isChecked(item.id, item.label);
               return (
                 <label
                   key={item.id}
@@ -95,7 +117,7 @@ export default function PropertyFeaturesSection({ selectedFeatures, onChange, re
                     <input
                       type="checkbox"
                       checked={checked}
-                      onChange={() => toggle(item.id)}
+                      onChange={() => toggle(item.id, item.label)}
                       disabled={readOnly}
                       style={{ cursor: readOnly ? 'default' : 'pointer', flexShrink: 0 }}
                     />
