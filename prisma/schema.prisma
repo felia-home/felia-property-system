@@ -112,6 +112,8 @@ model Property {
   national_land_act       Boolean   @default(false)
   agricultural_act        Boolean   @default(false)
   landscape_act           Boolean   @default(false)
+  // 法令上の制限（防火地域・高度地区など、複数チェック可）
+  legal_restrictions      String[]  @default([])
 
   // 費用・管理
   management_fee        Int?

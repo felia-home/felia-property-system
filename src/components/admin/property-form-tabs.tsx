@@ -102,6 +102,7 @@ export const INITIAL_FORM: Record<string, string> = {
   private_road: "false", setback_required: "false", setback_area: "",
   building_conditions: "false", rebuild_allowed: "",
   national_land_act: "false", agricultural_act: "false", landscape_act: "false",
+  legal_restrictions: "[]",
   // タブ6: 設備
   eq_autolock: "false", eq_elevator: "false", eq_parking: "false",
   eq_parking_fee: "", eq_bike_parking: "false", eq_storage: "false",
@@ -158,7 +159,7 @@ export function propertyToForm(p: Record<string, unknown>): Record<string, strin
   const form: Record<string, string> = { ...INITIAL_FORM };
   for (const [k, v] of Object.entries(p)) {
     if (v === null || v === undefined) continue;
-    if (k === "use_zones" || k === "roads") {
+    if (k === "use_zones" || k === "roads" || k === "legal_restrictions") {
       form[k] = Array.isArray(v) ? JSON.stringify(v) : "[]";
     } else if (DATE_FIELDS.has(k)) {
       form[k] = v ? new Date(v as string).toISOString().split("T")[0] : "";
@@ -179,6 +180,11 @@ export function formToBody(form: Record<string, string>): Record<string, unknown
     if (k === "use_zones" || k === "roads") {
       try { const arr = JSON.parse(v); body[k] = Array.isArray(arr) && arr.length > 0 ? arr : null; }
       catch { body[k] = null; }
+      continue;
+    }
+    if (k === "legal_restrictions") {
+      try { const arr = JSON.parse(v); body[k] = Array.isArray(arr) ? arr.map(String) : []; }
+      catch { body[k] = []; }
       continue;
     }
     if (BOOL_FIELDS.has(k)) { body[k] = v === "true"; continue; }
@@ -697,6 +703,64 @@ function RoadEditor({ form, setForm }: { form: Record<string, string>; setForm: 
 }
 
 // ── StoreStaffSelector ────────────────────────────────────────────────────────
+// ── LegalRestrictionsEditor ───────────────────────────────────────────────────
+const LEGAL_RESTRICTION_OPTIONS = [
+  // 防火・準防火
+  "防火地域", "準防火地域", "新たな防火規制区域", "建築基準法第22条区域",
+  // 高度
+  "高度地区", "高度利用地区", "特定街区",
+  // 日影・斜線
+  "日影制限有", "道路斜線制限", "隣地斜線制限", "北側斜線制限", "絶対高さ制限",
+  // 敷地
+  "敷地面積最低限度有", "壁面線の制限", "外壁後退",
+  // 地区計画
+  "地区計画区域", "景観地区", "風致地区", "特別用途地区", "特定用途制限地域",
+  // 災害
+  "土砂災害警戒区域", "土砂災害特別警戒区域", "津波災害警戒区域",
+  "造成宅地防災区域", "水害ハザードマップ該当",
+  // その他
+  "都市計画道路", "市街地開発事業", "建築協定", "私道の変更または廃止の制限",
+];
+
+function LegalRestrictionsEditor({ form, setForm }: { form: Record<string, string>; setForm: SetForm }) {
+  // form.legal_restrictions は JSON 配列文字列で保持
+  const parsed: string[] = (() => {
+    try {
+      const v = JSON.parse(form.legal_restrictions ?? "[]");
+      return Array.isArray(v) ? v.map(String) : [];
+    } catch { return []; }
+  })();
+
+  const toggle = (item: string) => {
+    const next = parsed.includes(item)
+      ? parsed.filter(x => x !== item)
+      : [...parsed, item];
+    setForm(f => ({ ...f, legal_restrictions: JSON.stringify(next) }));
+  };
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px 14px" }}>
+      {LEGAL_RESTRICTION_OPTIONS.map(item => {
+        const checked = parsed.includes(item);
+        return (
+          <label key={item} style={{
+            display: "flex", alignItems: "center", gap: 4,
+            fontSize: 12, cursor: "pointer",
+          }}>
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={() => toggle(item)}
+              style={{ cursor: "pointer" }}
+            />
+            <span>{item}</span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
 interface StoreOpt { id: string; name: string; store_code: string }
 interface StaffOpt { id: string; name: string; store_id: string }
 
@@ -1056,6 +1120,9 @@ export function PropertyFormTabs({ tab, setTab, form, setForm, onGenerateContent
             <FC label="農地法" name="agricultural_act" form={form} setForm={setForm} />
             <FC label="景観法" name="landscape_act" form={form} setForm={setForm} />
           </div>
+
+          <div style={sectionTitle}>法令上の制限（複数選択可）</div>
+          <LegalRestrictionsEditor form={form} setForm={setForm} />
         </div>
       )}
 

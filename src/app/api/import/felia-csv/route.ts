@@ -228,6 +228,13 @@ function parseUseZones(row: Record<string, unknown>): string[] {
   return zones;
 }
 
+// 法令上の制限（カンマ区切り → 配列）
+function parseLegalRestrictions(v: unknown): string[] {
+  const s = toStr(v);
+  if (!s) return [];
+  return s.split(/[、,，]/).map(r => r.trim()).filter(Boolean);
+}
+
 // ポータル掲載可否（"athome/Yahoo!" などのスラッシュ区切り）
 function parsePortalPublish(v: unknown): {
   published_suumo: boolean;
@@ -451,6 +458,7 @@ export async function POST(req: NextRequest) {
             published_suumo:        portal.published_suumo,
             published_athome:       portal.published_athome,
             published_yahoo:        portal.published_yahoo,
+            legal_restrictions:     parseLegalRestrictions(row["法令上の制限.1"]),
             price:                  price ?? 0,
             prefecture:             "東京都",
             city:                   toStr(row["行政区"]) ?? "",

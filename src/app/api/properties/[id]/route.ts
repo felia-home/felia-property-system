@@ -127,7 +127,7 @@ const DATETIME_FIELDS = new Set([
 
 // String[] 型フィールド（カンマ区切り文字列 or 配列を受け付ける）
 const STRING_ARRAY_FIELDS = new Set([
-  "pending_tasks","selling_points","features",
+  "pending_tasks","selling_points","features","legal_restrictions",
 ]);
 
 // Json 型フィールド — そのまま渡す
