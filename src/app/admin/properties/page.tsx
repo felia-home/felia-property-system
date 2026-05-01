@@ -302,7 +302,8 @@ export default function PropertiesPage() {
               properties.map(p => {
                 const def = getStatusDef(p.status);
                 const mainImg = p.images?.[0];
-                const photoCount = p.photo_count ?? p._count?.images ?? 0;
+                // _count.images を優先（インポート直後の photo_count キャッシュ更新漏れ対策）
+                const photoCount = p._count?.images ?? p.photo_count ?? 0;
                 const adOk = !!p.ad_confirmed_at;
                 const completion = calcPropertyCompletion({
                   city: p.city,

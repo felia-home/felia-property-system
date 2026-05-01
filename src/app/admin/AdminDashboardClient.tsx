@@ -150,7 +150,7 @@ function DashboardInner() {
 
   const noPhotoProps = (properties ?? []).filter(p =>
     !["DRAFT", "SOLD", "CLOSED", "AD_NG"].includes(p.status) &&
-    (p.photo_count ?? p._count?.images ?? 0) === 0
+    (p._count?.images ?? p.photo_count ?? 0) === 0
   );
   const adSentOverdue = (byStatus.get("AD_SENT") ?? []).filter(p => {
     const days = daysSince(p.ad_confirmation_sent_at);
@@ -158,8 +158,8 @@ function DashboardInner() {
   });
   const lowPhotoProps = (properties ?? []).filter(p =>
     !["DRAFT", "SOLD", "CLOSED", "AD_NG", "AD_PENDING"].includes(p.status) &&
-    (p.photo_count ?? p._count?.images ?? 0) > 0 &&
-    (p.photo_count ?? p._count?.images ?? 0) < 5
+    (p._count?.images ?? p.photo_count ?? 0) > 0 &&
+    (p._count?.images ?? p.photo_count ?? 0) < 5
   );
 
   const hasCritical = adPendingCount > 0 || noPhotoProps.length > 0;
@@ -180,7 +180,7 @@ function DashboardInner() {
   ];
 
   const publishedPhotoAlert = (byStatus.get("PUBLISHED") ?? []).filter(p => {
-    const pc = p.photo_count ?? p._count?.images ?? 0;
+    const pc = p._count?.images ?? p.photo_count ?? 0;
     return pc === 0 || pc < 5;
   });
 
@@ -370,11 +370,11 @@ function DashboardInner() {
             {(roleTab === "all" || roleTab === "backoffice") && (
               <TaskCard step={4} icon="📷" title="掲載中管理" subtitle="掲載中物件の写真・品質管理"
                 count={publishedPhotoAlert.length}
-                urgent={publishedPhotoAlert.some(p => (p.photo_count ?? p._count?.images ?? 0) === 0)}
+                urgent={publishedPhotoAlert.some(p => (p._count?.images ?? p.photo_count ?? 0) === 0)}
                 color="#6a1b9a" bg="#f3e5f5"
                 properties={publishedPhotoAlert.slice(0, 5).map<TaskCardProperty>(p => ({
                   id: p.id, label: `${p.city}${p.town ?? ""}`,
-                  sub: (p.photo_count ?? p._count?.images ?? 0) === 0 ? "写真なし" : `写真${p.photo_count ?? p._count?.images ?? 0}枚（5枚必要）`,
+                  sub: (p._count?.images ?? p.photo_count ?? 0) === 0 ? "写真なし" : `写真${p._count?.images ?? p.photo_count ?? 0}枚（5枚必要）`,
                 }))}
                 href="/admin/properties?status=PUBLISHED"
               />
@@ -428,7 +428,7 @@ function DashboardInner() {
                     <div style={{ color: "#ccc", fontSize: 11, textAlign: "center", padding: "12px 0" }}>なし</div>
                   )}
                   {items.slice(0, 8).map(p => {
-                    const photoCount = p.photo_count ?? p._count?.images ?? 0;
+                    const photoCount = p._count?.images ?? p.photo_count ?? 0;
                     const sentDays   = daysSince(p.ad_confirmation_sent_at);
                     const isOverdue  = p.status === "AD_SENT" && sentDays !== null && sentDays >= 3;
                     const statusDef  = getStatusDef(p.status);
@@ -541,7 +541,7 @@ function DashboardInner() {
                 <tbody>
                   {(backofficeTasks ?? []).slice(0, 15).map(p => {
                     const def        = getStatusDef(p.status);
-                    const photoCount = p.photo_count ?? p._count?.images ?? 0;
+                    const photoCount = p._count?.images ?? p.photo_count ?? 0;
                     const sentDays   = daysSince(p.ad_confirmation_sent_at);
                     const issues: string[] = [];
                     if (photoCount === 0) issues.push("写真なし");
