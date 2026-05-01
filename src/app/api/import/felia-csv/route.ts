@@ -196,6 +196,33 @@ function parseUseZones(row: Record<string, unknown>): string[] {
   return zones;
 }
 
+// 設備文字列（/区切り）→ 配列
+function parseFeatures(v: unknown): string[] {
+  const s = toStr(v);
+  if (!s) return [];
+  return s.split("/").map(f => f.trim()).filter(Boolean);
+}
+
+// 接道情報 → Prisma の Json 互換配列（Property.roads 用）
+type RoadJson = { direction: string; width: string; type: string; contact: string };
+function parseRoads(row: Record<string, unknown>): RoadJson[] {
+  const out: RoadJson[] = [];
+  for (let i = 1; i <= 3; i++) {
+    const dir   = toStr(row[`接道${i}(方向)`]);
+    const width = toFloat(row[`接道${i}(幅員)`]);
+    const type  = toStr(row[`接道${i}(種別)`]);
+    if (dir || width != null || (type && type !== "-")) {
+      out.push({
+        direction: dir ?? "",
+        width:     width != null ? String(width) : "",
+        type:      type && type !== "-" ? type : "",
+        contact:   "",
+      });
+    }
+  }
+  return out;
+}
+
 function parseBuiltYear(yearMonth: unknown): { year: number | null; month: number | null } {
   const s = toStr(yearMonth);
   if (!s) return { year: null, month: null };
@@ -285,11 +312,15 @@ export async function POST(req: NextRequest) {
 
         const yahooNo = toStr(row["Yahoo!物件番号"]);
 
+        const featuresArr = parseFeatures(row["設備"]);
+        const roadsArr    = parseRoads(row);
+        const useZonesArr = parseUseZones(row);
+
         const created = await prisma.property.create({
           data: {
             property_number:        propertyNumber,
             property_type:          propertyType,
-            transaction_type:       "仲介",
+            transaction_type:       toStr(row["取引態様"]) ?? "仲介",
             brokerage_type:         "専任",
             published_hp:           true,
             price:                  price ?? 0,
@@ -307,12 +338,26 @@ export async function POST(req: NextRequest) {
             building_year:          buildingYear,
             building_month:         buildingMonth,
             structure:              toStr(row["建物構造"]),
-            use_zone:               (() => {
-                                      const zs = parseUseZones(row);
-                                      return zs.length > 0 ? JSON.stringify(zs) : null;
-                                    })(),
+            floor_unit:             toInt(row["所在階"]),
+            direction:              toStr(row["バルコニー方向（主要採光方向）"]),
+            area_balcony_m2:        toFloat(row["バルコニー面積"]),
+            use_zone:               useZonesArr[0] ?? null,
+            use_zones:              useZonesArr.length > 0
+              ? useZonesArr.map(z => ({ zone: z, bcr: "", far: "", area_pct: "" }))
+              : undefined,
             bcr:                    toFloat(row["建ぺい率1"]),
             far:                    toFloat(row["容積率1"]),
+            land_right:             toStr(row["土地権利"]),
+            city_plan:              toStr(row["都市計画"]),
+            features:               featuresArr,
+            roads:                  roadsArr.length > 0 ? roadsArr : undefined,
+            delivery_timing:        toStr(row["引渡し"]),
+            delivery_status:        toStr(row["現況"]),
+            description_hp:         toStr(row["おすすめコメント"]) ??
+                                    toStr(row["一覧用コメント"]) ??
+                                    toStr(row["フリーコメント"]) ??
+                                    null,
+            internal_memo:          toStr(row["物件備考、備考"]) ?? toStr(row["備考"]) ?? null,
             total_units:            toInt(row["総戸数"]),
             floors_total:           toInt(row["地上階"]),
             floors_basement:        toInt(row["地下階"]),
