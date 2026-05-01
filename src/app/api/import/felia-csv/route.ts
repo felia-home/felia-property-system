@@ -244,6 +244,23 @@ const MONTH_ABBR_MAP: Record<string, number> = {
   Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
 };
 
+// Excel が住所「6-8」を「Jun-08」に勝手に変換する問題の逆変換
+function fixAddressDate(v: unknown): string | null {
+  const s = toStr(v);
+  if (!s) return null;
+
+  // "Jun-08" → "6-8" / "Mar-02" → "3-2"
+  const m = s.match(/^([A-Za-z]{3})-(\d{1,2})$/);
+  if (m) {
+    const key = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+    const month = MONTH_ABBR_MAP[key];
+    if (month) return `${month}-${parseInt(m[2])}`;
+  }
+
+  if (s === "-" || s === "－") return null;
+  return s;
+}
+
 function parseBuiltYear(yearMonth: unknown): { year: number | null; month: number | null } {
   const s = toStr(yearMonth);
   if (!s) return { year: null, month: null };
@@ -289,10 +306,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "データが空です" }, { status: 400 });
     }
 
-    // 既存staffsをDBから取得（担当者名→idマップ）
-    const allStaffs = await prisma.staff.findMany({ select: { id: true, name: true } });
-    const staffByName: Record<string, string> = {};
-    for (const s of allStaffs) staffByName[s.name] = s.id;
+    // 既存staffsをDBから取得（担当者名→{id, store_id}マップ）
+    const allStaffs = await prisma.staff.findMany({
+      select: { id: true, name: true, store_id: true },
+    });
+    const staffByName: Record<string, { id: string; store_id: string | null }> = {};
+    const staffById:   Record<string, { id: string; store_id: string | null }> = {};
+    for (const s of allStaffs) {
+      staffByName[s.name] = { id: s.id, store_id: s.store_id };
+      staffById[s.id]     = { id: s.id, store_id: s.store_id };
+    }
+    const defaultStaff  = default_agent_id ? staffById[default_agent_id] ?? null : null;
 
     let inserted = 0;
     let skipped  = 0;
@@ -316,10 +340,14 @@ export async function POST(req: NextRequest) {
         const propertyType = PROPERTY_TYPE_MAP[kindLabel] ?? "USED_HOUSE";
 
         const staffName = toStr(row["物件担当者名"]);
-        const agentId   =
-          (staffName && (STAFF_MAP[staffName] || staffByName[staffName])) ||
-          default_agent_id ||
-          null;
+        const mappedId  = staffName ? STAFF_MAP[staffName] : undefined;
+        // STAFF_MAP のID は DB の staff からも store_id を引く
+        const fixedStaff = mappedId ? staffById[mappedId] ?? null : null;
+        const matchedStaff = staffName ? staffByName[staffName] ?? null : null;
+        const staffInfo = fixedStaff ?? matchedStaff;
+
+        const agentId  = staffInfo?.id ?? default_agent_id ?? null;
+        const storeId  = staffInfo?.store_id ?? defaultStaff?.store_id ?? null;
 
         const { year: buildingYear, month: buildingMonth } = parseBuiltYear(row["築年月"]);
 
@@ -378,7 +406,9 @@ export async function POST(req: NextRequest) {
             prefecture:             "東京都",
             city:                   toStr(row["行政区"]) ?? "",
             town:                   toStr(row["町丁目名"]),
-            address:                toStr(row["番地(表示用)"]) ?? "",
+            address:                fixAddressDate(row["番地(表示用)"])
+                                    ?? fixAddressDate(row["番地(非表示用)"])
+                                    ?? "",
             latitude:               toFloat(row["位置情報(緯度)"]),
             longitude:              toFloat(row["位置情報(経度)"]),
             building_name:          buildingName,
@@ -430,6 +460,7 @@ export async function POST(req: NextRequest) {
             school_junior_high:     schoolJuniorHigh,
             selling_points:         hpComments,
             agent_id:               agentId,
+            store_id:               storeId,
             status:                 "PUBLISHED",
           },
         });
