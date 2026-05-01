@@ -26,11 +26,14 @@ interface Mansion {
 
 export default function MansionsPage() {
   const [mansions, setMansions] = useState<Mansion[]>([]);
+  const [cityStats, setCityStats] = useState<{ city: string; count: number }[]>([]);
+  const [filterCity, setFilterCity] = useState("");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [linking, setLinking] = useState(false);
 
   // Form state
   const [name, setName] = useState("");
@@ -58,26 +61,39 @@ export default function MansionsPage() {
     "防犯カメラ", "フラット設計", "二重窓", "ディスポーザー",
   ];
 
-  const load = async (q?: string) => {
+  const load = async (q?: string, city?: string) => {
     setLoading(true);
-    const params = q ? `?name=${encodeURIComponent(q)}` : "?name=　";
-    const res = await fetch(`/api/mansions${params}`);
+    const params = new URLSearchParams();
+    if (q)    params.set("name", q);
+    if (city) params.set("city", city);
+    const url = params.toString() ? `/api/mansions?${params}` : "/api/mansions?name=";
+    const res = await fetch(url);
     const data = await res.json();
-    // For full list, use a search with a wildcard-like approach by fetching all
-    if (!q) {
-      // GET all by empty search — API returns empty, so fetch with space trick
-      const res2 = await fetch("/api/mansions?name=");
-      const d2 = await res2.json();
-      setMansions(d2.mansions ?? []);
-    } else {
-      setMansions(data.mansions ?? []);
-    }
+    setMansions(data.mansions ?? []);
+    setCityStats(data.cityStats ?? []);
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(undefined, filterCity || undefined); }, [filterCity]);
 
-  const handleSearch = () => load(search || undefined);
+  const handleSearch = () => load(search || undefined, filterCity || undefined);
+
+  const handleLinkProperties = async () => {
+    if (!confirm("マンション物件と建物マスタを物件名で自動紐付けします。\nよろしいですか？")) return;
+    setLinking(true);
+    try {
+      const res = await fetch("/api/admin/mansions/link-properties", { method: "POST" });
+      const data = await res.json();
+      if (data.ok) {
+        alert(`紐付け完了: ${data.linked}件 / スキップ: ${data.skipped}件 / 対象: ${data.total}件`);
+        await load(undefined, filterCity || undefined);
+      } else {
+        alert("失敗しました: " + (data.error ?? ""));
+      }
+    } finally {
+      setLinking(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,7 +139,21 @@ export default function MansionsPage() {
           <h1 style={{ fontSize: 20, fontWeight: 500 }}>マンション建物マスタ</h1>
           <p style={{ fontSize: 12, color: "#706e68", marginTop: 4 }}>外観写真・建物情報の一元管理。複数物件で共有されます。</p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            onClick={handleLinkProperties}
+            disabled={linking}
+            style={{
+              padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 700,
+              border: "1px solid #bfdbfe",
+              background: linking ? "#e5e7eb" : "#eff6ff",
+              color: linking ? "#9ca3af" : "#1d4ed8",
+              cursor: linking ? "not-allowed" : "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            {linking ? "🔗 紐付け中..." : "🔗 物件と自動紐付け"}
+          </button>
           <button
             onClick={() => { setShowBulkImport(!showBulkImport); setShowForm(false); }}
             style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500, background: showBulkImport ? "#e8f5e9" : "#f7f6f2", color: showBulkImport ? "#234f35" : "#444", border: "1px solid #e0deda", cursor: "pointer", fontFamily: "inherit" }}
@@ -138,6 +168,49 @@ export default function MansionsPage() {
           </button>
         </div>
       </div>
+
+      {/* 区別件数サマリー */}
+      {cityStats.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+          {cityStats.map(s => (
+            <button
+              key={s.city}
+              type="button"
+              onClick={() => setFilterCity(filterCity === s.city ? "" : (s.city === "未設定" ? "" : s.city))}
+              style={{
+                padding: "4px 12px", borderRadius: 12, fontSize: 12,
+                border: `1px solid ${filterCity === s.city ? "#5BAD52" : "#e5e7eb"}`,
+                background: filterCity === s.city ? "#f0fdf4" : "#f9fafb",
+                color: filterCity === s.city ? "#166534" : "#374151",
+                cursor: "pointer",
+                fontWeight: filterCity === s.city ? "bold" : "normal",
+                fontFamily: "inherit",
+              }}
+            >
+              {s.city}
+              <span style={{
+                marginLeft: 4, padding: "1px 6px", borderRadius: 8,
+                background: "#e5e7eb", fontSize: 11, color: "#6b7280",
+              }}>
+                {s.count}
+              </span>
+            </button>
+          ))}
+          {filterCity && (
+            <button
+              type="button"
+              onClick={() => setFilterCity("")}
+              style={{
+                padding: "4px 10px", borderRadius: 12, fontSize: 12,
+                border: "1px solid #fca5a5", background: "#fff",
+                color: "#ef4444", cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              ✕ クリア
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Bulk import */}
       {showBulkImport && (

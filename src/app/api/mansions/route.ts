@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     const q = searchParams.get("q") ?? searchParams.get("name") ?? "";
+    const city = searchParams.get("city") ?? "";
 
     if (id) {
       const mansion = await prisma.mansionBuilding.findUnique({
@@ -20,8 +21,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ mansion });
     }
 
+    const where: Record<string, unknown> = {};
+    if (q)    where.name = { contains: q };
+    if (city) where.city = city;
+
     const mansions = await prisma.mansionBuilding.findMany({
-      where: q ? { name: { contains: q } } : undefined,
+      where,
       include: {
         exterior_images: {
           orderBy: { created_at: "asc" },
@@ -38,7 +43,18 @@ export async function GET(request: NextRequest) {
       orderBy: { created_at: "desc" },
     });
 
-    return NextResponse.json({ mansions });
+    // 区別件数（フィルタ非適用、全件で集計）
+    const cityStatsRaw = await prisma.mansionBuilding.groupBy({
+      by: ["city"],
+      _count: { id: true },
+      orderBy: { _count: { id: "desc" } },
+    });
+    const cityStats = cityStatsRaw.map(s => ({
+      city:  s.city ?? "未設定",
+      count: s._count.id,
+    }));
+
+    return NextResponse.json({ mansions, cityStats });
   } catch (error) {
     console.error("GET /api/mansions error:", error);
     return NextResponse.json({ mansions: [] }, { status: 500 });

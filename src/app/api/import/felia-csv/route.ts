@@ -449,6 +449,23 @@ export async function POST(req: NextRequest) {
         const useZonesArr = parseUseZones(row);
         const portal      = parsePortalPublish(row["ポータルサイトへ登録"]);
 
+        // マンション系は building_name (物件名) で建物マスタを検索
+        let mansionBuildingId: string | null = null;
+        if (propertyType === "MANSION" || propertyType === "NEW_MANSION") {
+          const buildingName = toStr(row["物件名"]);
+          if (buildingName) {
+            const trimmed = buildingName.replace(/[　\s]/g, "");
+            const match = await prisma.mansionBuilding.findFirst({
+              where: { name: { contains: trimmed } },
+              select: { id: true },
+            }) ?? await prisma.mansionBuilding.findFirst({
+              where: { name: { contains: buildingName.slice(0, 10) } },
+              select: { id: true },
+            });
+            mansionBuildingId = match?.id ?? null;
+          }
+        }
+
         const created = await prisma.property.create({
           data: {
             property_number:        propertyNumber,
@@ -520,6 +537,7 @@ export async function POST(req: NextRequest) {
             selling_points:         hpComments,
             agent_id:               agentId,
             store_id:               storeId,
+            mansion_building_id:    mansionBuildingId,
             status:                 "PUBLISHED",
           },
         });
