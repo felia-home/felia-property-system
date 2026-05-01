@@ -318,7 +318,7 @@ export async function POST(req: NextRequest) {
             school_junior_high:     schoolJuniorHigh,
             selling_points:         hpComments,
             agent_id:               agentId,
-            status:                 "ACTIVE",
+            status:                 "PUBLISHED",
           },
         });
 
