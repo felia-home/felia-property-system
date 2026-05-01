@@ -94,6 +94,28 @@ async function importPropertyImages(
     }
     await new Promise(r => setTimeout(r, 200));
   }
+
+  // 写真キャッシュフィールド (photo_count / photo_has_exterior / photo_has_floor_plan / photo_has_interior)
+  // を再集計してProperty更新（完成度計算で参照されるため）
+  const all = await prisma.propertyImage.findMany({
+    where: { property_id: propertyId },
+    select: { room_type: true },
+  });
+  const hasExterior  = all.some(i => i.room_type === "EXTERIOR");
+  const hasFloorPlan = all.some(i => i.room_type === "FLOOR_PLAN");
+  const hasInterior  = all.some(i =>
+    ["LIVING", "KITCHEN", "BEDROOM", "BATHROOM", "TOILET", "ENTRANCE", "BALCONY"].includes(i.room_type ?? "")
+  );
+  await prisma.property.update({
+    where: { id: propertyId },
+    data: {
+      photo_count:           all.length,
+      photo_has_exterior:    hasExterior,
+      photo_has_floor_plan:  hasFloorPlan,
+      photo_has_interior:    hasInterior,
+      photo_last_updated_at: new Date(),
+    },
+  });
 }
 
 // 周辺環境写真インポート（_s1.jpg〜_s9.jpg）

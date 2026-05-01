@@ -762,9 +762,10 @@ function StoreStaffSelector({ form, setForm }: { form: Record<string, string>; s
 }
 
 // ── Tab labels ────────────────────────────────────────────────────────────────
+// 設備・仕様タブは独立した mainTab="features" に統合済みのため削除
 const TAB_LABELS = [
   "基本・取引","売主情報","所在地・交通","面積・建物","法令・権利",
-  "設備・仕様","マンション・費用","引渡し・掲載","地図・周辺環境",
+  "マンション・費用","引渡し・掲載","地図・周辺環境",
 ];
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -1058,145 +1059,8 @@ export function PropertyFormTabs({ tab, setTab, form, setForm, onGenerateContent
         </div>
       )}
 
-      {/* ── Tab 5: 設備・仕様 ── */}
+      {/* ── Tab 5: マンション・費用 ── */}
       {tab === 5 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <div>
-            <div style={sectionTitle}>キッチン</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-              <FC label="システムキッチン" name="eq_system_kitchen" form={form} setForm={setForm} />
-              <FC label="対面式キッチン" name="eq_counter_kitchen" form={form} setForm={setForm} />
-              <FC label="カップボード" name="eq_cupboard" form={form} setForm={setForm} />
-              <FC label="パントリー" name="eq_pantry" form={form} setForm={setForm} />
-              <FC label="タッチレス水栓" name="eq_touchless_faucet" form={form} setForm={setForm} />
-              <FC label="床暖房" name="eq_floor_heating" form={form} setForm={setForm} />
-              <FC label="全室床暖房" name="eq_floor_heating_all" form={form} setForm={setForm} />
-            </div>
-          </div>
-          <div>
-            <div style={sectionTitle}>バス・洗面・トイレ</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-              <FC label="ユニットバス" name="eq_unit_bath" form={form} setForm={setForm} />
-              <FC label="バス・トイレ別" name="eq_separate_bath_toilet" form={form} setForm={setForm} />
-              <FC label="浴室乾燥機" name="eq_bathroom_dryer" form={form} setForm={setForm} />
-              <FC label="ダブルボウル洗面" name="eq_double_wash" form={form} setForm={setForm} />
-              <FC label="室内洗濯スペース" name="eq_laundry_space" form={form} setForm={setForm} />
-              <FC label="屋外洗濯物干し" name="eq_laundry_outdoor" form={form} setForm={setForm} />
-              <FC label="温水洗浄便座" name="eq_washlet" form={form} setForm={setForm} />
-              <FC label="全室温水洗浄便座" name="eq_washlet_all" form={form} setForm={setForm} />
-              <FC label="2F洗面台" name="eq_2f_washroom" form={form} setForm={setForm} />
-            </div>
-            <div style={{ marginTop: 8, width: "25%" }}>
-              <FI label="トイレ数" name="eq_toilet_count" form={form} setForm={setForm} type="number" placeholder="2" />
-            </div>
-          </div>
-          <div>
-            <div style={sectionTitle}>収納</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-              <FC label="ウォークインクロゼット" name="eq_walk_in_closet" form={form} setForm={setForm} />
-              <FC label="シューズクローゼット" name="eq_shoe_closet" form={form} setForm={setForm} />
-              <FC label="トランクルーム" name="eq_trunk_room" form={form} setForm={setForm} />
-              <FC label="屋根裏収納" name="eq_roof_storage" form={form} setForm={setForm} />
-              <FC label="全居室収納あり" name="eq_all_room_storage" form={form} setForm={setForm} />
-              <FC label="物置あり" name="eq_storage" form={form} setForm={setForm} />
-            </div>
-          </div>
-          <div>
-            <div style={sectionTitle}>冷暖房・省エネ</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-              <FC label="エアコン付き" name="eq_ac" form={form} setForm={setForm} />
-              <FC label="高気密高断熱" name="eq_high_insulation" form={form} setForm={setForm} />
-              <FC label="長期優良住宅" name="eq_long_quality" form={form} setForm={setForm} />
-              <FC label="ZEH" name="eq_zeh" form={form} setForm={setForm} />
-              <FC label="太陽光発電" name="eq_solar" form={form} setForm={setForm} />
-              <FC label="蓄電池" name="eq_storage_battery" form={form} setForm={setForm} />
-              <FC label="EV充電設備" name="eq_ev_charger" form={form} setForm={setForm} />
-              <FC label="オール電化" name="eq_all_electric" form={form} setForm={setForm} />
-              <FC label="複層ガラス" name="eq_double_glazing" form={form} setForm={setForm} />
-              <FC label="24時間換気システム" name="eq_ventilation" form={form} setForm={setForm} />
-            </div>
-          </div>
-          <div>
-            <div style={sectionTitle}>セキュリティ</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-              <FC label="オートロック" name="eq_autolock" form={form} setForm={setForm} />
-              <FC label="電子錠・スマートロック" name="eq_electronic_lock" form={form} setForm={setForm} />
-              <FC label="防犯ガラス" name="eq_crime_prevention_glass" form={form} setForm={setForm} />
-              <FC label="センサーライト" name="eq_security_light" form={form} setForm={setForm} />
-              <FC label="ホームセキュリティ" name="eq_home_security" form={form} setForm={setForm} />
-              <FC label="TVモニタホン" name="eq_tv_intercom" form={form} setForm={setForm} />
-            </div>
-          </div>
-          <div>
-            <div style={sectionTitle}>駐車・駐輪</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-              <FC label="駐車場あり" name="eq_parking" form={form} setForm={setForm} />
-              <FC label="2台以上可" name="eq_parking_2cars" form={form} setForm={setForm} />
-              <FC label="屋根付き駐車場" name="eq_parking_roofed" form={form} setForm={setForm} />
-              <FC label="電動シャッターガレージ" name="eq_electric_shutter" form={form} setForm={setForm} />
-              <FC label="バイク置場" name="eq_bike_parking" form={form} setForm={setForm} />
-            </div>
-            <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr 2fr", gap: 8 }}>
-              <FI label="駐車場月額（円）" name="eq_parking_fee" form={form} setForm={setForm} type="number" />
-              <FI label="駐輪台数" name="eq_bicycle_count" form={form} setForm={setForm} type="number" />
-            </div>
-          </div>
-          <div>
-            <div style={sectionTitle}>耐震</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 8 }}>
-              <FC label="免震構造" name="eq_seismic_isolation" form={form} setForm={setForm} />
-              <FC label="制震装置" name="eq_vibration_control" form={form} setForm={setForm} />
-            </div>
-            <div style={{ width: "40%" }}>
-              <FS label="耐震基準" name="eq_earthquake_resistant" form={form} setForm={setForm} options={[
-                {v:"",l:"選択"},{v:"新耐震",l:"新耐震（1981年以降）"},{v:"旧耐震",l:"旧耐震（1981年以前）"},
-                {v:"耐震補強済み",l:"耐震補強済み"},
-              ]} />
-            </div>
-          </div>
-          <div>
-            <div style={sectionTitle}>リフォーム・リノベーション</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-              <FC label="内装リフォーム済" name="eq_new_interior" form={form} setForm={setForm} />
-              <FC label="外装リフォーム済" name="eq_new_exterior" form={form} setForm={setForm} />
-              <FC label="リフォーム済み" name="eq_reformed" form={form} setForm={setForm} />
-              <FC label="リノベーション済み" name="eq_renovated" form={form} setForm={setForm} />
-              <FC label="キッチン新規交換済" name="eq_new_kitchen" form={form} setForm={setForm} />
-              <FC label="バス新規交換済" name="eq_new_bath" form={form} setForm={setForm} />
-              <FC label="トイレ新規交換済" name="eq_new_toilet" form={form} setForm={setForm} />
-              <FC label="床新規張替済" name="eq_new_floor" form={form} setForm={setForm} />
-              <FC label="クロス新規張替済" name="eq_new_wall" form={form} setForm={setForm} />
-            </div>
-            <div style={{ marginTop: 8, width: "25%" }}>
-              <FI label="リフォーム実施年" name="eq_reform_year" form={form} setForm={setForm} type="number" placeholder="2023" />
-            </div>
-          </div>
-          <div>
-            <div style={sectionTitle}>その他・外構</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-              <FC label="テラス" name="eq_terrace" form={form} setForm={setForm} />
-              <FC label="ルーフバルコニー" name="eq_roof_balcony" form={form} setForm={setForm} />
-              <FC label="パティオ（中庭）" name="eq_patio" form={form} setForm={setForm} />
-              <FC label="ウッドデッキ" name="eq_wood_deck" form={form} setForm={setForm} />
-              <FC label="バリアフリー" name="eq_barrier_free" form={form} setForm={setForm} />
-              <FC label="ホームエレベーター" name="eq_elevator_private" form={form} setForm={setForm} />
-              <FC label="エレベーター（共用）" name="eq_elevator" form={form} setForm={setForm} />
-              <FC label="角部屋" name="eq_corner" form={form} setForm={setForm} />
-              <FC label="最上階" name="eq_top_floor" form={form} setForm={setForm} />
-              <FC label="ペット可" name="eq_pet_ok" form={form} setForm={setForm} />
-              <FC label="光ファイバー" name="eq_optical_fiber" form={form} setForm={setForm} />
-              <FC label="BS・CS対応" name="eq_bs_cs" form={form} setForm={setForm} />
-              <FC label="都市ガス" name="eq_gas_city" form={form} setForm={setForm} />
-              <FC label="プロパンガス" name="eq_gas_prop" form={form} setForm={setForm} />
-              <FC label="公営水道" name="eq_water_city" form={form} setForm={setForm} />
-              <FC label="公共下水" name="eq_sewage" form={form} setForm={setForm} />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Tab 6: マンション・費用 ── */}
-      {tab === 6 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {isMansion && (
             <>
@@ -1228,8 +1092,8 @@ export function PropertyFormTabs({ tab, setTab, form, setForm, onGenerateContent
         </div>
       )}
 
-      {/* ── Tab 7: 引渡し・レインズ・掲載 ── */}
-      {tab === 7 && (
+      {/* ── Tab 6: 引渡し・レインズ・掲載 ── */}
+      {tab === 6 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={sectionTitle}>引渡し</div>
           <div style={grid3}>
@@ -1271,8 +1135,8 @@ export function PropertyFormTabs({ tab, setTab, form, setForm, onGenerateContent
         </div>
       )}
 
-      {/* ── Tab 8: 地図・周辺環境 ── */}
-      {tab === 8 && (
+      {/* ── Tab 7: 地図・周辺環境 ── */}
+      {tab === 7 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* 地図プレビュー */}
           {form.latitude && form.longitude ? (
