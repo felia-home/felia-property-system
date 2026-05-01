@@ -228,6 +228,20 @@ function parseUseZones(row: Record<string, unknown>): string[] {
   return zones;
 }
 
+// ポータル掲載可否（"athome/Yahoo!" などのスラッシュ区切り）
+function parsePortalPublish(v: unknown): {
+  published_suumo: boolean;
+  published_athome: boolean;
+  published_yahoo: boolean;
+} {
+  const s = (toStr(v) ?? "").toLowerCase();
+  return {
+    published_suumo:  s.includes("suumo"),
+    published_athome: s.includes("athome"),
+    published_yahoo:  s.includes("yahoo"),
+  };
+}
+
 // 設備文字列（/区切り）→ 配列。ラベルが master にあれば id に正規化、無ければ label のまま
 function parseFeatures(v: unknown): string[] {
   const s = toStr(v);
@@ -425,6 +439,7 @@ export async function POST(req: NextRequest) {
         const featuresArr = parseFeatures(row["設備"]);
         const roadsArr    = parseRoads(row);
         const useZonesArr = parseUseZones(row);
+        const portal      = parsePortalPublish(row["ポータルサイトへ登録"]);
 
         const created = await prisma.property.create({
           data: {
@@ -433,6 +448,9 @@ export async function POST(req: NextRequest) {
             transaction_type:       toStr(row["取引態様"]) ?? "仲介",
             brokerage_type:         "専任",
             published_hp:           true,
+            published_suumo:        portal.published_suumo,
+            published_athome:       portal.published_athome,
+            published_yahoo:        portal.published_yahoo,
             price:                  price ?? 0,
             prefecture:             "東京都",
             city:                   toStr(row["行政区"]) ?? "",
@@ -467,6 +485,7 @@ export async function POST(req: NextRequest) {
             delivery_status:        toStr(row["現況"]),
             description_hp:         toStr(row["おすすめコメント"]) ??
                                     toStr(row["一覧用コメント"]) ??
+                                    toStr(row["Yahooおすすめコメント、スタッフおすすめコメント"]) ??
                                     toStr(row["フリーコメント"]) ??
                                     null,
             internal_memo:          toStr(row["物件備考、備考"]) ?? toStr(row["備考"]) ?? null,
