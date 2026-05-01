@@ -955,6 +955,80 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
   const [showPdfImageModal, setShowPdfImageModal] = useState(false);
   const [pdfImageSourceUrl, setPdfImageSourceUrl] = useState<string | null>(null);
 
+  // マンション建物マスタ紐付け
+  type MansionRow = {
+    id: string;
+    name: string;
+    name_kana?: string | null;
+    city?: string | null;
+    address?: string | null;
+    total_units?: number | null;
+    floors_total?: number | null;
+    floors_basement?: number | null;
+    structure?: string | null;
+    built_year?: number | null;
+    built_month?: number | null;
+    management_company?: string | null;
+    management_fee?: number | null;
+    repair_reserve?: number | null;
+  };
+  const [mansionSearch, setMansionSearch]         = useState("");
+  const [mansionCandidates, setMansionCandidates] = useState<MansionRow[]>([]);
+  const [linkedMansion, setLinkedMansion]         = useState<MansionRow | null>(null);
+
+  const handleMansionSearch = async (q: string) => {
+    setMansionSearch(q);
+    if (q.length < 2) { setMansionCandidates([]); return; }
+    try {
+      const res = await fetch(`/api/mansions?name=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      setMansionCandidates((data.mansions ?? []).slice(0, 10));
+    } catch { setMansionCandidates([]); }
+  };
+
+  const handleApplyMansionData = async () => {
+    if (!form.mansion_building_id) return;
+    try {
+      const res = await fetch(`/api/mansions/${form.mansion_building_id}`);
+      const data = await res.json();
+      const m: MansionRow | null = data.mansion ?? null;
+      if (!m) return;
+      setForm(prev => ({
+        ...prev,
+        total_units:        m.total_units != null         ? String(m.total_units)        : prev.total_units,
+        floors_total:       m.floors_total != null        ? String(m.floors_total)       : prev.floors_total,
+        floors_basement:    m.floors_basement != null     ? String(m.floors_basement)    : prev.floors_basement,
+        structure:          m.structure                   ?? prev.structure,
+        building_year:      m.built_year != null          ? String(m.built_year)         : prev.building_year,
+        building_month:     m.built_month != null         ? String(m.built_month)        : prev.building_month,
+        management_company: m.management_company          ?? prev.management_company,
+        management_fee:     m.management_fee != null      ? String(m.management_fee)     : prev.management_fee,
+        repair_reserve:     m.repair_reserve != null      ? String(m.repair_reserve)     : prev.repair_reserve,
+        city:               prev.city    || m.city    || prev.city,
+        address:            prev.address || m.address || prev.address,
+      }));
+      alert(`「${m.name}」のデータを反映しました`);
+    } catch {
+      alert("マンションデータの取得に失敗しました");
+    }
+  };
+
+  // フォームの mansion_building_id が変化したら自動でリンク済みマンション情報を取得
+  useEffect(() => {
+    if (!form.mansion_building_id) { setLinkedMansion(null); return; }
+    if (linkedMansion?.id === form.mansion_building_id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/mansions/${form.mansion_building_id}`);
+        const data = await res.json();
+        if (!cancelled) setLinkedMansion(data.mansion ?? null);
+      } catch { if (!cancelled) setLinkedMansion(null); }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.mansion_building_id]);
+
   // 周辺環境写真 一括アップロード
   type PlaceCandidate = { name: string; category: string; lat: number; lng: number };
   type EnvImageItem = {
@@ -1939,6 +2013,93 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
         )}
         {mainTab === "info" && (
           <div>
+            {/* マンション建物マスタとの紐付け（マンション系のみ） */}
+            {(form.property_type === "MANSION" || form.property_type === "NEW_MANSION") && (
+              <div style={{ marginBottom: 16, padding: 14, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 6 }}>
+                  🏢 マンション建物マスタと紐付け
+                </label>
+                {form.mansion_building_id ? (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 14px", background: "#f0fdf4",
+                    border: "1px solid #86efac", borderRadius: 8,
+                  }}>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: "bold" }}>
+                      🏢 {linkedMansion?.name ?? "紐付け済み"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleApplyMansionData}
+                      style={{
+                        padding: "5px 12px", borderRadius: 6, fontSize: 12,
+                        border: "none", background: "#5BAD52", color: "#fff",
+                        cursor: "pointer", fontFamily: "inherit", fontWeight: "bold",
+                      }}
+                    >
+                      📋 データを反映
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm(prev => ({ ...prev, mansion_building_id: "" }));
+                        setLinkedMansion(null);
+                      }}
+                      style={{
+                        padding: "5px 10px", borderRadius: 6, fontSize: 12,
+                        border: "1px solid #fca5a5", background: "#fff",
+                        color: "#ef4444", cursor: "pointer", fontFamily: "inherit",
+                      }}
+                    >
+                      解除
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="マンション名で検索（2文字以上）..."
+                      value={mansionSearch}
+                      onChange={e => handleMansionSearch(e.target.value)}
+                      style={{
+                        width: "100%", padding: "8px 10px",
+                        border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13,
+                        boxSizing: "border-box", fontFamily: "inherit",
+                      }}
+                    />
+                    {mansionCandidates.length > 0 && (
+                      <div style={{
+                        border: "1px solid #e5e7eb", borderRadius: 6,
+                        maxHeight: 200, overflowY: "auto", marginTop: 4,
+                        background: "#fff",
+                      }}>
+                        {mansionCandidates.map(m => (
+                          <div
+                            key={m.id}
+                            onClick={() => {
+                              setForm(prev => ({ ...prev, mansion_building_id: m.id }));
+                              setLinkedMansion(m);
+                              setMansionCandidates([]);
+                              setMansionSearch("");
+                            }}
+                            style={{
+                              padding: "10px 14px", cursor: "pointer", fontSize: 13,
+                              borderBottom: "1px solid #f3f4f6",
+                            }}
+                          >
+                            <div style={{ fontWeight: "bold" }}>{m.name}</div>
+                            <div style={{ fontSize: 11, color: "#6b7280" }}>
+                              {m.city ?? ""}{m.address ?? ""}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16 }}>
               <button
                 type="button"

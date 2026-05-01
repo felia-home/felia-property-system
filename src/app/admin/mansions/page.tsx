@@ -42,8 +42,21 @@ export default function MansionsPage() {
   const [structure, setStructure] = useState("");
   const [floorsTotal, setFloorsTotal] = useState("");
   const [mgmtCompany, setMgmtCompany] = useState("");
+  const [mgmtType, setMgmtType] = useState("");
+  const [mgmtFee, setMgmtFee] = useState("");
+  const [repairReserve, setRepairReserve] = useState("");
+  const [petAllowed, setPetAllowed] = useState(false);
+  const [features, setFeatures] = useState<string[]>([]);
+  const [parkingType, setParkingType] = useState("");
+  const [notes, setNotes] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const FEATURE_OPTIONS = [
+    "オートロック", "宅配BOX", "管理人常駐", "24時間ゴミ出し可",
+    "エレベーター", "駐輪場", "駐車場", "バイク置場",
+    "防犯カメラ", "フラット設計", "二重窓", "ディスポーザー",
+  ];
 
   const load = async (q?: string) => {
     setLoading(true);
@@ -81,6 +94,13 @@ export default function MansionsPage() {
     if (structure) fd.append("structure", structure);
     if (floorsTotal) fd.append("floors_total", floorsTotal);
     if (mgmtCompany) fd.append("management_company", mgmtCompany);
+    if (mgmtType) fd.append("management_type", mgmtType);
+    if (mgmtFee) fd.append("management_fee", mgmtFee);
+    if (repairReserve) fd.append("repair_reserve", repairReserve);
+    fd.append("pet_allowed", petAllowed ? "true" : "false");
+    if (features.length > 0) fd.append("features", JSON.stringify(features));
+    if (parkingType) fd.append("parking_type", parkingType);
+    if (notes) fd.append("notes", notes);
     if (imageFile) fd.append("image", imageFile);
 
     const res = await fetch("/api/mansions", { method: "POST", body: fd });
@@ -88,7 +108,9 @@ export default function MansionsPage() {
       setShowForm(false);
       setName(""); setNameKana(""); setCity(""); setAddress("");
       setTotalUnits(""); setBuiltYear(""); setStructure(""); setFloorsTotal("");
-      setMgmtCompany(""); setImageFile(null);
+      setMgmtCompany(""); setMgmtType(""); setMgmtFee(""); setRepairReserve("");
+      setPetAllowed(false); setFeatures([]); setParkingType(""); setNotes("");
+      setImageFile(null);
       load();
     }
     setSubmitting(false);
@@ -159,9 +181,62 @@ export default function MansionsPage() {
               <label style={labelStyle}>地上階数</label>
               <input value={floorsTotal} onChange={e => setFloorsTotal(e.target.value)} type="number" placeholder="15" style={inputStyle} />
             </div>
-            <div style={{ gridColumn: "1 / -1" }}>
+            <div>
               <label style={labelStyle}>管理会社</label>
               <input value={mgmtCompany} onChange={e => setMgmtCompany(e.target.value)} placeholder="〇〇管理株式会社" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>管理形態</label>
+              <select value={mgmtType} onChange={e => setMgmtType(e.target.value)} style={inputStyle}>
+                <option value="">選択</option>
+                <option value="全部委託">全部委託</option>
+                <option value="一部委託">一部委託</option>
+                <option value="自主管理">自主管理</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>管理費（円/月）</label>
+              <input type="number" value={mgmtFee} onChange={e => setMgmtFee(e.target.value)} placeholder="15000" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>修繕積立金（円/月）</label>
+              <input type="number" value={repairReserve} onChange={e => setRepairReserve(e.target.value)} placeholder="10000" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>駐車場種別</label>
+              <select value={parkingType} onChange={e => setParkingType(e.target.value)} style={inputStyle}>
+                <option value="">なし</option>
+                <option value="平置き">平置き</option>
+                <option value="機械式">機械式</option>
+                <option value="自走式">自走式</option>
+                <option value="屋内">屋内</option>
+              </select>
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={labelStyle}>
+                <input type="checkbox" checked={petAllowed} onChange={e => setPetAllowed(e.target.checked)} style={{ marginRight: 6 }} />
+                ペット可
+              </label>
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={labelStyle}>特徴</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", padding: "6px 0" }}>
+                {FEATURE_OPTIONS.map(f => (
+                  <label key={f} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={features.includes(f)}
+                      onChange={e => setFeatures(prev => e.target.checked ? [...prev, f] : prev.filter(x => x !== f))}
+                    />
+                    {f}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={labelStyle}>備考</label>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
+                style={{ ...inputStyle, resize: "vertical" }} />
             </div>
           </div>
           <div style={{ marginBottom: 16 }}>

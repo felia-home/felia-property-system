@@ -319,6 +319,10 @@ model Property {
   // 360度ツアーURL（外部サービスへの埋め込みリンク）
   tour_url              String?
 
+  // マンション建物マスタとの紐付け
+  mansion_building_id   String?
+  mansion_building      MansionBuilding? @relation(fields: [mansion_building_id], references: [id])
+
   // 広告承諾（売主からの広告承諾取得記録）
   ad_approval_contact   String?   // 承諾取得先担当者名
   ad_approval_method    String?   // EMAIL | PHONE | SELF
@@ -419,9 +423,19 @@ model MansionBuilding {
   floors_total       Int?
   floors_basement    Int?
   management_company String?
+  management_type    String?
+  management_fee     Int?
+  repair_reserve     Int?
+  pet_allowed        Boolean  @default(false)
+  features           String[]
+  parking_type       String?
+  latitude           Float?
+  longitude          Float?
+  notes              String?
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
   exterior_images    MansionExteriorImage[]
+  properties         Property[]
   @@map("mansion_buildings")
 }
 

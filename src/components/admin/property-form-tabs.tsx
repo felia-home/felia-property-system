@@ -72,6 +72,7 @@ export const INITIAL_FORM: Record<string, string> = {
   purchase_price: "", purchase_date: "",
   internal_memo: "", source: "", store_id: "", property_number: "",
   tour_url: "",
+  mansion_building_id: "",
   // タブ3: 所在地
   address_display_level: "town",
   address_display_custom: "",
