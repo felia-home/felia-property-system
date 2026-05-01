@@ -59,6 +59,30 @@ function daysAgo(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000);
 }
 
+// 住所内の日付化された番地を逆変換して表示する
+// 例: "7月24日" → "7-24", "Jun-08" → "6-8"
+const ADDRESS_MONTH_MAP: Record<string, string> = {
+  Jan: "1", Feb: "2", Mar: "3", Apr: "4", May: "5", Jun: "6",
+  Jul: "7", Aug: "8", Sep: "9", Oct: "10", Nov: "11", Dec: "12",
+};
+function fixAddressForDisplay(s: string | null | undefined): string {
+  if (!s) return "";
+  let out = s;
+  // 7月24日 → 7-24
+  out = out.replace(/(\d{1,2})月(\d{1,2})日/g, (_m, a, b) => `${parseInt(a)}-${parseInt(b)}`);
+  // Jun-08 → 6-8
+  out = out.replace(/\b([A-Za-z]{3})-(\d{1,2})\b/g, (_m, mon: string, d: string) => {
+    const key = mon.charAt(0).toUpperCase() + mon.slice(1).toLowerCase();
+    const num = ADDRESS_MONTH_MAP[key];
+    return num ? `${num}-${parseInt(d)}` : `${mon}-${d}`;
+  });
+  return out;
+}
+
+function buildAddressLabel(p: { city?: string | null; town?: string | null; address?: string | null }): string {
+  return [p.city, p.town, fixAddressForDisplay(p.address)].filter(Boolean).join("");
+}
+
 function completionColor(score: number): string {
   if (score >= 80) return "#1b5e20";
   if (score >= 50) return "#f57c00";
@@ -349,7 +373,7 @@ export default function PropertiesPage() {
                     {/* Property info */}
                     <td style={{ padding: "12px 14px" }}>
                       <div style={{ fontSize: 13, fontWeight: 500 }}>
-                        {TYPE_LABELS[p.property_type] ?? p.property_type}｜{p.city}{p.town ?? ""}{p.address}
+                        {TYPE_LABELS[p.property_type] ?? p.property_type}｜{buildAddressLabel(p)}
                       </div>
                       <div style={{ fontSize: 11, color: "#706e68", marginTop: 3 }}>
                         {p.station_name1 ? `${p.station_name1} 徒歩${p.station_walk1}分` : ""}

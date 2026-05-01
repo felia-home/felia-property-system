@@ -266,18 +266,27 @@ const MONTH_ABBR_MAP: Record<string, number> = {
   Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
 };
 
-// Excel が住所「6-8」を「Jun-08」に勝手に変換する問題の逆変換
+// Excel が住所「6-8」を日付に勝手に変換する問題の逆変換
+// パターン: "Jun-08" / "6月8日" / "6/8/2024" などを "6-8" に戻す
 function fixAddressDate(v: unknown): string | null {
   const s = toStr(v);
   if (!s) return null;
 
   // "Jun-08" → "6-8" / "Mar-02" → "3-2"
-  const m = s.match(/^([A-Za-z]{3})-(\d{1,2})$/);
-  if (m) {
-    const key = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+  const m1 = s.match(/^([A-Za-z]{3})-(\d{1,2})$/);
+  if (m1) {
+    const key = m1[1].charAt(0).toUpperCase() + m1[1].slice(1).toLowerCase();
     const month = MONTH_ABBR_MAP[key];
-    if (month) return `${month}-${parseInt(m[2])}`;
+    if (month) return `${month}-${parseInt(m1[2])}`;
   }
+
+  // "7月24日" → "7-24"
+  const m2 = s.match(/^(\d{1,2})月(\d{1,2})日$/);
+  if (m2) return `${parseInt(m2[1])}-${parseInt(m2[2])}`;
+
+  // "2024/7/24" / "2024-07-24" のような日付（年付き）→ "7-24"（番地っぽいので末尾2要素）
+  const m3 = s.match(/^\d{4}[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (m3) return `${parseInt(m3[1])}-${parseInt(m3[2])}`;
 
   if (s === "-" || s === "－") return null;
   return s;
