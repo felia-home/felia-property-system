@@ -82,7 +82,7 @@ function DashboardInner() {
   const [roleTab, setRoleTab] = useState<"all" | "sales" | "backoffice">("all");
 
   useEffect(() => {
-    fetch("/api/properties?take=300")
+    fetch("/api/properties?limit=300")
       .then(r => r.json())
       .then(d => {
         const props = Array.isArray(d?.properties) ? d.properties : [];

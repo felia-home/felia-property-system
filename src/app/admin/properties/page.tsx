@@ -67,6 +67,8 @@ function completionColor(score: number): string {
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(50);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -87,7 +89,7 @@ export default function PropertiesPage() {
   useEffect(() => {
     fetch("/api/stores").then(r => r.json()).then(d => setStores(d.stores ?? [])).catch(() => {});
     // Fetch all properties for status count badges (no status filter)
-    fetch("/api/properties?take=1000")
+    fetch("/api/properties?limit=1000")
       .then(r => r.json())
       .then((d: { properties?: Property[] }) => {
         const counts: Record<string, number> = {};
@@ -113,6 +115,8 @@ export default function PropertiesPage() {
       if (storeFilter) params.set("store_id", storeFilter);
       if (agentFilter) params.set("agent_id", agentFilter);
       if (noCopyOnly) params.set("noCopy", "true");
+      params.set("page", String(page));
+      params.set("limit", String(pageSize));
       const res = await fetch(`/api/properties?${params}`);
       const data = await res.json();
       let props: Property[] = data.properties ?? [];
@@ -121,7 +125,10 @@ export default function PropertiesPage() {
       setTotal(alertOnly ? props.length : (data.total ?? 0));
     } catch { /* ignore */ }
     finally { setLoading(false); }
-  }, [search, status, storeFilter, agentFilter, alertOnly, noCopyOnly]);
+  }, [search, status, storeFilter, agentFilter, alertOnly, noCopyOnly, page, pageSize]);
+
+  // フィルタ変更時はページを1にリセット
+  useEffect(() => { setPage(1); }, [search, status, storeFilter, agentFilter, alertOnly, noCopyOnly]);
 
   const handleBulkGenerate = async () => {
     // 広告文未入力の物件を取得（現在表示中のリストから or APIから）
@@ -445,6 +452,49 @@ export default function PropertiesPage() {
           </tbody>
         </table>
       </div>
+
+      {/* ページネーション */}
+      {!loading && total > 0 && (() => {
+        const totalPages = Math.max(1, Math.ceil(total / pageSize));
+        return (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            gap: 8, marginTop: 16, fontSize: 13, color: "#374151",
+          }}>
+            <button
+              type="button"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              style={{
+                padding: "6px 14px", borderRadius: 6,
+                border: "1px solid #d1d5db", background: "#fff",
+                cursor: page <= 1 ? "not-allowed" : "pointer",
+                color: page <= 1 ? "#9ca3af" : "#374151",
+                fontFamily: "inherit",
+              }}
+            >
+              ← 前
+            </button>
+            <span style={{ padding: "6px 12px" }}>
+              {page} / {totalPages}ページ（{total.toLocaleString()}件）
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              style={{
+                padding: "6px 14px", borderRadius: 6,
+                border: "1px solid #d1d5db", background: "#fff",
+                cursor: page >= totalPages ? "not-allowed" : "pointer",
+                color: page >= totalPages ? "#9ca3af" : "#374151",
+                fontFamily: "inherit",
+              }}
+            >
+              次 →
+            </button>
+          </div>
+        );
+      })()}
 
       {/* 進捗トースト */}
       {bulkGenerating && (

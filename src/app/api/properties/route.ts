@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const priceMin      = searchParams.get("price_min") ? Number(searchParams.get("price_min")) : null;
     const priceMax      = searchParams.get("price_max") ? Number(searchParams.get("price_max")) : null;
     const page          = Math.max(1, Number(searchParams.get("page") ?? "1"));
-    const limit         = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? "20")));
+    const limit         = Math.min(1000, Math.max(1, Number(searchParams.get("limit") ?? "20")));
 
     // ── WHERE 条件（AND 配列で複数 OR 条件の衝突を回避）────────
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
