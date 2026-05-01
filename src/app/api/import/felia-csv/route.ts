@@ -186,6 +186,16 @@ function toStr(v: unknown): string | null {
   return s === "" ? null : s;
 }
 
+// 用途地域1/2 を文字列にまとめる（重複は除外）
+function parseUseZones(row: Record<string, unknown>): string[] {
+  const zones: string[] = [];
+  const z1 = toStr(row["用途地域1"]);
+  const z2 = toStr(row["用途地域2"]);
+  if (z1) zones.push(z1);
+  if (z2 && z2 !== z1) zones.push(z2);
+  return zones;
+}
+
 function parseBuiltYear(yearMonth: unknown): { year: number | null; month: number | null } {
   const s = toStr(yearMonth);
   if (!s) return { year: null, month: null };
@@ -297,6 +307,12 @@ export async function POST(req: NextRequest) {
             building_year:          buildingYear,
             building_month:         buildingMonth,
             structure:              toStr(row["建物構造"]),
+            use_zone:               (() => {
+                                      const zs = parseUseZones(row);
+                                      return zs.length > 0 ? JSON.stringify(zs) : null;
+                                    })(),
+            bcr:                    toFloat(row["建ぺい率1"]),
+            far:                    toFloat(row["容積率1"]),
             total_units:            toInt(row["総戸数"]),
             floors_total:           toInt(row["地上階"]),
             floors_basement:        toInt(row["地下階"]),
