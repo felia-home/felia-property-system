@@ -91,6 +91,9 @@ export async function GET(request: NextRequest) {
             take: 1,
           },
           _count: { select: { images: true } },
+          agent: {
+            select: { id: true, name: true, photo_url: true },
+          },
         },
       }),
     ]);

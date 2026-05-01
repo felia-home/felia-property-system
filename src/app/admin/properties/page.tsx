@@ -52,6 +52,7 @@ interface Property {
   check_interval_days: number;
   images: Array<{ id: string; url: string; is_main: boolean }>;
   _count: { images: number };
+  agent?: { id: string; name: string; photo_url: string | null } | null;
 }
 
 function daysAgo(dateStr: string): number {
@@ -358,6 +359,23 @@ export default function PropertiesPage() {
                       {p.property_number && (
                         <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{p.property_number}</div>
                       )}
+                      {/* 担当者 */}
+                      <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+                        {p.agent ? (
+                          <>
+                            {p.agent.photo_url && (
+                              <img
+                                src={p.agent.photo_url}
+                                alt=""
+                                style={{ width: 16, height: 16, borderRadius: "50%", objectFit: "cover" }}
+                              />
+                            )}
+                            <span>👤 {p.agent.name}</span>
+                          </>
+                        ) : (
+                          <span style={{ color: "#d1d5db" }}>担当者未設定</span>
+                        )}
+                      </div>
                       {/* 確認期限バッジ */}
                       {checkDeadlineAlert === "over" && (
                         <span title={`確認期限超過（${p.check_interval_days}日ごと）`} style={{ display: "inline-block", marginTop: 3, fontSize: 10, background: "#fdeaea", color: "#8c1f1f", padding: "1px 6px", borderRadius: 8, fontWeight: 600 }}>
