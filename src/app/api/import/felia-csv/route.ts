@@ -2,9 +2,158 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { downloadAndUploadToR2 } from "@/lib/import-image";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
+
+const SELL_IMAGE_BASE = "https://img.hs.aws.multi-use.net/adm1/felia/images/sell";
+
+// 周辺環境カテゴリのマッピング
+function mapCategory(cat: string | null): string {
+  if (!cat) return "OTHER";
+  if (cat.includes("スーパー") || cat.includes("買物"))     return "SUPERMARKET";
+  if (cat.includes("学校")     || cat.includes("学ぶ"))     return "SCHOOL";
+  if (cat.includes("公園"))                                  return "PARK";
+  if (cat.includes("病院")     || cat.includes("医療"))     return "HOSPITAL";
+  if (cat.includes("駅")       || cat.includes("交通"))     return "STATION";
+  if (cat.includes("コンビニ"))                              return "CONVENIENCE";
+  return "OTHER";
+}
+
+// 物件画像インポート（外観 + 間取り + 画像1〜34）
+async function importPropertyImages(
+  propertyId: string,
+  yahooNo: string,
+  row: Record<string, unknown>
+): Promise<void> {
+  const get = (k: string): string | null => {
+    const v = row[k];
+    if (v === null || v === undefined || v === "") return null;
+    const s = String(v).trim();
+    return s === "" ? null : s;
+  };
+
+  let order = 1;
+
+  // 外観 (_1.jpg)
+  const gaikan = get("外観画像コメント(100文字)");
+  if (gaikan) {
+    const url = await downloadAndUploadToR2(`${SELL_IMAGE_BASE}/${yahooNo}_1.jpg`, "properties");
+    if (url) {
+      await prisma.propertyImage.create({
+        data: {
+          property_id: propertyId,
+          url, filename: url.split("/").pop() ?? "exterior.jpg",
+          caption: gaikan, order: order++, is_main: true,
+          room_type: "EXTERIOR",
+        },
+      });
+    }
+  }
+
+  // 間取り (_2.jpg)
+  const madori = get("間取り・区画画像コメント(100文字)");
+  if (madori) {
+    const url = await downloadAndUploadToR2(`${SELL_IMAGE_BASE}/${yahooNo}_2.jpg`, "properties");
+    if (url) {
+      await prisma.propertyImage.create({
+        data: {
+          property_id: propertyId,
+          url, filename: url.split("/").pop() ?? "floorplan.jpg",
+          caption: madori, order: order++, is_main: false,
+          room_type: "FLOOR_PLAN",
+        },
+      });
+    }
+  }
+
+  // 画像1〜34 (_N+1.jpg)
+  for (let i = 1; i <= 34; i++) {
+    const comment = get(`画像${i}コメント(100文字)`);
+    if (!comment) continue;
+    const url = await downloadAndUploadToR2(`${SELL_IMAGE_BASE}/${yahooNo}_${i + 1}.jpg`, "properties");
+    if (url) {
+      await prisma.propertyImage.create({
+        data: {
+          property_id: propertyId,
+          url, filename: url.split("/").pop() ?? `image${i}.jpg`,
+          caption: comment, order: order++, is_main: false,
+        },
+      });
+    }
+    await new Promise(r => setTimeout(r, 200));
+  }
+}
+
+// 周辺環境写真インポート（_s1.jpg〜_s9.jpg）
+async function importEnvImages(
+  propertyId: string,
+  yahooNo: string,
+  row: Record<string, unknown>
+): Promise<void> {
+  const get = (k: string): string | null => {
+    const v = row[k];
+    if (v === null || v === undefined || v === "") return null;
+    const s = String(v).trim();
+    return s === "" ? null : s;
+  };
+  const getNum = (k: string): number | null => {
+    const v = row[k];
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return isNaN(n) ? null : n;
+  };
+
+  for (let i = 1; i <= 9; i++) {
+    const comment = get(`周辺画像${i}コメント（100文字）`) ?? get(`周辺画像${i}コメント(100文字)`);
+    if (!comment) continue;
+
+    const facilityName =
+      get(`周辺環境${i}名称`) ||
+      get(`周辺環境名称${i}`) ||
+      comment.slice(0, 30);
+    const distance = getNum(`周辺環境${i}距離`);
+    const category = get(`周辺画像${i}カテゴリ`);
+
+    const url = await downloadAndUploadToR2(`${SELL_IMAGE_BASE}/${yahooNo}_s${i}.jpg`, "env-images");
+    if (!url) continue;
+
+    // PropertyEnvironmentImage はフラットなテーブル。同じURLが既にあれば再利用
+    const existing = await prisma.propertyEnvironmentImage.findFirst({
+      where: { url },
+      select: { id: true },
+    });
+
+    let envImageId: string;
+    if (existing) {
+      envImageId = existing.id;
+    } else {
+      const created = await prisma.propertyEnvironmentImage.create({
+        data: {
+          url,
+          filename:      url.split("/").pop() ?? "env.jpg",
+          facility_name: facilityName,
+          caption:       comment,
+          facility_type: mapCategory(category),
+        },
+      });
+      envImageId = created.id;
+    }
+
+    await prisma.propertyEnvImageLink.upsert({
+      where: { property_id_image_id: { property_id: propertyId, image_id: envImageId } },
+      create: {
+        property_id:  propertyId,
+        image_id:     envImageId,
+        walk_minutes: distance != null ? Math.max(1, Math.round(distance / 80)) : null,
+      },
+      update: {},
+    });
+
+    await new Promise(r => setTimeout(r, 200));
+  }
+}
 
 const PROPERTY_TYPE_MAP: Record<string, string> = {
   "中古マンション": "MANSION",
@@ -124,7 +273,9 @@ export async function POST(req: NextRequest) {
         const managementFee = toInt(row["管理費"]);
         const repairReserve = toInt(row["修繕積立金"]);
 
-        await prisma.property.create({
+        const yahooNo = toStr(row["Yahoo!物件番号"]);
+
+        const created = await prisma.property.create({
           data: {
             property_number:        propertyNumber,
             property_type:          propertyType,
@@ -172,6 +323,20 @@ export async function POST(req: NextRequest) {
         });
 
         inserted++;
+
+        // Yahoo!物件番号があれば画像も一緒にインポート（失敗しても続行）
+        if (yahooNo) {
+          try {
+            await importPropertyImages(created.id, yahooNo, row);
+          } catch (e) {
+            console.error(`[import] image error for ${propertyNumber}:`, e);
+          }
+          try {
+            await importEnvImages(created.id, yahooNo, row);
+          } catch (e) {
+            console.error(`[import] env image error for ${propertyNumber}:`, e);
+          }
+        }
       } catch (err) {
         errors++;
         errorDetails.push(String(err).slice(0, 120));

@@ -180,6 +180,18 @@ export default function FeliaHpImportPage() {
         </button>
       )}
 
+      {importing && (
+        <div style={{
+          marginTop: 16, padding: 16,
+          background: "#fffbeb", border: "1px solid #fde68a",
+          borderRadius: 6, fontSize: 13, color: "#92400e", lineHeight: 1.7,
+        }}>
+          ⏳ インポート中です。画像のダウンロード・R2 アップロードがあるため
+          数分〜十数分かかる場合があります。<br />
+          このページを閉じないでください。
+        </div>
+      )}
+
       {result && (
         <div style={{
           marginTop: 20, padding: 16,
