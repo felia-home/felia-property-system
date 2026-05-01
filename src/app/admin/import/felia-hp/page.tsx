@@ -18,7 +18,7 @@ export default function FeliaHpImportPage() {
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // CSV パーサ（簡易版・ダブルクォートのみ対応）
+  // RFC4180準拠のCSVパーサ。引用符内の改行・カンマを正しく扱う
   const parseCsv = async (f: File): Promise<Record<string, unknown>[]> => {
     const buffer = await f.arrayBuffer();
     let text = new TextDecoder("shift-jis").decode(buffer);
@@ -26,33 +26,82 @@ export default function FeliaHpImportPage() {
       text = new TextDecoder("utf-8").decode(buffer);
     }
 
-    // ダブルクォート対応の行分割（カンマ単位）
-    const splitLine = (line: string): string[] => {
-      const out: string[] = [];
-      let cur = "";
-      let inQuote = false;
-      for (let i = 0; i < line.length; i++) {
-        const c = line[i];
-        if (c === '"') { inQuote = !inQuote; continue; }
-        if (c === "," && !inQuote) { out.push(cur); cur = ""; continue; }
-        cur += c;
+    const parseCSVText = (csv: string): string[][] => {
+      const rows: string[][] = [];
+      let row: string[] = [];
+      let field = "";
+      let inQuotes = false;
+      let i = 0;
+
+      while (i < csv.length) {
+        const ch = csv[i];
+
+        if (inQuotes) {
+          if (ch === '"') {
+            if (csv[i + 1] === '"') {
+              field += '"';
+              i += 2;
+            } else {
+              inQuotes = false;
+              i++;
+            }
+          } else {
+            field += ch;
+            i++;
+          }
+        } else {
+          if (ch === '"') {
+            inQuotes = true;
+            i++;
+          } else if (ch === ",") {
+            row.push(field);
+            field = "";
+            i++;
+          } else if (ch === "\r") {
+            if (csv[i + 1] === "\n") i++;
+            row.push(field);
+            field = "";
+            rows.push(row);
+            row = [];
+            i++;
+          } else if (ch === "\n") {
+            row.push(field);
+            field = "";
+            rows.push(row);
+            row = [];
+            i++;
+          } else {
+            field += ch;
+            i++;
+          }
+        }
       }
-      out.push(cur);
-      return out.map(s => s.trim());
+
+      if (field !== "" || row.length > 0) {
+        row.push(field);
+        rows.push(row);
+      }
+      return rows;
     };
 
-    const lines = text.split(/\r?\n/).filter(l => l.trim());
-    if (lines.length < 2) return [];
+    const allRows = parseCSVText(text);
+    if (allRows.length < 2) return [];
 
-    const headers = splitLine(lines[0]);
-    const rows: Record<string, unknown>[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const values = splitLine(lines[i]);
+    const headers = allRows[0].map(h => h.trim());
+    const result: Record<string, unknown>[] = [];
+
+    for (let i = 1; i < allRows.length; i++) {
+      const values = allRows[i];
+      if (values.every(v => v.trim() === "")) continue;
       const row: Record<string, unknown> = {};
-      headers.forEach((h, idx) => { row[h] = values[idx] ?? null; });
-      rows.push(row);
+      headers.forEach((h, idx) => {
+        const v = values[idx] ?? "";
+        row[h] = v.trim() === "" ? null : v.trim();
+      });
+      result.push(row);
     }
-    return rows;
+
+    return result;
   };
 
   const handleImport = async () => {
