@@ -239,11 +239,37 @@ function parseRoads(row: Record<string, unknown>): RoadJson[] {
   return out;
 }
 
+const MONTH_ABBR_MAP: Record<string, number> = {
+  Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
+  Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
+};
+
 function parseBuiltYear(yearMonth: unknown): { year: number | null; month: number | null } {
   const s = toStr(yearMonth);
   if (!s) return { year: null, month: null };
-  const m = s.match(/(\d{4})\D+(\d{1,2})/);
-  if (m) return { year: parseInt(m[1]), month: parseInt(m[2]) };
+
+  // YYYY/MM または YYYY-MM
+  const m1 = s.match(/^(\d{4})[\/\-](\d{1,2})$/);
+  if (m1) return { year: parseInt(m1[1]), month: parseInt(m1[2]) };
+
+  // Aug-90 / Jan-2005（Excelが変換した英語月略称）
+  const m2 = s.match(/^([A-Za-z]{3})[\/\-](\d{2,4})$/);
+  if (m2) {
+    const key = m2[1].charAt(0).toUpperCase() + m2[1].slice(1).toLowerCase();
+    const month = MONTH_ABBR_MAP[key];
+    const yr = parseInt(m2[2]);
+    const year = yr < 100 ? (yr >= 50 ? 1900 + yr : 2000 + yr) : yr;
+    if (month) return { year, month };
+  }
+
+  // YYYY年MM月
+  const m3 = s.match(/(\d{4})年\s*(\d{1,2})月/);
+  if (m3) return { year: parseInt(m3[1]), month: parseInt(m3[2]) };
+
+  // フォールバック: 数値が2つ並ぶ場合（"1990 8" 等）
+  const m4 = s.match(/(\d{4})\D+(\d{1,2})/);
+  if (m4) return { year: parseInt(m4[1]), month: parseInt(m4[2]) };
+
   return { year: null, month: null };
 }
 
@@ -298,9 +324,18 @@ export async function POST(req: NextRequest) {
         const { year: buildingYear, month: buildingMonth } = parseBuiltYear(row["築年月"]);
 
         const price            = toInt(row["価格"]);
-        const areaExclusiveM2  = toFloat(row["建物面積(専有面積)"]);
-        const areaBuildM2      = toFloat(row["建物面積(専有面積)"]);
-        const areaLandM2       = toFloat(row["土地面積"]) ?? toFloat(row["敷地面積"]);
+        // 面積は物件種目で振り分ける
+        // - マンション系: area_exclusive_m2 のみ（area_build_m2/area_land_m2 は null）
+        // - 戸建て系:    area_build_m2 + area_land_m2（area_exclusive_m2 は null）
+        // - 土地:        area_land_m2 のみ
+        const isMansion       = propertyType === "MANSION" || propertyType === "NEW_MANSION";
+        const isLand          = propertyType === "LAND";
+        const buildAreaCsv    = toFloat(row["建物面積(専有面積)"]);
+        const landAreaCsv     = toFloat(row["土地面積"]) ?? toFloat(row["敷地面積"]);
+
+        const areaExclusiveM2 = isMansion ? buildAreaCsv : null;
+        const areaBuildM2     = !isMansion && !isLand ? buildAreaCsv : null;
+        const areaLandM2      = isLand ? landAreaCsv : (isMansion ? null : landAreaCsv);
 
         const stationLine1 = toStr(row["沿線1"]);
         const stationName1 = toStr(row["駅1"]);
