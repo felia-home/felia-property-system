@@ -96,6 +96,38 @@ export default function InquiryReportPage() {
             style={{ padding: "7px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, fontFamily: "inherit" }}>
             {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}月</option>)}
           </select>
+          <a
+            href={`/api/admin/reports/inquiry/export?year=${year}&month=${month}${storeId ? `&store_id=${storeId}` : ""}`}
+            download
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "7px 14px", borderRadius: 6, fontSize: 13,
+              border: "1px solid #d1d5db", background: "#fff",
+              color: "#374151", textDecoration: "none", cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            📥 CSVエクスポート
+          </a>
+          <button
+            type="button"
+            onClick={async () => {
+              const res = await fetch("/api/admin/reports/generate", {
+                method:  "POST",
+                headers: { "Content-Type": "application/json" },
+                body:    JSON.stringify({ type: "MONTHLY", year, month, store_id: storeId || undefined }),
+              });
+              const json = await res.json();
+              alert(json.ok ? "月次レポートを生成しました" : "生成に失敗しました");
+            }}
+            style={{
+              padding: "7px 14px", borderRadius: 6, fontSize: 13,
+              border: "1px solid #bfdbfe", background: "#eff6ff",
+              color: "#1d4ed8", cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            📋 月次レポート生成
+          </button>
         </div>
       </div>
 

@@ -60,6 +60,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { href: "/admin/reports/sales",     label: "営業ダッシュボード", icon: "🎯" },
       { href: "/admin/reports/inquiries", label: "反響レポート",       icon: "📊" },
+      { href: "/admin/reports/kpi",       label: "KPIレポート",        icon: "📈" },
     ],
   },
   {
