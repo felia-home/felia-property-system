@@ -372,6 +372,7 @@ export async function POST(req: NextRequest) {
     const defaultStaff  = default_agent_id ? staffById[default_agent_id] ?? null : null;
 
     let inserted = 0;
+    let updated  = 0;
     let skipped  = 0;
     let errors   = 0;
     const errorDetails: string[] = [];
@@ -383,11 +384,11 @@ export async function POST(req: NextRequest) {
 
         const propertyNumber = `F${oldNumber}`;
 
+        // property_number は @unique でないため findFirst → update or create で手動upsert
         const existing = await prisma.property.findFirst({
           where: { property_number: propertyNumber },
           select: { id: true },
         });
-        if (existing) { skipped++; continue; }
 
         const kindLabel    = toStr(row["物件種目"]) ?? "";
         const propertyType = PROPERTY_TYPE_MAP[kindLabel] ?? "USED_HOUSE";
@@ -466,96 +467,113 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        const created = await prisma.property.create({
-          data: {
-            property_number:        propertyNumber,
-            property_type:          propertyType,
-            transaction_type:       toStr(row["取引態様"]) ?? "仲介",
-            brokerage_type:         "専任",
-            published_hp:           true,
-            published_suumo:        portal.published_suumo,
-            published_athome:       portal.published_athome,
-            published_yahoo:        portal.published_yahoo,
-            legal_restrictions:     parseLegalRestrictions(row["法令上の制限.1"]),
-            price:                  price ?? 0,
-            prefecture:             "東京都",
-            city:                   toStr(row["行政区"]) ?? "",
-            town:                   toStr(row["町丁目名"]),
-            address:                fixAddressDate(row["番地(表示用)"])
-                                    ?? fixAddressDate(row["番地(非表示用)"])
-                                    ?? "",
-            latitude:               toFloat(row["位置情報(緯度)"]),
-            longitude:              toFloat(row["位置情報(経度)"]),
-            building_name:          buildingName,
-            rooms:                  toStr(row["間取り"]),
-            area_build_m2:          areaBuildM2,
-            area_exclusive_m2:      areaExclusiveM2,
-            area_land_m2:           areaLandM2,
-            building_year:          buildingYear,
-            building_month:         buildingMonth,
-            structure:              toStr(row["建物構造"]),
-            floor_unit:             toInt(row["所在階"]),
-            direction:              toStr(row["バルコニー方向（主要採光方向）"]),
-            area_balcony_m2:        toFloat(row["バルコニー面積"]),
-            use_zone:               useZonesArr[0] ?? null,
-            use_zones:              useZonesArr.length > 0
-              ? useZonesArr.map(z => ({ zone: z, bcr: "", far: "", area_pct: "" }))
-              : undefined,
-            bcr:                    toFloat(row["建ぺい率1"]),
-            far:                    toFloat(row["容積率1"]),
-            land_right:             toStr(row["土地権利"]),
-            city_plan:              toStr(row["都市計画"]),
-            features:               featuresArr,
-            roads:                  roadsArr.length > 0 ? roadsArr : undefined,
-            delivery_timing:        toStr(row["引渡し"]),
-            delivery_status:        toStr(row["現況"]),
-            description_hp:         toStr(row["おすすめコメント"]) ??
-                                    toStr(row["一覧用コメント"]) ??
-                                    toStr(row["Yahooおすすめコメント、スタッフおすすめコメント"]) ??
-                                    toStr(row["フリーコメント"]) ??
-                                    null,
-            internal_memo:          toStr(row["物件備考、備考"]) ?? toStr(row["備考"]) ?? null,
-            total_units:            toInt(row["総戸数"]),
-            floors_total:           toInt(row["地上階"]),
-            floors_basement:        toInt(row["地下階"]),
-            management_fee:         managementFee,
-            repair_reserve:         repairReserve,
-            management_type:        toStr(row["管理形態"]),
-            management_company:     toStr(row["管理会社名"]),
-            station_line1:          stationLine1,
-            station_name1:          stationName1,
-            station_walk1:          stationWalk1,
-            station_line2:          stationLine2,
-            station_name2:          stationName2,
-            station_walk2:          stationWalk2,
-            station_line3:          stationLine3,
-            station_name3:          stationName3,
-            station_walk3:          stationWalk3,
-            school_elementary:      schoolElementary,
-            env_elementary_school:  schoolElementary,
-            school_junior_high:     schoolJuniorHigh,
-            selling_points:         hpComments,
-            agent_id:               agentId,
-            store_id:               storeId,
-            mansion_building_id:    mansionBuildingId,
-            status:                 "PUBLISHED",
-          },
-        });
+        // 共通の保存データ（create / update で同じ内容）
+        const baseData = {
+          property_type:          propertyType,
+          transaction_type:       toStr(row["取引態様"]) ?? "仲介",
+          published_hp:           true,
+          published_suumo:        portal.published_suumo,
+          published_athome:       portal.published_athome,
+          published_yahoo:        portal.published_yahoo,
+          legal_restrictions:     parseLegalRestrictions(row["法令上の制限.1"]),
+          price:                  price ?? 0,
+          prefecture:             "東京都",
+          city:                   toStr(row["行政区"]) ?? "",
+          town:                   toStr(row["町丁目名"]),
+          address:                fixAddressDate(row["番地(表示用)"])
+                                  ?? fixAddressDate(row["番地(非表示用)"])
+                                  ?? "",
+          latitude:               toFloat(row["位置情報(緯度)"]),
+          longitude:              toFloat(row["位置情報(経度)"]),
+          building_name:          buildingName,
+          rooms:                  toStr(row["間取り"]),
+          area_build_m2:          areaBuildM2,
+          area_exclusive_m2:      areaExclusiveM2,
+          area_land_m2:           areaLandM2,
+          building_year:          buildingYear,
+          building_month:         buildingMonth,
+          structure:              toStr(row["建物構造"]),
+          floor_unit:             toInt(row["所在階"]),
+          direction:              toStr(row["バルコニー方向（主要採光方向）"]),
+          area_balcony_m2:        toFloat(row["バルコニー面積"]),
+          use_zone:               useZonesArr[0] ?? null,
+          use_zones:              useZonesArr.length > 0
+            ? useZonesArr.map(z => ({ zone: z, bcr: "", far: "", area_pct: "" }))
+            : undefined,
+          bcr:                    toFloat(row["建ぺい率1"]),
+          far:                    toFloat(row["容積率1"]),
+          land_right:             toStr(row["土地権利"]),
+          city_plan:              toStr(row["都市計画"]),
+          features:               featuresArr,
+          roads:                  roadsArr.length > 0 ? roadsArr : undefined,
+          delivery_timing:        toStr(row["引渡し"]),
+          delivery_status:        toStr(row["現況"]),
+          description_hp:         toStr(row["おすすめコメント"]) ??
+                                  toStr(row["一覧用コメント"]) ??
+                                  toStr(row["Yahooおすすめコメント、スタッフおすすめコメント"]) ??
+                                  toStr(row["フリーコメント"]) ??
+                                  null,
+          internal_memo:          toStr(row["物件備考、備考"]) ?? toStr(row["備考"]) ?? null,
+          total_units:            toInt(row["総戸数"]),
+          floors_total:           toInt(row["地上階"]),
+          floors_basement:        toInt(row["地下階"]),
+          management_fee:         managementFee,
+          repair_reserve:         repairReserve,
+          management_type:        toStr(row["管理形態"]),
+          management_company:     toStr(row["管理会社名"]),
+          station_line1:          stationLine1,
+          station_name1:          stationName1,
+          station_walk1:          stationWalk1,
+          station_line2:          stationLine2,
+          station_name2:          stationName2,
+          station_walk2:          stationWalk2,
+          station_line3:          stationLine3,
+          station_name3:          stationName3,
+          station_walk3:          stationWalk3,
+          school_elementary:      schoolElementary,
+          env_elementary_school:  schoolElementary,
+          school_junior_high:     schoolJuniorHigh,
+          selling_points:         hpComments,
+          agent_id:               agentId,
+          store_id:               storeId,
+          mansion_building_id:    mansionBuildingId,
+        };
 
-        inserted++;
+        const created = existing
+          ? await prisma.property.update({
+              where: { id: existing.id },
+              data:  baseData,
+            })
+          : await prisma.property.create({
+              data: {
+                ...baseData,
+                property_number:    propertyNumber,
+                brokerage_type:     "専任",
+                status:             "PUBLISHED",
+              },
+            });
+
+        if (existing) updated++;
+        else          inserted++;
 
         // Yahoo!物件番号があれば画像も一緒にインポート（失敗しても続行）
         // skip_images=true の場合は画像処理をスキップ（高速モード）
+        // 既存画像が1枚でもあれば再取得しない（重複防止）
         if (!skip_images && yahooNo) {
-          try {
-            await importPropertyImages(created.id, yahooNo, row);
-          } catch (e) {
-            console.error(`[import] image error for ${propertyNumber}:`, e);
-          }
-          try {
-            await importEnvImages(created.id, yahooNo, row);
-          } catch (e) {
-            console.error(`[import] env image error for ${propertyNumber}:`, e);
+          const existingImageCount = await prisma.propertyImage.count({
+            where: { property_id: created.id },
+          });
+          if (existingImageCount === 0) {
+            try {
+              await importPropertyImages(created.id, yahooNo, row);
+            } catch (e) {
+              console.error(`[import] image error for ${propertyNumber}:`, e);
+            }
+            try {
+              await importEnvImages(created.id, yahooNo, row);
+            } catch (e) {
+              console.error(`[import] env image error for ${propertyNumber}:`, e);
+            }
           }
         }
       } catch (err) {
@@ -567,6 +585,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       inserted,
+      updated,
       skipped,
       errors,
       total: rows.length,

@@ -14,7 +14,7 @@ export default function FeliaHpImportPage() {
   const [skipImages, setSkipImages] = useState<boolean>(true); // デフォルトは高速モード
   const [importing, setImporting] = useState(false);
   const [result, setResult]       = useState<{
-    inserted: number; skipped: number; errors: number; total: number;
+    inserted: number; updated?: number; skipped: number; errors: number; total: number;
     error_details?: string[];
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -287,7 +287,8 @@ export default function FeliaHpImportPage() {
           <div style={{ fontSize: 13, lineHeight: 2 }}>
             <div>処理件数: {result.total}件</div>
             <div>新規登録: <strong>{result.inserted}件</strong></div>
-            <div>スキップ（重複・必須欠落）: {result.skipped}件</div>
+            <div>更新: <strong>{result.updated ?? 0}件</strong></div>
+            <div>スキップ（必須欠落）: {result.skipped}件</div>
             <div>エラー: {result.errors}件</div>
           </div>
           {result.error_details && result.error_details.length > 0 && (
