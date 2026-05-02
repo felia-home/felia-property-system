@@ -9,6 +9,27 @@ import PropertyFeaturesSection from "@/components/admin/PropertyFeaturesSection"
 import { getWorkflowStep, WORKFLOW, WORKFLOW_KANBAN_COLUMNS, type WorkflowStatus } from "@/lib/workflow";
 import { calcPropertyCompletion, type PropertyForCompletion } from "@/lib/property-completion";
 
+// features を必ず string[] に正規化
+// - 配列ならそのまま
+// - JSON文字列なら parse
+// - スラッシュ区切り文字列なら split
+// - その他は空配列
+function normalizeFeatures(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (!s) return [];
+    if (s.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed)) return parsed.map(String);
+      } catch { /* fall through */ }
+    }
+    return s.split(/[/、,，]/).map(f => f.trim()).filter(Boolean);
+  }
+  return [];
+}
+
 // ── Workflow Progress Bar ────────────────────────────────────────────────────
 
 const PROGRESS_STATUSES: WorkflowStatus[] = [
@@ -1164,7 +1185,7 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
     if (res.ok && d.property) {
       setProperty(d.property);
       setForm(propertyToForm(d.property));
-      setFeatures(Array.isArray(d.property.features) ? d.property.features : []);
+      setFeatures(normalizeFeatures(d.property.features));
       setCopyFields({
         title: String(d.property.title ?? ""),
         catch_copy: String(d.property.catch_copy ?? ""),
