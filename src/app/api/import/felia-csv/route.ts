@@ -49,32 +49,40 @@ async function importPropertyImages(
   // 外観 (_1.jpg)
   const gaikan = get("外観画像コメント(100文字)");
   if (gaikan) {
-    const url = await downloadAndUploadToR2(`${SELL_IMAGE_BASE}/${yahooNo}_1.jpg`, "properties");
-    if (url) {
-      await prisma.propertyImage.create({
-        data: {
-          property_id: propertyId,
-          url, filename: url.split("/").pop() ?? "exterior.jpg",
-          caption: gaikan, order: order++, is_main: true,
-          room_type: "EXTERIOR",
-        },
-      });
+    try {
+      const url = await downloadAndUploadToR2(`${SELL_IMAGE_BASE}/${yahooNo}_1.jpg`, "properties");
+      if (url) {
+        await prisma.propertyImage.create({
+          data: {
+            property_id: propertyId,
+            url, filename: url.split("/").pop() ?? "exterior.jpg",
+            caption: gaikan, order: order++, is_main: true,
+            room_type: "EXTERIOR",
+          },
+        });
+      }
+    } catch (e) {
+      console.error(`[import] gaikan image error for ${yahooNo}:`, e instanceof Error ? e.message : e);
     }
   }
 
   // 間取り (_2.jpg)
   const madori = get("間取り・区画画像コメント(100文字)");
   if (madori) {
-    const url = await downloadAndUploadToR2(`${SELL_IMAGE_BASE}/${yahooNo}_2.jpg`, "properties");
-    if (url) {
-      await prisma.propertyImage.create({
-        data: {
-          property_id: propertyId,
-          url, filename: url.split("/").pop() ?? "floorplan.jpg",
-          caption: madori, order: order++, is_main: false,
-          room_type: "FLOOR_PLAN",
-        },
-      });
+    try {
+      const url = await downloadAndUploadToR2(`${SELL_IMAGE_BASE}/${yahooNo}_2.jpg`, "properties");
+      if (url) {
+        await prisma.propertyImage.create({
+          data: {
+            property_id: propertyId,
+            url, filename: url.split("/").pop() ?? "floorplan.jpg",
+            caption: madori, order: order++, is_main: false,
+            room_type: "FLOOR_PLAN",
+          },
+        });
+      }
+    } catch (e) {
+      console.error(`[import] madori image error for ${yahooNo}:`, e instanceof Error ? e.message : e);
     }
   }
 
@@ -82,15 +90,19 @@ async function importPropertyImages(
   for (let i = 1; i <= 34; i++) {
     const comment = get(`画像${i}コメント(100文字)`);
     if (!comment) continue;
-    const url = await downloadAndUploadToR2(`${SELL_IMAGE_BASE}/${yahooNo}_${i + 1}.jpg`, "properties");
-    if (url) {
-      await prisma.propertyImage.create({
-        data: {
-          property_id: propertyId,
-          url, filename: url.split("/").pop() ?? `image${i}.jpg`,
-          caption: comment, order: order++, is_main: false,
-        },
-      });
+    try {
+      const url = await downloadAndUploadToR2(`${SELL_IMAGE_BASE}/${yahooNo}_${i + 1}.jpg`, "properties");
+      if (url) {
+        await prisma.propertyImage.create({
+          data: {
+            property_id: propertyId,
+            url, filename: url.split("/").pop() ?? `image${i}.jpg`,
+            caption: comment, order: order++, is_main: false,
+          },
+        });
+      }
+    } catch (e) {
+      console.error(`[import] image${i} error for ${yahooNo}:`, e instanceof Error ? e.message : e);
     }
     await new Promise(r => setTimeout(r, 200));
   }
@@ -148,40 +160,44 @@ async function importEnvImages(
     const distance = getNum(`周辺環境${i}距離`);
     const category = get(`周辺画像${i}カテゴリ`);
 
-    const url = await downloadAndUploadToR2(`${SELL_IMAGE_BASE}/${yahooNo}_s${i}.jpg`, "env-images");
-    if (!url) continue;
+    try {
+      const url = await downloadAndUploadToR2(`${SELL_IMAGE_BASE}/${yahooNo}_s${i}.jpg`, "env-images");
+      if (!url) continue;
 
-    // PropertyEnvironmentImage はフラットなテーブル。同じURLが既にあれば再利用
-    const existing = await prisma.propertyEnvironmentImage.findFirst({
-      where: { url },
-      select: { id: true },
-    });
-
-    let envImageId: string;
-    if (existing) {
-      envImageId = existing.id;
-    } else {
-      const created = await prisma.propertyEnvironmentImage.create({
-        data: {
-          url,
-          filename:      url.split("/").pop() ?? "env.jpg",
-          facility_name: facilityName,
-          caption:       comment,
-          facility_type: mapCategory(category),
-        },
+      // PropertyEnvironmentImage はフラットなテーブル。同じURLが既にあれば再利用
+      const existing = await prisma.propertyEnvironmentImage.findFirst({
+        where: { url },
+        select: { id: true },
       });
-      envImageId = created.id;
-    }
 
-    await prisma.propertyEnvImageLink.upsert({
-      where: { property_id_image_id: { property_id: propertyId, image_id: envImageId } },
-      create: {
-        property_id:  propertyId,
-        image_id:     envImageId,
-        walk_minutes: distance != null ? Math.max(1, Math.round(distance / 80)) : null,
-      },
-      update: {},
-    });
+      let envImageId: string;
+      if (existing) {
+        envImageId = existing.id;
+      } else {
+        const created = await prisma.propertyEnvironmentImage.create({
+          data: {
+            url,
+            filename:      url.split("/").pop() ?? "env.jpg",
+            facility_name: facilityName,
+            caption:       comment,
+            facility_type: mapCategory(category),
+          },
+        });
+        envImageId = created.id;
+      }
+
+      await prisma.propertyEnvImageLink.upsert({
+        where: { property_id_image_id: { property_id: propertyId, image_id: envImageId } },
+        create: {
+          property_id:  propertyId,
+          image_id:     envImageId,
+          walk_minutes: distance != null ? Math.max(1, Math.round(distance / 80)) : null,
+        },
+        update: {},
+      });
+    } catch (e) {
+      console.error(`[import] env image${i} error for ${yahooNo}:`, e instanceof Error ? e.message : e);
+    }
 
     await new Promise(r => setTimeout(r, 200));
   }

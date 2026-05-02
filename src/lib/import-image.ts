@@ -2,8 +2,17 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { r2Client, R2_BUCKET_NAME, R2_PUBLIC_URL } from "@/lib/r2";
 import { randomBytes } from "crypto";
 
+const ALLOWED_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+
 /**
  * 外部URLから画像をダウンロードしてR2にアップロードする
+ * sharp での変換は行わず、バイト列をそのまま格納する
  * @returns R2のpublic URL、失敗時はnull
  */
 export async function downloadAndUploadToR2(
@@ -18,16 +27,23 @@ export async function downloadAndUploadToR2(
 
     if (!res.ok) return null;
 
-    const contentType = res.headers.get("content-type") ?? "image/jpeg";
-    if (!contentType.startsWith("image/")) return null;
-
     const buffer = await res.arrayBuffer();
-    if (buffer.byteLength < 1000) return null; // 1KB未満はスキップ（404 placeholder などを除外）
+    if (buffer.byteLength < 1000) return null; // 1KB未満は404 placeholderなどとみなしスキップ
 
-    const ext = contentType.includes("png") ? "png"
-      : contentType.includes("webp") ? "webp"
-      : contentType.includes("gif")  ? "gif"
-      : "jpg";
+    // Content-Typeを正規化: "image/jpeg; charset=utf-8" → "image/jpeg"
+    const rawContentType = res.headers.get("content-type") ?? "image/jpeg";
+    const contentType = rawContentType.split(";")[0].trim().toLowerCase();
+
+    // 対応フォーマット外（HEIF/AVIF など）はスキップせずJPEG扱いでフォールバック
+    // ※旧システムは Content-Type が壊れているケースがあるため
+    if (!ALLOWED_TYPES.has(contentType)) {
+      console.log(`[import-image] unsupported content-type: ${contentType} for ${sourceUrl} — fallback to image/jpeg`);
+    }
+
+    const ext = contentType.includes("png")  ? "png"
+              : contentType.includes("webp") ? "webp"
+              : contentType.includes("gif")  ? "gif"
+              : "jpg";
 
     const filename = `${folder}/${randomBytes(8).toString("hex")}.${ext}`;
 
@@ -35,7 +51,7 @@ export async function downloadAndUploadToR2(
       Bucket:      R2_BUCKET_NAME,
       Key:         filename,
       Body:        Buffer.from(buffer),
-      ContentType: contentType,
+      ContentType: `image/${ext === "jpg" ? "jpeg" : ext}`,
     }));
 
     return `${R2_PUBLIC_URL}/${filename}`;
