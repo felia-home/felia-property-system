@@ -10,14 +10,18 @@ export async function GET(request: NextRequest) {
     const priority = searchParams.get("priority");
     const source = searchParams.get("source");
     const assignedTo = searchParams.get("assigned_to");
+    const storeId = searchParams.get("store_id");
     const includeInquiries = searchParams.get("includeInquiries") === "true";
     const includeFamily = searchParams.get("includeFamily") === "true";
+    const limitRaw = parseInt(searchParams.get("limit") ?? "200", 10);
+    const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 200, 1), 1000);
 
     const where: Record<string, unknown> = { is_deleted: false };
     if (status) where.status = status;
     if (priority) where.priority = priority;
     if (source) where.source = source;
     if (assignedTo) where.assigned_to = assignedTo;
+    if (storeId) where.store_id = storeId;
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },
@@ -34,7 +38,7 @@ export async function GET(request: NextRequest) {
         { ai_score: "desc" },
         { created_at: "desc" },
       ],
-      take: 200,
+      take: limit,
       include: {
         ...(includeInquiries ? {
           inquiries: {

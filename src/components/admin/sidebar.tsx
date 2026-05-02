@@ -28,6 +28,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "顧客管理",
     items: [
       { href: "/admin/customers",          label: "ダッシュボード", icon: "人" },
+      { href: "/admin/customers/pipeline", label: "パイプライン",   icon: "🗂" },
       { href: "/admin/customers/follow-up",label: "AI追客",         icon: "🤖" },
       { href: "/admin/notifications",      label: "通知管理",       icon: "📧" },
     ],

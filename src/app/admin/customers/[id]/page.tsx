@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 
 const STATUS_LABELS: Record<string, string> = {
   NEW: "新規", CONTACTING: "連絡中", VISITING: "内見調整中",
@@ -104,7 +105,43 @@ interface Customer {
   assigned_staff: { id: string; name: string } | null;
 }
 
-type TabKey = "basic" | "family" | "desired" | "finance" | "followup" | "history";
+type TabKey = "basic" | "family" | "desired" | "finance" | "followup" | "history" | "matching";
+
+interface VisitItem {
+  id: string;
+  scheduled_at: string;
+  status: string;
+  result: string | null;
+  feedback: string | null;
+  property: { id: string; building_name: string | null; city: string | null; town?: string | null } | null;
+  staff:    { id: string; name: string } | null;
+}
+interface MatchProperty {
+  id: string;
+  property_type: string;
+  price: number | null;
+  city: string | null;
+  town: string | null;
+  rooms: string | null;
+  station_name1: string | null;
+  station_walk1: number | null;
+  building_name: string | null;
+  images: { url: string }[];
+  score: number;
+}
+interface AiNextAction {
+  priority: "HIGH" | "MEDIUM" | "LOW" | string;
+  action: string;
+  timing: string;
+  reason: string;
+}
+interface AiSuggestion {
+  summary?: string;
+  next_actions?: AiNextAction[];
+  contact_message?: string;
+  risk_level?: "HIGH" | "MEDIUM" | "LOW" | string;
+  risk_reason?: string;
+}
 
 const inputSt: React.CSSProperties = {
   padding: "6px 10px", border: "1px solid #e0deda", borderRadius: 6,
@@ -177,6 +214,21 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
   const [actResult, setActResult] = useState("");
   const [actNext, setActNext] = useState("");
   const [addingAct, setAddingAct] = useState(false);
+
+  // Matching / AI / Visits
+  const [visits, setVisits]                 = useState<VisitItem[]>([]);
+  const [matchProps, setMatchProps]         = useState<MatchProperty[]>([]);
+  const [matchLoading, setMatchLoading]     = useState(false);
+  const [aiSuggestion, setAiSuggestion]     = useState<AiSuggestion | null>(null);
+  const [aiLoading, setAiLoading]           = useState(false);
+  const [showVisitForm, setShowVisitForm]   = useState(false);
+  const [visitForm, setVisitForm]           = useState<{
+    scheduled_at: string;
+    property_id:  string;
+    staff_id:     string;
+    feedback:     string;
+  }>({ scheduled_at: "", property_id: "", staff_id: "", feedback: "" });
+  const [savingVisit, setSavingVisit]       = useState(false);
 
   const loadCustomer = useCallback(async () => {
     try {
@@ -263,6 +315,70 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
     } catch { setError("通信エラーが発生しました"); }
     finally { setSaving(false); }
   };
+
+  const loadVisits = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/visit-appointments?customer_id=${params.id}`);
+      const d = await r.json() as { visits?: VisitItem[] };
+      setVisits(d.visits ?? []);
+    } catch { /* ignore */ }
+  }, [params.id]);
+
+  const runAiSuggest = async () => {
+    setAiLoading(true);
+    try {
+      const res = await fetch(`/api/customers/${params.id}/ai-suggest`, { method: "POST" });
+      const data = await res.json() as { suggestion?: AiSuggestion };
+      setAiSuggestion(data.suggestion ?? null);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const runMatching = async () => {
+    setMatchLoading(true);
+    try {
+      const res = await fetch(`/api/customers/${params.id}/matching`);
+      const data = await res.json() as { properties?: MatchProperty[] };
+      setMatchProps(data.properties ?? []);
+    } finally {
+      setMatchLoading(false);
+    }
+  };
+
+  const submitVisit = async () => {
+    if (!visitForm.scheduled_at) { alert("内見日時を入力してください"); return; }
+    setSavingVisit(true);
+    try {
+      const res = await fetch("/api/visit-appointments", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          customer_id:  params.id,
+          property_id:  visitForm.property_id || null,
+          staff_id:     visitForm.staff_id    || null,
+          scheduled_at: visitForm.scheduled_at,
+          feedback:     visitForm.feedback    || null,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        alert(d.error ?? "登録に失敗しました");
+        return;
+      }
+      setShowVisitForm(false);
+      setVisitForm({ scheduled_at: "", property_id: "", staff_id: "", feedback: "" });
+      await loadVisits();
+      await loadCustomer();
+    } finally {
+      setSavingVisit(false);
+    }
+  };
+
+  // matchingタブを開いたら内見一覧を取得
+  useEffect(() => {
+    if (activeTab === "matching") void loadVisits();
+  }, [activeTab, loadVisits]);
 
   const handleAnalyze = async () => {
     setAnalyzing(true); setError("");
@@ -381,6 +497,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
     { key: "finance", label: "資金計画" },
     { key: "followup", label: "追客管理" },
     { key: "history", label: `対応履歴 (${customer.activities?.length ?? 0})` },
+    { key: "matching", label: "AI・内見・マッチング" },
   ];
 
   const SaveBtn = () => (
@@ -1191,6 +1308,288 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ─── Tab7: AI・内見・マッチング ─── */}
+      {activeTab === "matching" && (
+        <div>
+          {/* AIアシスタントカード */}
+          <div style={{
+            padding: 20, background: "#faf5ff",
+            border: "1px solid #e9d5ff", borderRadius: 10, marginBottom: 16,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ fontSize: 14, fontWeight: "bold", color: "#7c3aed" }}>🤖 AIアシスタント</div>
+              <button
+                type="button"
+                onClick={runAiSuggest}
+                disabled={aiLoading}
+                style={{
+                  padding: "5px 14px", borderRadius: 6, fontSize: 12,
+                  border: "none", background: aiLoading ? "#e5e7eb" : "#7c3aed",
+                  color: aiLoading ? "#9ca3af" : "#fff",
+                  cursor: aiLoading ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {aiLoading ? "✨ 分析中..." : "✨ AI分析"}
+              </button>
+            </div>
+
+            {aiSuggestion ? (
+              <div>
+                {aiSuggestion.summary && (
+                  <p style={{ fontSize: 13, color: "#374151", marginBottom: 12 }}>
+                    {aiSuggestion.summary}
+                  </p>
+                )}
+                {aiSuggestion.next_actions?.map((act, i) => (
+                  <div key={i} style={{
+                    padding: "8px 12px", marginBottom: 8,
+                    background: "#fff", borderRadius: 6,
+                    border: `1px solid ${act.priority === "HIGH" ? "#fca5a5" : act.priority === "MEDIUM" ? "#fde68a" : "#e5e7eb"}`,
+                  }}>
+                    <div style={{ fontSize: 12, fontWeight: "bold", color: "#374151" }}>
+                      {act.priority === "HIGH" ? "🔴" : act.priority === "MEDIUM" ? "🟡" : "🟢"} {act.action}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                      {act.timing} — {act.reason}
+                    </div>
+                  </div>
+                ))}
+                {aiSuggestion.contact_message && (
+                  <div style={{
+                    padding: "10px 12px", background: "#fff",
+                    border: "1px solid #e9d5ff", borderRadius: 6, marginTop: 8,
+                  }}>
+                    <div style={{ fontSize: 11, fontWeight: "bold", color: "#7c3aed", marginBottom: 4 }}>
+                      📝 推奨メッセージ
+                    </div>
+                    <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                      {aiSuggestion.contact_message}
+                    </div>
+                  </div>
+                )}
+                {aiSuggestion.risk_level && (
+                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 8 }}>
+                    リスク: <strong>{aiSuggestion.risk_level}</strong>
+                    {aiSuggestion.risk_reason ? ` — ${aiSuggestion.risk_reason}` : ""}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: "#9ca3af" }}>
+                「AI分析」ボタンを押すと、活動履歴をもとに次のアクションを提案します。
+              </div>
+            )}
+          </div>
+
+          {/* マッチング物件 */}
+          <div style={{
+            padding: 20, background: "#fff",
+            border: "1px solid #e5e7eb", borderRadius: 10, marginBottom: 16,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ fontSize: 14, fontWeight: "bold" }}>🏠 マッチング物件</div>
+              <button
+                type="button"
+                onClick={runMatching}
+                disabled={matchLoading}
+                style={{
+                  padding: "5px 12px", borderRadius: 6, fontSize: 12,
+                  border: "1px solid #bfdbfe", background: "#eff6ff",
+                  color: "#1d4ed8",
+                  cursor: matchLoading ? "not-allowed" : "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {matchLoading ? "検索中..." : "🔍 検索"}
+              </button>
+            </div>
+
+            {matchProps.length === 0 ? (
+              <div style={{ fontSize: 13, color: "#9ca3af" }}>
+                「検索」を押すと希望条件に合う物件を表示します。
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {matchProps.slice(0, 10).map(p => (
+                  <Link key={p.id} href={`/admin/properties/${p.id}`} style={{ textDecoration: "none" }}>
+                    <div style={{
+                      display: "flex", gap: 10, padding: "8px 10px",
+                      background: "#f9fafb", borderRadius: 6, alignItems: "center",
+                    }}>
+                      {p.images?.[0]?.url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.images[0].url} alt="" style={{ width: 60, height: 45, objectFit: "cover", borderRadius: 4 }} />
+                      ) : (
+                        <div style={{ width: 60, height: 45, background: "#e5e7eb", borderRadius: 4 }} />
+                      )}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12, fontWeight: "bold", color: "#374151" }}>
+                          {p.building_name || `${p.city ?? ""}${p.town ?? ""}`}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#6b7280" }}>
+                          {p.price?.toLocaleString() ?? "?"}万円 / {p.rooms ?? "?"} / {p.station_name1 ?? ""}
+                          {p.station_walk1 ? `徒歩${p.station_walk1}分` : ""}
+                        </div>
+                      </div>
+                      <div style={{
+                        padding: "2px 8px", borderRadius: 8,
+                        background: "#f0fdf4", color: "#166534", fontSize: 11, fontWeight: "bold",
+                      }}>
+                        {p.score}点
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 内見管理 */}
+          <div style={{
+            padding: 20, background: "#fff",
+            border: "1px solid #e5e7eb", borderRadius: 10, marginBottom: 16,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ fontSize: 14, fontWeight: "bold" }}>📅 内見予約 ({visits.length})</div>
+              <button
+                type="button"
+                onClick={() => setShowVisitForm(true)}
+                style={{
+                  padding: "5px 12px", borderRadius: 6, fontSize: 12,
+                  border: "none", background: "#5BAD52", color: "#fff",
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                ＋ 内見登録
+              </button>
+            </div>
+
+            {visits.length === 0 ? (
+              <div style={{ fontSize: 13, color: "#9ca3af" }}>内見予約はまだありません。</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {visits.map(v => (
+                  <div key={v.id} style={{
+                    padding: "10px 12px", background: "#f9fafb",
+                    borderRadius: 6, border: "1px solid #e5e7eb",
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontSize: 13, fontWeight: "bold", color: "#374151" }}>
+                        {new Date(v.scheduled_at).toLocaleString("ja-JP", {
+                          year: "numeric", month: "2-digit", day: "2-digit",
+                          hour: "2-digit", minute: "2-digit",
+                        })}
+                      </span>
+                      <span style={{
+                        padding: "1px 8px", borderRadius: 8,
+                        background: v.status === "DONE" ? "#dcfce7" : v.status === "CANCELED" ? "#fee2e2" : "#dbeafe",
+                        color:      v.status === "DONE" ? "#166534" : v.status === "CANCELED" ? "#991b1b" : "#1d4ed8",
+                        fontSize: 11, fontWeight: "bold",
+                      }}>{v.status}</span>
+                    </div>
+                    {v.property && (
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>
+                        🏠 {v.property.building_name || `${v.property.city ?? ""}${v.property.town ?? ""}`}
+                      </div>
+                    )}
+                    {v.staff && (
+                      <div style={{ fontSize: 11, color: "#9ca3af" }}>担当: {v.staff.name}</div>
+                    )}
+                    {v.feedback && (
+                      <div style={{ fontSize: 11, color: "#374151", marginTop: 4 }}>📝 {v.feedback}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 内見登録モーダル */}
+      {showVisitForm && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: 28, width: 480, maxWidth: "90vw" }}>
+            <h3 style={{ fontSize: 15, fontWeight: "bold", marginBottom: 16 }}>🏠 内見予約を登録</h3>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
+                内見日時 *
+              </label>
+              <input
+                type="datetime-local"
+                value={visitForm.scheduled_at}
+                onChange={e => setVisitForm(f => ({ ...f, scheduled_at: e.target.value }))}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
+                物件ID（任意）
+              </label>
+              <input
+                type="text"
+                value={visitForm.property_id}
+                onChange={e => setVisitForm(f => ({ ...f, property_id: e.target.value }))}
+                placeholder="cmxxxx..."
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
+                担当者
+              </label>
+              <select
+                value={visitForm.staff_id}
+                onChange={e => setVisitForm(f => ({ ...f, staff_id: e.target.value }))}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
+              >
+                <option value="">未指定</option>
+                {allStaff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
+                備考
+              </label>
+              <textarea
+                value={visitForm.feedback}
+                onChange={e => setVisitForm(f => ({ ...f, feedback: e.target.value }))}
+                rows={3}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit", resize: "vertical" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20 }}>
+              <button
+                type="button"
+                onClick={() => setShowVisitForm(false)}
+                disabled={savingVisit}
+                style={{ padding: "8px 20px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={submitVisit}
+                disabled={savingVisit}
+                style={{ padding: "8px 20px", borderRadius: 6, border: "none", background: savingVisit ? "#888" : "#5BAD52", color: "#fff", fontSize: 13, fontWeight: "bold", cursor: savingVisit ? "not-allowed" : "pointer", fontFamily: "inherit" }}
+              >
+                {savingVisit ? "登録中..." : "登録"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
