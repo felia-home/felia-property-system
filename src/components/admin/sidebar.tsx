@@ -56,6 +56,13 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
+    label: "レポート",
+    items: [
+      { href: "/admin/reports/sales",     label: "営業ダッシュボード", icon: "🎯" },
+      { href: "/admin/reports/inquiries", label: "反響レポート",       icon: "📊" },
+    ],
+  },
+  {
     label: "設定・管理",
     items: [
       { href: "/admin/staff",                label: "スタッフ管理",       icon: "👤", feature: "staff.view" },

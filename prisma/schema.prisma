@@ -357,6 +357,7 @@ model Property {
   env_image_links       PropertyEnvImageLink[]
   documents             PropertyDocument[]
   favorites             MemberFavorite[]
+  visit_appointments    VisitAppointment[]
   @@map("properties")
 }
 
@@ -632,6 +633,7 @@ model Inquiry {
   // メモ
   internal_memo     String?
   token             String?   // プライベートセレクション経由の場合のトークン
+  store_id          String?   // 反響を担当する店舗
   created_at        DateTime  @default(now())
   updated_at        DateTime  @updatedAt
 
@@ -755,6 +757,7 @@ model Customer {
   contracts              Contract[]
   assigned_staff         Staff?    @relation("CustomerAgent", fields: [assigned_to], references: [id])
   privateSelectionTokens PrivateSelectionToken[]
+  visit_appointments     VisitAppointment[]
 
   @@map("customers")
 }
@@ -941,6 +944,7 @@ model Staff {
   testimonials         Testimonial[]
   sale_results         SaleResult[]
   check_logs           PropertyCheckLog[]
+  visit_appointments   VisitAppointment[]
 
   @@map("staffs")
 }
@@ -1534,4 +1538,52 @@ model AreaColumnStation {
 
   @@id([column_id, station_id])
   @@map("area_column_stations")
+}
+
+// ===== レポート・スケジュール・内見予定 =====
+model ScheduledReport {
+  id           String    @id @default(cuid())
+  type         String
+  period_start DateTime  @db.Date
+  period_end   DateTime  @db.Date
+  store_id     String?
+  data_json    Json?
+  pdf_url      String?
+  sent_at      DateTime?
+  created_at   DateTime  @default(now())
+
+  @@map("scheduled_reports")
+}
+
+model ReportSchedule {
+  id         String   @id @default(cuid())
+  type       String
+  is_active  Boolean  @default(true)
+  send_day   Int?
+  send_hour  Int      @default(9)
+  recipients String[]
+  store_ids  String[]
+  created_at DateTime @default(now())
+
+  @@map("report_schedules")
+}
+
+model VisitAppointment {
+  id             String    @id @default(cuid())
+  customer_id    String?
+  property_id    String?
+  staff_id       String?
+  scheduled_at   DateTime
+  status         String    @default("SCHEDULED")
+  result         String?
+  feedback       String?
+  next_action    String?
+  next_action_at DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  customer       Customer? @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  property       Property? @relation(fields: [property_id], references: [id], onDelete: SetNull)
+  staff          Staff?    @relation(fields: [staff_id], references: [id], onDelete: SetNull)
+
+  @@map("visit_appointments")
 }
