@@ -77,6 +77,9 @@ export async function GET(request: NextRequest) {
     const where = { AND: andConditions };
 
     // ── DB クエリ（件数 + ページネーション）────────────────────
+    // include を使い select を指定しないため、Property の全スカラフィールド
+    // （building_name / area_exclusive_m2 / building_year / building_month /
+    //  features 等を含む）が返却される。
     const [total, properties] = await Promise.all([
       prisma.property.count({ where }),
       prisma.property.findMany({

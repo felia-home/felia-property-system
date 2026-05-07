@@ -142,6 +142,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    // select を指定しないため Property の全スカラフィールドを返却する
+    // （building_name / area_exclusive_m2 / building_year / building_month /
+    //  features 等を含む）。
     const property = await prisma.property.findUnique({ where: { id: params.id } });
     if (!property) return NextResponse.json({ error: "物件が見つかりません" }, { status: 404 });
     return NextResponse.json({ property });
