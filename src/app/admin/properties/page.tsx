@@ -53,7 +53,11 @@ interface Property {
   images: Array<{ id: string; url: string; is_main: boolean }>;
   _count: { images: number };
   agent?: { id: string; name: string; photo_url: string | null } | null;
+  view_count_7d?:    number;
+  view_count_total?: number;
 }
+
+type ViewSort = "none" | "total_desc" | "week_desc";
 
 function daysAgo(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000);
@@ -106,6 +110,7 @@ export default function PropertiesPage() {
   const [bulkProgress, setBulkProgress] = useState(0);
   const [bulkTotal, setBulkTotal] = useState(0);
   const [bulkErrors, setBulkErrors] = useState(0);
+  const [viewSort, setViewSort] = useState<ViewSort>("none");
 
   const [stores, setStores] = useState<Store[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
@@ -313,18 +318,40 @@ export default function PropertiesPage() {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#f7f6f2" }}>
-              {["", "物件情報", "掲載", "ステータス", "写真", "広告文", "完成度", "価格", "掲載日数", ""].map(h => (
+              {["", "物件情報", "掲載", "ステータス", "写真", "広告文", "完成度", "価格", "掲載日数"].map(h => (
                 <th key={h} style={{ textAlign: "left", fontSize: 10, fontWeight: 500, color: "#706e68", letterSpacing: ".07em", textTransform: "uppercase", padding: "10px 14px", borderBottom: "1px solid #e0deda", whiteSpace: "nowrap" }}>{h}</th>
               ))}
+              <th
+                onClick={() => setViewSort(s =>
+                  s === "none" ? "total_desc" :
+                  s === "total_desc" ? "week_desc" :
+                  "none"
+                )}
+                style={{
+                  textAlign: "left", fontSize: 10, fontWeight: 500,
+                  color: viewSort === "none" ? "#706e68" : "#234f35",
+                  letterSpacing: ".07em", textTransform: "uppercase",
+                  padding: "10px 14px", borderBottom: "1px solid #e0deda",
+                  whiteSpace: "nowrap", cursor: "pointer", userSelect: "none",
+                }}
+                title="クリックでソート切替: 累計降順 → 7日降順 → 解除"
+              >
+                閲覧数{viewSort === "total_desc" ? " ↓累計" : viewSort === "week_desc" ? " ↓7日" : ""}
+              </th>
+              <th style={{ textAlign: "left", fontSize: 10, fontWeight: 500, color: "#706e68", letterSpacing: ".07em", textTransform: "uppercase", padding: "10px 14px", borderBottom: "1px solid #e0deda", whiteSpace: "nowrap" }}></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={10} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>読み込み中...</td></tr>
+              <tr><td colSpan={11} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>読み込み中...</td></tr>
             ) : properties.length === 0 ? (
-              <tr><td colSpan={10} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>物件データがありません。</td></tr>
+              <tr><td colSpan={11} style={{ padding: "48px 16px", textAlign: "center", color: "#706e68", fontSize: 13 }}>物件データがありません。</td></tr>
             ) : (
-              properties.map(p => {
+              [...properties].sort((a, b) => {
+                if (viewSort === "total_desc") return (b.view_count_total ?? 0) - (a.view_count_total ?? 0);
+                if (viewSort === "week_desc")  return (b.view_count_7d ?? 0)    - (a.view_count_7d ?? 0);
+                return 0;
+              }).map(p => {
                 const def = getStatusDef(p.status);
                 const mainImg = p.images?.[0];
                 // _count.images を優先（インポート直後の photo_count キャッシュ更新漏れ対策）
@@ -479,6 +506,16 @@ export default function PropertiesPage() {
                     {/* Days on market */}
                     <td style={{ padding: "12px 14px", fontSize: 12, color: "#706e68", whiteSpace: "nowrap" }}>
                       {daysListed !== null ? `${daysListed}日` : "—"}
+                    </td>
+
+                    {/* View counts */}
+                    <td style={{ padding: "12px 14px", fontSize: 11, color: "#374151", whiteSpace: "nowrap" }}>
+                      <div style={{ fontWeight: viewSort === "total_desc" ? 700 : 500 }}>
+                        累計: {(p.view_count_total ?? 0).toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2, fontWeight: viewSort === "week_desc" ? 700 : 400 }}>
+                        7日: {(p.view_count_7d ?? 0).toLocaleString()}
+                      </div>
                     </td>
 
                     {/* Action */}

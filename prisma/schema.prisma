@@ -359,7 +359,20 @@ model Property {
   favorites             MemberFavorite[]
   visit_appointments    VisitAppointment[]
   proposals             CustomerProposal[]
+  views                 PropertyView[]
   @@map("properties")
+}
+
+model PropertyView {
+  id          String   @id @default(cuid())
+  property_id String
+  viewed_at   DateTime @default(now())
+  session_key String   // SHA256(IP + UserAgent) の先頭16文字
+  property    Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
+
+  @@index([property_id, viewed_at])
+  @@index([property_id, session_key, viewed_at])
+  @@map("property_views")
 }
 
 model PropertyDocument {

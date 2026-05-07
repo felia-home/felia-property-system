@@ -101,12 +101,51 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
+    // ── 閲覧数集計（7日間 / 累計）────────────────────────────
+    // 表示中の最大50件分を1ページ単位で集計するため、
+    // groupBy を property_id IN (ids) で2クエリにまとめる。
+    const propertyIds = properties.map(p => p.id);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const viewCountMap = new Map<string, { total: number; week: number }>();
+    if (propertyIds.length > 0) {
+      const [totalRows, weekRows] = await Promise.all([
+        prisma.propertyView.groupBy({
+          by:     ["property_id"],
+          where:  { property_id: { in: propertyIds } },
+          _count: { _all: true },
+        }),
+        prisma.propertyView.groupBy({
+          by:     ["property_id"],
+          where:  { property_id: { in: propertyIds }, viewed_at: { gte: sevenDaysAgo } },
+          _count: { _all: true },
+        }),
+      ]);
+      for (const r of totalRows) {
+        viewCountMap.set(r.property_id, { total: r._count._all, week: 0 });
+      }
+      for (const r of weekRows) {
+        const cur = viewCountMap.get(r.property_id) ?? { total: 0, week: 0 };
+        cur.week = r._count._all;
+        viewCountMap.set(r.property_id, cur);
+      }
+    }
+
+    const propertiesWithViews = properties.map(p => {
+      const c = viewCountMap.get(p.id);
+      return {
+        ...p,
+        view_count_7d:    c?.week  ?? 0,
+        view_count_total: c?.total ?? 0,
+      };
+    });
+
     return NextResponse.json({
       total,
       page,
       limit,
       total_pages: Math.ceil(total / limit),
-      properties,
+      properties: propertiesWithViews,
     });
   } catch (error) {
     console.error("GET /api/properties error:", error);
