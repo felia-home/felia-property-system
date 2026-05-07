@@ -261,7 +261,7 @@ export default function PhotoManager({
   const [mansionSelected, setMansionSelected] = useState<MansionSuggestion | null>(null);
   const [linkedEnvImageIds, setLinkedEnvImageIds] = useState<Set<string>>(new Set());
   const fileInput = useRef<HTMLInputElement>(null);
-  const isMansion = propertyType === "MANSION" || propertyType === "USED_MANSION" || propertyType === "NEW_MANSION";
+  const isMansion = propertyType === "MANSION" || propertyType === "NEW_MANSION";
 
   const isIOS = typeof window !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
 

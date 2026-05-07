@@ -39,7 +39,7 @@ const PROPERTY_TYPE_LABELS: Record<string, string> = {
 function buildAreaText(property: PropertyForTemplate): string {
   const type = property.property_type ?? "";
   // マンションの場合は専有面積
-  if ((type === "MANSION" || type === "USED_MANSION" || type === "NEW_MANSION") && property.area_exclusive_m2) {
+  if ((type === "MANSION" || type === "NEW_MANSION") && property.area_exclusive_m2) {
     return `専有面積 ${property.area_exclusive_m2}㎡`;
   }
   // 戸建て・土地の場合
