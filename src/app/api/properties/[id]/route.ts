@@ -56,7 +56,8 @@ const STRING_FIELDS = new Set([
   "delivery_timing","delivery_status","reins_number","reins_status","delivery_condition",
   "seller_company","seller_phone","seller_contact","seller_agent","seller_fax","seller_transaction_type","seller_brokerage_type",
   "suumo_id","athome_id","yahoo_id","homes_id",
-  "property_number","internal_memo","source","tour_url","mansion_building_id",
+  "property_number","internal_memo","source","tour_url",
+  // mansion_building_id は relation 経由で connect/disconnect するため STRING_FIELDS には含めない
   // agent_id / store_id / successor_agent_id はリレーションIDのため connect/disconnect で処理
   "ad_confirmation_method","ad_confirmed_by","ad_confirmation_file",
   "last_confirmed_by","last_check_result",
@@ -198,6 +199,12 @@ export async function PATCH(
     if ("successor_agent_id" in body) {
       const v = body.successor_agent_id as string | null | undefined;
       data.successor_agent = v ? { connect: { id: v } } : { disconnect: true };
+    }
+    if ("mansion_building_id" in body) {
+      const mid = body.mansion_building_id as string | null | undefined;
+      data.mansion_building = mid
+        ? { connect: { id: mid } }
+        : { disconnect: true };
     }
 
     if (Object.keys(data).length === 0) {
