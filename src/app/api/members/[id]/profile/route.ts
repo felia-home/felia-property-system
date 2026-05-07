@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { resolveStoreForMember } from "@/lib/store-routing";
 
 // GET /api/members/[id]/profile
 export async function GET(
@@ -88,6 +89,46 @@ export async function PATCH(
       create: { member_id: params.id, ...data },
       update: data,
     });
+
+    // 希望条件が更新された場合は customer.store_id を再評価
+    // MemberProfile は property_types/desired_lines、Customer は
+    // desired_property_type/desired_stations と命名が異なるため両方を許容
+    try {
+      const desiredAreas = Array.isArray(body.desired_areas)
+        ? (body.desired_areas as string[]) : [];
+      const desiredStations = Array.isArray(body.desired_stations)
+        ? (body.desired_stations as string[])
+        : Array.isArray(body.desired_lines)
+          ? (body.desired_lines as string[]) : [];
+      const desiredPropertyType = Array.isArray(body.desired_property_type)
+        ? (body.desired_property_type as string[])
+        : Array.isArray(body.property_types)
+          ? (body.property_types as string[]) : [];
+
+      const conditionTouched =
+        body.desired_areas !== undefined ||
+        body.desired_stations !== undefined ||
+        body.desired_lines !== undefined ||
+        body.desired_property_type !== undefined ||
+        body.property_types !== undefined;
+
+      if (conditionTouched) {
+        const newStoreId = await resolveStoreForMember({
+          desired_areas:         desiredAreas,
+          desired_stations:      desiredStations,
+          desired_property_type: desiredPropertyType,
+        });
+        if (newStoreId) {
+          await prisma.customer.updateMany({
+            where: { member_id: params.id },
+            data:  { store_id: newStoreId },
+          });
+        }
+      }
+    } catch (e) {
+      console.error("store-routing on profile update failed:", e);
+    }
+
     return NextResponse.json({ success: true, profile });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
