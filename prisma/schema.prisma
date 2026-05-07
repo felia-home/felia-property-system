@@ -926,6 +926,8 @@ model Staff {
 
   // ===== HP・プロフィール公開情報 =====
   photo_url         String?
+  photo_focal_x     Float?    @default(50)  // 顔の位置 (0-100%) — object-position 用
+  photo_focal_y     Float?    @default(50)
   bio               String?
   catchphrase       String?
   qualification     String?

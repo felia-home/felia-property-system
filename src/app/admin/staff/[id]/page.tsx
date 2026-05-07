@@ -51,6 +51,8 @@ interface StaffFull {
   monthly_target: number | null;
   career_history: string | null;
   photo_url: string | null;
+  photo_focal_x: number | null;
+  photo_focal_y: number | null;
   bio: string | null;
   catchphrase: string | null;
   qualification: string | null;
@@ -594,14 +596,90 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
         <div>
           <div style={section}>
             <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 16, color: "#3a2a1a" }}>プロフィール写真</div>
-            <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-              <div style={{ width: 80, height: 80, borderRadius: "50%", background: "#f7f6f2", overflow: "hidden", flexShrink: 0 }}>
-                {form.photo_url ? (
-                  <img src={form.photo_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, color: "#ccc" }}>👤</div>
-                )}
+
+            {form.photo_url && (
+              <div style={{ display: "flex", gap: 20, alignItems: "flex-start", marginBottom: 16, flexWrap: "wrap" }}>
+                {/* 円形プレビュー */}
+                <div>
+                  <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>現在の表示</div>
+                  <div style={{
+                    width: 100, height: 100, borderRadius: "50%",
+                    overflow: "hidden", border: "2px solid #e5e7eb",
+                  }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={form.photo_url}
+                      alt=""
+                      style={{
+                        width: "100%", height: "100%",
+                        objectFit: "cover",
+                        objectPosition: `${form.photo_focal_x ?? 50}% ${form.photo_focal_y ?? 50}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* ドラッグで位置調整 */}
+                <div>
+                  <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>
+                    📍 クリックで顔の位置を調整
+                  </div>
+                  <div
+                    style={{
+                      width: 160, height: 160, borderRadius: 8,
+                      overflow: "hidden", position: "relative",
+                      border: "2px solid #3b82f6", cursor: "crosshair",
+                    }}
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+                      const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+                      setF("photo_focal_x", Math.max(0, Math.min(100, x)));
+                      setF("photo_focal_y", Math.max(0, Math.min(100, y)));
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={form.photo_url}
+                      alt=""
+                      style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }}
+                    />
+                    <div style={{
+                      position: "absolute",
+                      left: `${form.photo_focal_x ?? 50}%`,
+                      top:  `${form.photo_focal_y ?? 50}%`,
+                      transform: "translate(-50%, -50%)",
+                      width: 20, height: 20, borderRadius: "50%",
+                      border: "3px solid #fff",
+                      boxShadow: "0 0 0 2px #3b82f6, 0 2px 4px rgba(0,0,0,0.3)",
+                      pointerEvents: "none",
+                    }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>
+                    位置: {form.photo_focal_x ?? 50}% / {form.photo_focal_y ?? 50}%
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setF("photo_focal_x", 50); setF("photo_focal_y", 50); }}
+                    style={{
+                      marginTop: 4, fontSize: 11, padding: "3px 8px",
+                      border: "1px solid #d1d5db", borderRadius: 4,
+                      background: "#fff", cursor: "pointer", color: "#6b7280",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    中央に戻す
+                  </button>
+                </div>
               </div>
+            )}
+
+            <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+              {!form.photo_url && (
+                <div style={{ width: 80, height: 80, borderRadius: "50%", background: "#f7f6f2", overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, color: "#ccc" }}>
+                  👤
+                </div>
+              )}
               <div style={{ flex: 1, ...row }}>
                 <label style={lbl}>プロフィール画像</label>
                 <input
@@ -842,7 +920,8 @@ export default function StaffDetailPage({ params }: { params: { id: string } }) 
             <div style={{ border: "1px solid #e0deda", borderRadius: 10, padding: 16, maxWidth: 280, display: "flex", gap: 12, alignItems: "flex-start" }}>
               <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#f7f6f2", overflow: "hidden", flexShrink: 0 }}>
                 {form.photo_url ? (
-                  <img src={form.photo_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={form.photo_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${form.photo_focal_x ?? 50}% ${form.photo_focal_y ?? 50}%` }} />
                 ) : (
                   <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, color: "#ccc" }}>👤</div>
                 )}

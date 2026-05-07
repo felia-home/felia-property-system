@@ -14,6 +14,8 @@ interface StaffMember {
   position: string | null;
   qualifications: string[];
   photo_url: string | null;
+  photo_focal_x: number | null;
+  photo_focal_y: number | null;
   email_work: string | null;
   tel_work: string | null;
   is_active: boolean;
@@ -229,7 +231,8 @@ export default function StaffListPage() {
               {/* Photo */}
               <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#f7f6f2", overflow: "hidden", marginBottom: 4, flexShrink: 0 }}>
                 {s.photo_url ? (
-                  <img src={s.photo_url} alt={s.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={s.photo_url} alt={s.name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${s.photo_focal_x ?? 50}% ${s.photo_focal_y ?? 50}%` }} />
                 ) : (
                   <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, color: "#ccc" }}>👤</div>
                 )}

@@ -29,6 +29,8 @@ export async function GET(
         department: staff.department,
         store_name: staff.store?.name ?? null,
         photo_url: staff.photo_url,
+        photo_focal_x: staff.photo_focal_x ?? 50,
+        photo_focal_y: staff.photo_focal_y ?? 50,
         bio: staff.bio,
         catchphrase: staff.catchphrase,
         qualification: staff.qualification,
