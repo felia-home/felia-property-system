@@ -45,7 +45,7 @@ const STRING_FIELDS = new Set([
   "property_type","transaction_type","brokerage_type","status",
   "title","catch_copy","description_hp","description_portal","description_suumo","description_athome",
   "prefecture","city","address","address_chiban","postal_code",
-  "address_display_level","address_display_custom","town","building_name","room_number",
+  "address_display_level","address_display_custom","town","building_block","building_name","room_number",
   "ad_transfer_consent",
   "station_line1","station_name1","station_line2","station_name2","station_line3","station_name3",
   "bus_stop1","bus_stop2","bus_stop3",

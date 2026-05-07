@@ -37,6 +37,7 @@ model Property {
   address_display_level   String    @default("town") // town | city | custom
   address_display_custom  String?
   town                    String?   // 町名丁目（表示用）
+  building_block          String?   // 号棟・区画番号・棟名（種別で意味が変わる）
   building_name           String?
   room_number             String?
   latitude                Float?

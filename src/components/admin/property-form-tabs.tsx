@@ -76,7 +76,7 @@ export const INITIAL_FORM: Record<string, string> = {
   // タブ3: 所在地
   address_display_level: "town",
   address_display_custom: "",
-  prefecture: "東京都", city: "", town: "", address: "",
+  prefecture: "東京都", city: "", town: "", building_block: "", address: "",
   address_chiban: "", postal_code: "", building_name: "", room_number: "",
   latitude: "", longitude: "",
   station_line1: "", station_name1: "", station_walk1: "",
@@ -469,6 +469,29 @@ function TownInput({ form, setForm }: { form: Record<string, string>; setForm: S
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── BuildingBlockInput ────────────────────────────────────────────────────────
+// 物件種別によってラベル・プレースホルダを切り替える
+function BuildingBlockInput({ form, setForm }: { form: Record<string, string>; setForm: SetForm }) {
+  const type = form.property_type ?? "";
+  const isLand    = type === "LAND";
+  const isMansion = type === "MANSION" || type === "NEW_MANSION";
+  const label       = isLand ? "区画番号" : isMansion ? "棟名" : "号棟";
+  const placeholder = isLand ? "例：1区画" : isMansion ? "例：East棟" : "例：A号棟";
+
+  return (
+    <div style={rowSt}>
+      <label style={labelSt}>{label}</label>
+      <input
+        type="text"
+        value={form.building_block ?? ""}
+        onChange={(e) => setForm(f => ({ ...f, building_block: e.target.value }))}
+        placeholder={placeholder}
+        style={inputSt}
+      />
     </div>
   );
 }
@@ -971,6 +994,10 @@ export function PropertyFormTabs({ tab, setTab, form, setForm, onGenerateContent
           </div>
           <div style={grid3}>
             <TownInput form={form} setForm={setForm} />
+            <BuildingBlockInput form={form} setForm={setForm} />
+            <div />
+          </div>
+          <div style={grid3}>
             <div style={rowSt}>
               <label style={labelSt}>番地以降 <span style={{ color: "#8c1f1f", fontSize: 10 }}>内部管理・公開不可</span></label>
               <input type="text" value={form.address ?? ""} placeholder="12-3"
@@ -978,6 +1005,7 @@ export function PropertyFormTabs({ tab, setTab, form, setForm, onGenerateContent
                 style={{ ...inputSt, borderColor: "#f0ad4e" }} />
             </div>
             <FI label="地番（登記簿）" name="address_chiban" form={form} setForm={setForm} />
+            <div />
           </div>
           {isMansion && (
             <div style={grid3}>
