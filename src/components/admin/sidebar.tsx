@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { hasPermission, type Feature } from "@/lib/permissions";
+import { hasPermission, normalizePermission, PERMISSION_LEVELS, type Feature } from "@/lib/permissions";
 
 type CurrentUser = {
   name?: string | null;
@@ -12,43 +12,66 @@ type CurrentUser = {
 
 type NavItem = { href: string; label: string; icon: string; badge?: string; feature?: Feature };
 
-const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+  requireAdmin?: boolean;       // ADMIN のみ
+  requireBackoffice?: boolean;  // ADMIN + マネージャ層 + BACKOFFICE
+};
+
+const NAV_GROUPS: NavGroup[] = [
   {
-    label: "物件管理",
+    label: "営業管理",
     items: [
-      { href: "/admin",                  label: "ダッシュボード",   icon: "▦" },
-      { href: "/admin/properties",       label: "物件一覧",         icon: "⌂" },
-      { href: "/admin/reins",            label: "レインズ物件",     icon: "🔴" },
-      { href: "/admin/properties/check", label: "物件確認",         icon: "📋" },
-      { href: "/admin/approvals",        label: "広告確認待ち",     icon: "✓" },
-      { href: "/admin/sold",             label: "成約アラート",     icon: "!" },
+      { href: "/admin/reports/sales",     label: "営業ダッシュボード", icon: "🎯" },
+      { href: "/admin/reports/inquiries", label: "反響レポート",       icon: "📊" },
+      { href: "/admin/reports/kpi",       label: "KPIレポート",        icon: "📈" },
     ],
   },
   {
     label: "顧客管理",
     items: [
-      { href: "/admin/customers",          label: "顧客一覧",       icon: "人" },
+      { href: "/admin/customers",          label: "顧客一覧",       icon: "👥" },
       { href: "/admin/customers/pipeline", label: "パイプライン",   icon: "🗂" },
-      { href: "/admin/inquiries",          label: "問合せ一覧",     icon: "📧" },
-      { href: "/admin/customers/follow-up",label: "フォローアップ", icon: "🤖" },
-      { href: "/admin/notifications",      label: "通知管理",       icon: "🔔" },
+      { href: "/admin/customers/follow-up",label: "フォローアップ", icon: "📋" },
+      { href: "/admin/inquiries",          label: "問合せ一覧",     icon: "📨" },
+    ],
+  },
+  {
+    label: "物件管理",
+    items: [
+      { href: "/admin",                    label: "ダッシュボード",     icon: "▦" },
+      { href: "/admin/properties",         label: "物件一覧",           icon: "🏠" },
+      { href: "/admin/properties/new",     label: "新規登録",           icon: "➕" },
+      { href: "/admin/private-properties", label: "未公開物件DB",       icon: "🔒" },
+      { href: "/admin/reins",              label: "レインズ物件",       icon: "📊" },
+      { href: "/admin/mansions",           label: "マンション管理",     icon: "🏢" },
+      { href: "/admin/properties/check",   label: "物件確認",           icon: "🔎" },
+      { href: "/admin/approvals",          label: "広告確認待ち",       icon: "✓" },
+      { href: "/admin/sold",               label: "成約アラート",       icon: "🔔" },
+      { href: "/admin/competitor",         label: "競合モニタリング",   icon: "📡", feature: "competitor.view" },
+      { href: "/admin/environment-images", label: "周辺環境写真",       icon: "🌳" },
+      { href: "/admin/import",             label: "データインポート",   icon: "📥", feature: "import.execute" },
+      { href: "/admin/import/felia-hp",    label: "旧HP物件インポート", icon: "📥", feature: "import.execute" },
     ],
   },
   {
     label: "書類・契約",
     items: [
       { href: "/admin/contracts", label: "契約管理", icon: "📄" },
+      { href: "/admin/sales",     label: "売上管理", icon: "💰", feature: "sales.view_all" },
     ],
   },
   {
     label: "HP管理",
+    requireBackoffice: true,
     items: [
-      { href: "/admin/hp",           label: "HP管理トップ",   icon: "🌐" },
-      { href: "/admin/hp/sections",  label: "セクション管理",  icon: "📐" },
-      { href: "/admin/hp/features",  label: "特集管理",       icon: "🗂" },
-      { href: "/admin/hp/news",      label: "お知らせ管理",   icon: "📰" },
-      { href: "/admin/hp/banners",        label: "バナー管理",         icon: "🖼" },
-      { href: "/admin/hp/hero-banners",    label: "ヒーローバナー管理",   icon: "🎞" },
+      { href: "/admin/hp",                label: "HP管理トップ",         icon: "🌐" },
+      { href: "/admin/hp/sections",       label: "セクション管理",       icon: "📐" },
+      { href: "/admin/hp/features",       label: "特集管理",             icon: "🗂" },
+      { href: "/admin/hp/news",           label: "お知らせ管理",         icon: "📰" },
+      { href: "/admin/hp/banners",        label: "バナー管理",           icon: "🖼" },
+      { href: "/admin/hp/hero-banners",   label: "ヒーローバナー管理",   icon: "🎞" },
       { href: "/admin/hp/search-banners", label: "検索上部バナー管理",   icon: "🔍" },
       { href: "/admin/hp/areas",          label: "エリア管理",           icon: "🗺" },
       { href: "/admin/hp/sale-results",   label: "売却実績管理",         icon: "🏆" },
@@ -58,27 +81,15 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
-    label: "レポート",
-    items: [
-      { href: "/admin/reports/sales",     label: "営業ダッシュボード", icon: "🎯" },
-      { href: "/admin/reports/inquiries", label: "反響レポート",       icon: "📊" },
-      { href: "/admin/reports/kpi",       label: "KPIレポート",        icon: "📈" },
-    ],
-  },
-  {
     label: "設定・管理",
+    requireAdmin: true,
     items: [
-      { href: "/admin/staff",                label: "スタッフ管理",       icon: "👤", feature: "staff.view" },
-      { href: "/admin/settings/company",     label: "会社・店舗設定",     icon: "⚙",  feature: "settings.view" },
-      { href: "/admin/settings/branches",   label: "支店管理",           icon: "🏠", feature: "settings.view" },
-      { href: "/admin/sales",                label: "売上管理",           icon: "¥",  feature: "sales.view_all" },
-      { href: "/admin/mansions",             label: "マンションマスタ",   icon: "🏢" },
-      { href: "/admin/environment-images",   label: "周辺環境写真",       icon: "🌳" },
-      { href: "/admin/import",               label: "データインポート",   icon: "📥", feature: "import.execute" },
-      { href: "/admin/import/felia-hp",      label: "旧HP物件インポート", icon: "📥", feature: "import.execute" },
-      { href: "/admin/competitor",           label: "競合モニタリング",   icon: "📊", feature: "competitor.view" },
-      { href: "/admin/private-properties",   label: "未公開物件DB",       icon: "🔒" },
-      { href: "/admin/settings/email-templates", label: "メールテンプレート", icon: "✉",  feature: "settings.view" },
+      { href: "/admin/settings",                 label: "基本設定",           icon: "⚙" },
+      { href: "/admin/settings/company",         label: "会社情報",           icon: "🏢" },
+      { href: "/admin/settings/branches",        label: "店舗管理",           icon: "🏪" },
+      { href: "/admin/settings/email-templates", label: "メールテンプレート", icon: "✉" },
+      { href: "/admin/staff",                    label: "スタッフ管理",       icon: "👤" },
+      { href: "/admin/notifications",            label: "通知設定",           icon: "🔔" },
     ],
   },
 ];
@@ -86,6 +97,16 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
 export default function Sidebar({ currentUser }: { currentUser?: CurrentUser }) {
   const pathname = usePathname();
   const userPermission = currentUser?.permission ?? "AGENT";
+  const normalized = normalizePermission(userPermission);
+  const isAdmin = normalized === "ADMIN";
+  // 内勤レベル(50)以上：ADMIN, SENIOR_MANAGER, MANAGER, BACKOFFICE
+  const isBackoffice = PERMISSION_LEVELS[normalized] >= PERMISSION_LEVELS.BACKOFFICE;
+
+  const visibleGroups = NAV_GROUPS.filter(g => {
+    if (g.requireAdmin && !isAdmin) return false;
+    if (g.requireBackoffice && !isBackoffice) return false;
+    return true;
+  });
 
   return (
     <aside style={{
@@ -99,7 +120,7 @@ export default function Sidebar({ currentUser }: { currentUser?: CurrentUser }) 
       </div>
 
       <nav style={{ padding: "4px 0", flex: 1, overflowY: "auto" }}>
-        {(NAV_GROUPS ?? []).map((group, gi) => {
+        {visibleGroups.map((group, gi) => {
           const visibleItems = (group.items ?? []).filter((item) =>
             !item.feature || hasPermission(userPermission, item.feature)
           );
@@ -140,7 +161,7 @@ export default function Sidebar({ currentUser }: { currentUser?: CurrentUser }) 
                 );
               })}
 
-              {gi < NAV_GROUPS.length - 1 && (
+              {gi < visibleGroups.length - 1 && (
                 <div style={{ margin: "6px 16px 2px", borderTop: "1px solid rgba(255,255,255,.08)" }} />
               )}
             </div>
