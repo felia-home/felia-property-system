@@ -846,7 +846,7 @@ interface TabsProps {
 
 export function PropertyFormTabs({ tab, setTab, form, setForm, onGenerateContent, generatingContent, onGeocode, geocoding }: TabsProps) {
   const isLand = form.property_type === "LAND";
-  const isMansion = form.property_type === "MANSION" || form.property_type === "NEW_MANSION";
+  const isMansion = form.property_type === "MANSION" || form.property_type === "USED_MANSION" || form.property_type === "NEW_MANSION";
 
   const handleGeocode = async () => {
     const addr = [form.prefecture, form.city, form.town, form.address].filter(Boolean).join("");

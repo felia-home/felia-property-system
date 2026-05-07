@@ -2035,7 +2035,7 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
         {mainTab === "info" && (
           <div>
             {/* マンション建物マスタとの紐付け（マンション系のみ） */}
-            {(form.property_type === "MANSION" || form.property_type === "NEW_MANSION") && (
+            {(form.property_type === "MANSION" || form.property_type === "USED_MANSION" || form.property_type === "NEW_MANSION") && (
               <div style={{ marginBottom: 16, padding: 14, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8 }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 6 }}>
                   🏢 マンション建物マスタと紐付け

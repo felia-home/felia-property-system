@@ -426,7 +426,7 @@ export async function POST(req: NextRequest) {
         // - マンション系: area_exclusive_m2 のみ（area_build_m2/area_land_m2 は null）
         // - 戸建て系:    area_build_m2 + area_land_m2（area_exclusive_m2 は null）
         // - 土地:        area_land_m2 のみ
-        const isMansion       = propertyType === "MANSION" || propertyType === "NEW_MANSION";
+        const isMansion       = propertyType === "MANSION" || propertyType === "USED_MANSION" || propertyType === "NEW_MANSION";
         const isLand          = propertyType === "LAND";
         const buildAreaCsv    = toFloat(row["建物面積(専有面積)"]);
         const landAreaCsv     = toFloat(row["土地面積"]) ?? toFloat(row["敷地面積"]);
@@ -468,7 +468,7 @@ export async function POST(req: NextRequest) {
 
         // マンション系は building_name (物件名) で建物マスタを検索
         let mansionBuildingId: string | null = null;
-        if (propertyType === "MANSION" || propertyType === "NEW_MANSION") {
+        if (propertyType === "MANSION" || propertyType === "USED_MANSION" || propertyType === "NEW_MANSION") {
           const buildingName = toStr(row["物件名"]);
           if (buildingName) {
             const trimmed = buildingName.replace(/[　\s]/g, "");

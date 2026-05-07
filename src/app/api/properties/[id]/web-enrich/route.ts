@@ -48,7 +48,7 @@ export async function POST(
       return NextResponse.json({ error: "物件が見つかりません" }, { status: 404 });
     }
 
-    const isMansion = property.property_type === "MANSION" || property.property_type === "NEW_MANSION";
+    const isMansion = property.property_type === "MANSION" || property.property_type === "USED_MANSION" || property.property_type === "NEW_MANSION";
 
     const propertyTypeStr = TYPE_LABEL[property.property_type ?? ""] ?? "";
     const priceStr = property.price ? `${property.price}万円` : "";
