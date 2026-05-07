@@ -11,7 +11,7 @@ export async function GET(
       include: {
         assigned_staff: { select: { id: true, name: true, permission: true } },
         property: { select: { id: true, property_number: true, city: true, town: true, price: true, status: true } },
-        customer: { select: { id: true, name: true, email: true, phone: true } },
+        customer: { select: { id: true, name: true, email: true, tel: true, tel_mobile: true } },
         activities: { orderBy: { created_at: "desc" } },
       },
     });
