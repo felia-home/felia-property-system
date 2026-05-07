@@ -107,13 +107,16 @@ export async function GET(req: NextRequest) {
     _count: { id: true },
   });
 
+  // 営業ダッシュボードには営業職のみ表示（ADMIN / BACKOFFICE / SENIOR_AGENT は除外）
   const staffList = await prisma.staff.findMany({
     where: {
       is_active: true,
+      permission: { in: ["AGENT", "MANAGER", "SENIOR_MANAGER"] },
       ...(storeId ? { store_id: storeId } : {}),
     },
     select: { id: true, name: true },
   });
+  const staffIds = staffList.map(s => s.id);
 
   const staffOverdue = await prisma.customer.groupBy({
     by: ["assigned_to"],
@@ -121,6 +124,7 @@ export async function GET(req: NextRequest) {
       is_deleted: false,
       next_contact_at: { lt: todayStart },
       status: { notIn: ["CLOSED", "LOST"] },
+      assigned_to: { in: staffIds },
     },
     _count: { id: true },
   });
