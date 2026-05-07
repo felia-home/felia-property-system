@@ -6,19 +6,31 @@ import Link from "next/link";
 import { ACTIVITY_TYPES, SALES_ACTIONS, CONTRACT_ACTIONS, type ActivityType } from "@/lib/activity-types";
 
 const STATUS_LABELS: Record<string, string> = {
-  NEW: "新規", CONTACTING: "連絡中", VISITING: "内見調整中",
-  NEGOTIATING: "商談中", CONTRACT: "契約済", CLOSED: "成約",
-  LOST: "失注", PENDING: "保留",
+  NEW: "新規問い合わせ", CONTACTING: "コンタクト中", CONTACTED: "コンタクト済",
+  INVITING: "案内誘致中", VISITING: "案内中",
+  NEGOTIATING: "検討・商談中", CONTRACT: "契約", CLOSED: "成約",
+  LOST: "追客終了", PENDING: "保留",
 };
 const STATUS_BADGE: Record<string, React.CSSProperties> = {
   NEW:         { background: "#e3f2fd", color: "#1565c0" },
   CONTACTING:  { background: "#fff8e1", color: "#e65100" },
+  CONTACTED:   { background: "#f0f9ff", color: "#0c4a6e" },
+  INVITING:    { background: "#ecfdf5", color: "#065f46" },
   VISITING:    { background: "#e8f5e9", color: "#2e7d32" },
   NEGOTIATING: { background: "#234f35", color: "#fff" },
   CONTRACT:    { background: "#1a237e", color: "#fff" },
   CLOSED:      { background: "#880e4f", color: "#fff" },
   LOST:        { background: "#fdeaea", color: "#8c1f1f" },
   PENDING:     { background: "#f3f2ef", color: "#706e68" },
+};
+const LOST_REASON_LABELS: Record<string, string> = {
+  COMPETITOR:     "他決（他社で契約）",
+  DO_NOT_CONTACT: "連絡停止要望",
+  BUDGET:         "予算・資金面",
+  CONDITION:      "希望条件が合わない",
+  TIMING:         "時期が合わない",
+  NO_RESPONSE:    "連絡途絶",
+  OTHER:          "その他",
 };
 const SOURCE_LABELS: Record<string, string> = {
   SUUMO: "SUUMO", ATHOME: "athome", YAHOO: "Yahoo不動産",
@@ -81,6 +93,7 @@ interface Customer {
   assigned_to: string | null; assigned_at: string | null; store_id: string | null;
   last_contact_at: string | null; next_contact_at: string | null; next_contact_note: string | null;
   contact_frequency: string | null; do_not_contact: boolean; unsubscribed: boolean;
+  lost_reason: string | null; lost_at: string | null; lost_note: string | null;
   internal_memo: string | null; tags: string[];
   is_member: boolean; member_registered_at: string | null;
   member_id: string | null;
@@ -231,6 +244,12 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
   // Quick action bar
   const [quickAction, setQuickAction]       = useState<{ type: ActivityType; phase: string } | null>(null);
   const [showQuickModal, setShowQuickModal] = useState(false);
+
+  // 追客終了モーダル
+  const [showLostModal, setShowLostModal] = useState(false);
+  const [lostReason, setLostReason]       = useState("");
+  const [lostNote, setLostNote]           = useState("");
+  const [savingLost, setSavingLost]       = useState(false);
   const [quickForm, setQuickForm]           = useState({
     content: "", result: "", next_action: "", next_action_at: "",
   });
@@ -598,6 +617,16 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
           <span style={{ ...badge, padding: "3px 12px", borderRadius: 99, fontSize: 11, fontWeight: 500 }}>
             {STATUS_LABELS[customer.status] ?? customer.status}
           </span>
+          {customer.status === "LOST" && customer.lost_reason && (
+            <span style={{ background: "#fee2e2", color: "#991b1b", padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: "bold" }}>
+              ❌ {LOST_REASON_LABELS[customer.lost_reason] ?? customer.lost_reason}
+              {customer.lost_at && (
+                <span style={{ marginLeft: 6, fontWeight: "normal" }}>
+                  ({new Date(customer.lost_at).toLocaleDateString("ja-JP")})
+                </span>
+              )}
+            </span>
+          )}
           {customer.ai_score != null && (
             <span style={{ background: customer.ai_score >= 70 ? "#ffebee" : "#f7f6f2", color: customer.ai_score >= 70 ? "#c62828" : "#706e68", padding: "3px 12px", borderRadius: 99, fontSize: 12, fontWeight: 700 }}>
               AIスコア {customer.ai_score}点
@@ -782,11 +811,76 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 16 }}>対応状況</div>
             <div style={row}>
               <span style={labelW}>ステータス</span>
-              <select value={String(form.status ?? "NEW")} onChange={e => setF("status", e.target.value as never)}
-                style={{ ...inputSt, flex: 1 }}>
+              <select
+                value={String(form.status ?? "NEW")}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "LOST" && form.status !== "LOST") {
+                    // LOST に変更しようとしたらモーダル経由のみ許可
+                    setLostReason("");
+                    setLostNote("");
+                    setShowLostModal(true);
+                    return; // form.status は変更しない（モーダル確定で更新）
+                  }
+                  setF("status", v as never);
+                  // LOST から他に戻した場合は lost_reason をクリア（保存時にPATCH送信される）
+                  if (form.status === "LOST" && v !== "LOST") {
+                    setF("lost_reason", null as never);
+                    setF("lost_at", null as never);
+                    setF("lost_note", null as never);
+                  }
+                }}
+                style={{ ...inputSt, flex: 1 }}
+              >
                 {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </div>
+            {form.status === "LOST" && form.lost_reason && (
+              <div style={{ ...row, alignItems: "flex-start" }}>
+                <span style={labelW}>終了理由</span>
+                <div style={{ flex: 1, fontSize: 12 }}>
+                  <span style={{ padding: "2px 10px", borderRadius: 99, background: "#fee2e2", color: "#991b1b", fontWeight: "bold" }}>
+                    {LOST_REASON_LABELS[String(form.lost_reason)] ?? form.lost_reason}
+                  </span>
+                  {form.lost_at && (
+                    <span style={{ marginLeft: 8, color: "#706e68" }}>
+                      終了日: {new Date(String(form.lost_at)).toLocaleDateString("ja-JP")}
+                    </span>
+                  )}
+                  {form.lost_note && (
+                    <div style={{ marginTop: 6, color: "#374151", whiteSpace: "pre-wrap" }}>
+                      {form.lost_note}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm("再活性化しますか？（ステータスを「新規問い合わせ」に戻します）")) return;
+                      setF("status",      "NEW" as never);
+                      setF("lost_reason", null  as never);
+                      setF("lost_at",     null  as never);
+                      setF("lost_note",   null  as never);
+                      // 即時保存
+                      const res = await fetch(`/api/customers/${params.id}`, {
+                        method:  "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body:    JSON.stringify({
+                          status: "NEW", lost_reason: null, lost_at: null, lost_note: null,
+                        }),
+                      });
+                      if (res.ok) await loadCustomer();
+                    }}
+                    style={{
+                      marginTop: 8, padding: "4px 12px", borderRadius: 6, fontSize: 11,
+                      border: "1px solid #86efac", background: "#f0fdf4", color: "#166534",
+                      cursor: "pointer", fontFamily: "inherit",
+                    }}
+                  >
+                    ↺ 再活性化
+                  </button>
+                </div>
+              </div>
+            )}
             <div style={row}>
               <span style={labelW}>優先度</span>
               <select value={String(form.priority ?? "NORMAL")} onChange={e => setF("priority", e.target.value as never)}
@@ -1745,6 +1839,104 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 追客終了モーダル */}
+      {showLostModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 480, maxWidth: "90vw" }}>
+            <h3 style={{ fontSize: 16, fontWeight: "bold", marginBottom: 4 }}>追客終了</h3>
+            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>{customer.name} 様</div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 8 }}>
+                終了理由 <span style={{ color: "#ef4444" }}>*</span>
+              </label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {Object.entries(LOST_REASON_LABELS).map(([v, l]) => (
+                  <label key={v} style={{
+                    display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer",
+                    padding: "4px 6px", borderRadius: 4,
+                    background: lostReason === v ? "#fef2f2" : "transparent",
+                  }}>
+                    <input type="radio" name="lost_reason_modal" value={v}
+                      checked={lostReason === v} onChange={() => setLostReason(v)} />
+                    {l}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
+                補足メモ（任意）
+              </label>
+              <textarea
+                value={lostNote}
+                onChange={(e) => setLostNote(e.target.value)}
+                rows={2}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setShowLostModal(false)}
+                disabled={savingLost}
+                style={{ padding: "8px 20px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                disabled={!lostReason || savingLost}
+                onClick={async () => {
+                  if (!lostReason) return;
+                  setSavingLost(true);
+                  try {
+                    const nowIso = new Date().toISOString();
+                    const payload: Record<string, unknown> = {
+                      status:      "LOST",
+                      lost_reason: lostReason,
+                      lost_at:     nowIso,
+                      lost_note:   lostNote || null,
+                    };
+                    if (lostReason === "DO_NOT_CONTACT") payload.do_not_contact = true;
+                    const res = await fetch(`/api/customers/${params.id}`, {
+                      method:  "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body:    JSON.stringify(payload),
+                    });
+                    if (!res.ok) {
+                      const d = await res.json();
+                      alert(d.error ?? "更新に失敗しました");
+                      return;
+                    }
+                    setShowLostModal(false);
+                    await loadCustomer();
+                  } finally {
+                    setSavingLost(false);
+                  }
+                }}
+                style={{
+                  padding: "8px 20px", borderRadius: 6, border: "none",
+                  background: lostReason && !savingLost ? "#ef4444" : "#e5e7eb",
+                  color:      lostReason && !savingLost ? "#fff" : "#9ca3af",
+                  fontSize: 13, fontWeight: "bold",
+                  cursor: lostReason && !savingLost ? "pointer" : "not-allowed",
+                  fontFamily: "inherit",
+                }}
+              >
+                {savingLost ? "保存中..." : "追客終了にする"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -22,7 +22,14 @@ const UPDATABLE_FIELDS = [
   "contact_frequency", "do_not_contact", "unsubscribed",
   "internal_memo", "tags",
   "is_member", "member_registered_at",
+  "lost_reason", "lost_at", "lost_note",
 ];
+
+// DateTime に変換が必要なフィールド
+const DATE_FIELDS = new Set([
+  "first_inquiry_at", "assigned_at", "last_contact_at", "next_contact_at",
+  "member_registered_at", "lost_at",
+]);
 
 // GET /api/customers/[id]
 export async function GET(
@@ -101,7 +108,13 @@ export async function PATCH(
 
     const data: Record<string, unknown> = {};
     for (const key of UPDATABLE_FIELDS) {
-      if (key in body) data[key] = body[key];
+      if (!(key in body)) continue;
+      const v = body[key];
+      if (DATE_FIELDS.has(key)) {
+        data[key] = v == null || v === "" ? null : (v instanceof Date ? v : new Date(String(v)));
+      } else {
+        data[key] = v;
+      }
     }
 
     if (Object.keys(data).length === 0) {

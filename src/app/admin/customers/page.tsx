@@ -2,21 +2,28 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 
 const STATUS_LABELS: Record<string, string> = {
-  NEW: "新規", CONTACTING: "連絡中", VISITING: "内見調整中",
-  NEGOTIATING: "商談中", CONTRACT: "契約済", CLOSED: "成約",
-  LOST: "失注", PENDING: "保留",
+  NEW: "新規問い合わせ", CONTACTING: "コンタクト中", CONTACTED: "コンタクト済",
+  INVITING: "案内誘致中", VISITING: "案内中",
+  NEGOTIATING: "検討・商談中", CONTRACT: "契約", CLOSED: "成約",
+  LOST: "追客終了", PENDING: "保留",
   // legacy
   lead: "見込み客", active: "商談中（旧）", contract: "契約済み（旧）", closed: "クローズ（旧）",
 };
 const STATUS_BADGE: Record<string, React.CSSProperties> = {
   NEW:         { background: "#e3f2fd", color: "#1565c0" },
   CONTACTING:  { background: "#fff8e1", color: "#e65100" },
+  CONTACTED:   { background: "#f0f9ff", color: "#0c4a6e" },
+  INVITING:    { background: "#ecfdf5", color: "#065f46" },
   VISITING:    { background: "#e8f5e9", color: "#2e7d32" },
   NEGOTIATING: { background: "#234f35", color: "#fff" },
   CONTRACT:    { background: "#1a237e", color: "#fff" },
   CLOSED:      { background: "#880e4f", color: "#fff" },
   LOST:        { background: "#fdeaea", color: "#8c1f1f" },
   PENDING:     { background: "#f3f2ef", color: "#706e68" },
+};
+const LOST_REASON_LABELS: Record<string, string> = {
+  COMPETITOR: "他決", DO_NOT_CONTACT: "連絡停止", BUDGET: "予算",
+  CONDITION: "条件不一致", TIMING: "時期", NO_RESPONSE: "連絡途絶", OTHER: "その他",
 };
 const SOURCE_LABELS: Record<string, string> = {
   SUUMO: "SUUMO", ATHOME: "athome", YAHOO: "Yahoo不動産",
@@ -41,6 +48,7 @@ interface Customer {
   status: string; source: string | null; priority: string;
   ai_score: number | null;
   last_contact_at: string | null; next_contact_at: string | null;
+  lost_reason: string | null; lost_at: string | null;
   created_at: string;
   assigned_staff: StaffItem | null;
   family_members?: FamilyMember[];
@@ -464,7 +472,7 @@ export default function CustomersPage() {
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
             style={{ padding: "6px 10px", border: "1px solid #e0deda", borderRadius: 7, fontSize: 12, fontFamily: "inherit" }}>
             <option value="">全ステータス</option>
-            {["NEW","CONTACTING","VISITING","NEGOTIATING","CONTRACT","CLOSED","LOST","PENDING"].map(k =>
+            {["NEW","CONTACTING","CONTACTED","INVITING","VISITING","NEGOTIATING","CONTRACT","CLOSED","LOST","PENDING"].map(k =>
               <option key={k} value={k}>{STATUS_LABELS[k]}</option>
             )}
           </select>
@@ -555,6 +563,11 @@ export default function CustomersPage() {
                     <span style={{ ...(STATUS_BADGE[c.status] ?? { background: "#f3f2ef", color: "#706e68" }), padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: 500, whiteSpace: "nowrap" }}>
                       {STATUS_LABELS[c.status] ?? c.status}
                     </span>
+                    {c.status === "LOST" && c.lost_reason && (
+                      <div style={{ marginTop: 4, fontSize: 10, color: "#8c1f1f" }}>
+                        理由: {LOST_REASON_LABELS[c.lost_reason] ?? c.lost_reason}
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: "10px 12px" }}>
                     <a href={`/admin/customers/${c.id}`} style={{ fontSize: 12, color: "#234f35", textDecoration: "none", fontWeight: 500 }}>詳細</a>

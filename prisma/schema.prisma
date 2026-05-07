@@ -749,6 +749,11 @@ model Customer {
   do_not_contact         Boolean   @default(false)
   unsubscribed           Boolean   @default(false)
 
+  // ===== 追客終了（LOST）情報 =====
+  lost_reason            String?   // COMPETITOR | DO_NOT_CONTACT | BUDGET | CONDITION | TIMING | NO_RESPONSE | OTHER
+  lost_at                DateTime?
+  lost_note              String?
+
   // ===== 内部メモ =====
   internal_memo          String?
   tags                   String[]
