@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { ACTIVITY_TYPES, SALES_ACTIONS, CONTRACT_ACTIONS, type ActivityType } from "@/lib/activity-types";
 
 const STATUS_LABELS: Record<string, string> = {
   NEW: "新規", CONTACTING: "連絡中", VISITING: "内見調整中",
@@ -105,7 +106,18 @@ interface Customer {
   assigned_staff: { id: string; name: string } | null;
 }
 
-type TabKey = "basic" | "family" | "desired" | "finance" | "followup" | "history" | "matching";
+type TabKey = "basic" | "family" | "desired" | "finance" | "followup" | "history" | "matching" | "proposals";
+
+interface ProposalItem {
+  id: string;
+  title: string | null;
+  pdf_url: string | null;
+  extracted_text: string | null;
+  note: string | null;
+  created_at: string;
+  staff: { id: string; name: string } | null;
+  property: { id: string; building_name: string | null; city: string | null; price: number | null } | null;
+}
 
 interface VisitItem {
   id: string;
@@ -214,6 +226,26 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
   const [actResult, setActResult] = useState("");
   const [actNext, setActNext] = useState("");
   const [addingAct, setAddingAct] = useState(false);
+
+  // Quick action bar
+  const [quickAction, setQuickAction]       = useState<{ type: ActivityType; phase: string } | null>(null);
+  const [showQuickModal, setShowQuickModal] = useState(false);
+  const [quickForm, setQuickForm]           = useState({
+    content: "", result: "", next_action: "", next_action_at: "",
+  });
+  const [savingQuick, setSavingQuick]       = useState(false);
+
+  // Proposals
+  const [proposals, setProposals]           = useState<ProposalItem[]>([]);
+  const [uploadingProposal, setUploadingProposal] = useState(false);
+
+  const loadProposals = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/customers/${params.id}/proposals`);
+      const d = await r.json() as { proposals?: ProposalItem[] };
+      setProposals(d.proposals ?? []);
+    } catch { /* ignore */ }
+  }, [params.id]);
 
   // Matching / AI / Visits
   const [visits, setVisits]                 = useState<VisitItem[]>([]);
@@ -380,6 +412,46 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
     if (activeTab === "matching") void loadVisits();
   }, [activeTab, loadVisits]);
 
+  // proposalsタブを開いたら提案一覧を取得
+  useEffect(() => {
+    if (activeTab === "proposals") void loadProposals();
+  }, [activeTab, loadProposals]);
+
+  const submitQuickAction = async () => {
+    if (!quickAction) return;
+    if (!quickForm.next_action || !quickForm.next_action_at) {
+      alert("次回アクションと日時は必須です");
+      return;
+    }
+    setSavingQuick(true);
+    try {
+      const def = ACTIVITY_TYPES[quickAction.type];
+      const res = await fetch(`/api/customers/${params.id}/activities`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          type:           quickAction.type,
+          phase:          quickAction.phase,
+          content:        quickForm.content || def.label,
+          result:         quickForm.result || null,
+          next_action:    quickForm.next_action,
+          next_action_at: quickForm.next_action_at,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        alert(d.error ?? "記録に失敗しました");
+        return;
+      }
+      setShowQuickModal(false);
+      setQuickAction(null);
+      setQuickForm({ content: "", result: "", next_action: "", next_action_at: "" });
+      await loadCustomer();
+    } finally {
+      setSavingQuick(false);
+    }
+  };
+
   const handleAnalyze = async () => {
     setAnalyzing(true); setError("");
     try {
@@ -498,6 +570,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
     { key: "followup", label: "追客管理" },
     { key: "history", label: `対応履歴 (${customer.activities?.length ?? 0})` },
     { key: "matching", label: "AI・内見・マッチング" },
+    { key: "proposals", label: "提案物件" },
   ];
 
   const SaveBtn = () => (
@@ -586,8 +659,62 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
         </div>
       )}
 
+      {/* クイックアクション記録バー */}
+      <div style={{
+        background: "#fff", borderRadius: 10, border: "1px solid #e0deda",
+        padding: "10px 14px", marginBottom: 16,
+        display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center",
+      }}>
+        <span style={{ fontSize: 11, color: "#706e68", marginRight: 4 }}>営業</span>
+        {SALES_ACTIONS.map((type) => {
+          const def = ACTIVITY_TYPES[type];
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => {
+                setQuickAction({ type, phase: "SALES" });
+                setShowQuickModal(true);
+              }}
+              style={{
+                padding: "6px 12px", borderRadius: 16, fontSize: 12,
+                border: `1px solid ${def.color}55`,
+                background: `${def.color}15`,
+                color: def.color, cursor: "pointer", fontWeight: "bold",
+                fontFamily: "inherit",
+              }}
+            >
+              {def.label}
+            </button>
+          );
+        })}
+        <span style={{ width: 1, height: 22, background: "#e0deda", margin: "0 6px" }} />
+        <span style={{ fontSize: 11, color: "#706e68", marginRight: 4 }}>契約</span>
+        {CONTRACT_ACTIONS.map((type) => {
+          const def = ACTIVITY_TYPES[type];
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => {
+                setQuickAction({ type, phase: "CONTRACT" });
+                setShowQuickModal(true);
+              }}
+              style={{
+                padding: "6px 12px", borderRadius: 16, fontSize: 12,
+                border: `1px solid ${def.color}55`,
+                background: `${def.color}15`,
+                color: def.color, cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              {def.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Tabs */}
-      <div style={{ display: "flex", borderBottom: "2px solid #e0deda", marginBottom: 20, gap: 0 }}>
+      <div style={{ display: "flex", borderBottom: "2px solid #e0deda", marginBottom: 20, gap: 0, flexWrap: "wrap" }}>
         {tabs.map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)}
             style={{ padding: "9px 16px", fontSize: 12, fontWeight: activeTab === t.key ? 600 : 400, color: activeTab === t.key ? "#234f35" : "#706e68", background: "none", border: "none", borderBottom: activeTab === t.key ? "2px solid #234f35" : "2px solid transparent", marginBottom: -2, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
@@ -1506,6 +1633,181 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Tab: 提案物件 ─── */}
+      {activeTab === "proposals" && (
+        <div>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              padding: "10px 20px", borderRadius: 6, cursor: uploadingProposal ? "wait" : "pointer",
+              border: "2px dashed #d1d5db", background: "#f9fafb",
+              fontSize: 13, color: "#374151", opacity: uploadingProposal ? 0.6 : 1,
+            }}>
+              📄 販売図面PDFを添付
+              <input
+                type="file"
+                accept=".pdf"
+                multiple
+                disabled={uploadingProposal}
+                style={{ display: "none" }}
+                onChange={async (e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  if (files.length === 0) return;
+                  setUploadingProposal(true);
+                  try {
+                    for (const file of files) {
+                      const fd = new FormData();
+                      fd.append("file", file);
+                      fd.append("title", file.name.replace(/\.pdf$/i, ""));
+                      await fetch(`/api/customers/${params.id}/proposals`, {
+                        method: "POST",
+                        body:   fd,
+                      });
+                    }
+                    await loadProposals();
+                    await loadCustomer();
+                  } finally {
+                    setUploadingProposal(false);
+                    e.target.value = "";
+                  }
+                }}
+              />
+            </label>
+            <span style={{ fontSize: 12, color: "#9ca3af", marginLeft: 8 }}>
+              {uploadingProposal ? "⏳ AI解析中..." : "複数ファイル選択可・AIが内容を自動解析します"}
+            </span>
+          </div>
+
+          {proposals.length === 0 ? (
+            <div style={{ fontSize: 13, color: "#9ca3af", padding: 24, textAlign: "center" }}>
+              提案物件はまだありません
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {proposals.map(p => (
+                <div key={p.id} style={{
+                  padding: "12px 16px", background: "#fff",
+                  border: "1px solid #e5e7eb", borderRadius: 8,
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: "bold", fontSize: 13 }}>📄 {p.title ?? "提案書類"}</div>
+                      {p.extracted_text && (
+                        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4, lineHeight: 1.6 }}>
+                          {p.extracted_text}
+                        </div>
+                      )}
+                      {p.property && (
+                        <div style={{ fontSize: 11, color: "#5BAD52", marginTop: 4 }}>
+                          🏠 {p.property.building_name || p.property.city || ""} {p.property.price?.toLocaleString() ?? ""}万円
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ textAlign: "right", fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap" }}>
+                      <div>{new Date(p.created_at).toLocaleDateString("ja-JP")}</div>
+                      <div>{p.staff?.name ?? ""}</div>
+                      {p.pdf_url && (
+                        <a href={p.pdf_url} target="_blank" rel="noreferrer"
+                          style={{ color: "#3b82f6", textDecoration: "none" }}>
+                          PDFを開く
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* クイックアクション記録モーダル */}
+      {showQuickModal && quickAction && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 520, maxWidth: "90vw" }}>
+            <h3 style={{ fontSize: 16, fontWeight: "bold", marginBottom: 16 }}>
+              {ACTIVITY_TYPES[quickAction.type]?.label} を記録
+            </h3>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
+                内容・メモ
+              </label>
+              <textarea
+                value={quickForm.content}
+                onChange={e => setQuickForm({ ...quickForm, content: e.target.value })}
+                rows={3}
+                placeholder="簡潔に記録してください..."
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 4 }}>
+                結果・反応
+              </label>
+              <input
+                value={quickForm.result}
+                onChange={e => setQuickForm({ ...quickForm, result: e.target.value })}
+                placeholder="例: 前向き検討、再度連絡を希望 等"
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
+              />
+            </div>
+
+            <div style={{
+              marginBottom: 16, padding: 12,
+              background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8,
+            }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: "bold", color: "#92400e", marginBottom: 8 }}>
+                ⚠️ 次回アクション（必須）
+              </label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <input
+                  value={quickForm.next_action}
+                  onChange={e => setQuickForm({ ...quickForm, next_action: e.target.value })}
+                  placeholder="次にやること"
+                  style={{ padding: "8px 10px", border: "1px solid #fcd34d", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
+                />
+                <input
+                  type="datetime-local"
+                  value={quickForm.next_action_at}
+                  onChange={e => setQuickForm({ ...quickForm, next_action_at: e.target.value })}
+                  style={{ padding: "8px 10px", border: "1px solid #fcd34d", borderRadius: 6, fontSize: 13, boxSizing: "border-box", fontFamily: "inherit" }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => { setShowQuickModal(false); setQuickAction(null); }}
+                disabled={savingQuick}
+                style={{ padding: "8px 20px", borderRadius: 6, border: "1px solid #d1d5db", background: "#fff", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={submitQuickAction}
+                disabled={savingQuick}
+                style={{
+                  padding: "8px 20px", borderRadius: 6, border: "none",
+                  background: savingQuick ? "#888" : "#5BAD52", color: "#fff",
+                  fontSize: 13, fontWeight: "bold",
+                  cursor: savingQuick ? "not-allowed" : "pointer", fontFamily: "inherit",
+                }}
+              >
+                {savingQuick ? "記録中..." : "記録する"}
+              </button>
+            </div>
           </div>
         </div>
       )}

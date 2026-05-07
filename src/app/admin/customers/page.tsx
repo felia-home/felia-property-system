@@ -76,6 +76,28 @@ export default function CustomersPage() {
   const [pdfError, setPdfError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // PDF -> Customer matching
+  const [matchLoading, setMatchLoading] = useState(false);
+  const [matchResult, setMatchResult] = useState<{
+    property_info: {
+      price_man?:    number;
+      areas?:        string[];
+      property_type?: string;
+      rooms?:        string;
+      station_name?: string;
+      walk_min?:     number;
+    };
+    customers: Array<{
+      id: string;
+      name: string;
+      score: number;
+      desired_budget_max: number | null;
+      desired_areas: string[];
+      assigned: { id: string; name: string } | null;
+    }>;
+    total: number;
+  } | null>(null);
+
   const fetchCustomers = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -255,6 +277,112 @@ export default function CustomersPage() {
       </div>
 
       {error && <div style={{ background: "#fdeaea", color: "#8c1f1f", padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13 }}>{error}</div>}
+
+      {/* PDFマッチング検索 */}
+      <div style={{ marginBottom: 16, padding: 16, background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: "bold", color: "#166534", marginBottom: 8 }}>
+          🏠 物件PDFで顧客マッチング
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <label style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "7px 14px", borderRadius: 6,
+            cursor: matchLoading ? "wait" : "pointer",
+            border: "1px solid #86efac", background: "#fff",
+            fontSize: 13, color: "#166534",
+            opacity: matchLoading ? 0.6 : 1,
+          }}>
+            📄 PDFを選択（複数可）
+            <input
+              type="file"
+              accept=".pdf"
+              multiple
+              disabled={matchLoading}
+              style={{ display: "none" }}
+              onChange={async (e) => {
+                const files = Array.from(e.target.files ?? []);
+                if (files.length === 0) return;
+                setMatchLoading(true);
+                setMatchResult(null);
+                try {
+                  const fd = new FormData();
+                  files.forEach(f => fd.append("files", f));
+                  const res = await fetch("/api/properties/match-customers", {
+                    method: "POST", body: fd,
+                  });
+                  const data = await res.json();
+                  setMatchResult(data);
+                } finally {
+                  setMatchLoading(false);
+                  e.target.value = "";
+                }
+              }}
+            />
+          </label>
+          {matchLoading && <span style={{ fontSize: 12, color: "#6b7280" }}>⏳ AI解析中...</span>}
+          {matchResult && (
+            <span style={{ fontSize: 12, color: "#166534" }}>
+              ✅ {matchResult.total}件がマッチしました
+            </span>
+          )}
+          {matchResult && (
+            <button
+              type="button"
+              onClick={() => setMatchResult(null)}
+              style={{
+                padding: "5px 12px", borderRadius: 6, border: "1px solid #d1d5db",
+                background: "#fff", color: "#6b7280", fontSize: 12, cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              クリア
+            </button>
+          )}
+        </div>
+
+        {matchResult && matchResult.customers.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: "bold", color: "#6b7280", marginBottom: 8 }}>
+              解析結果: {matchResult.property_info.areas?.join("・") ?? ""} /
+              {matchResult.property_info.price_man ? ` ${matchResult.property_info.price_man.toLocaleString()}万円` : ""} /
+              {matchResult.property_info.rooms ? ` ${matchResult.property_info.rooms}` : ""}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {matchResult.customers.slice(0, 10).map(c => (
+                <div key={c.id} style={{
+                  display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                  padding: "8px 12px", background: "#fff",
+                  border: "1px solid #d1fae5", borderRadius: 6,
+                }}>
+                  <span style={{
+                    padding: "2px 8px", borderRadius: 8, fontSize: 11,
+                    background: "#f0fdf4", color: "#166534", fontWeight: "bold",
+                  }}>
+                    {c.score}点
+                  </span>
+                  <span style={{ fontWeight: "bold", fontSize: 13, flex: 1, minWidth: 100 }}>{c.name}</span>
+                  <span style={{ fontSize: 11, color: "#6b7280" }}>
+                    {c.desired_budget_max ? `〜${c.desired_budget_max.toLocaleString()}万` : "予算未設定"}
+                    {c.desired_areas.length > 0 ? ` / ${c.desired_areas.slice(0, 2).join("・")}` : ""}
+                  </span>
+                  <span style={{ fontSize: 11, color: "#9ca3af" }}>
+                    {c.assigned?.name ?? "未割当"}
+                  </span>
+                  <a href={`/admin/customers/${c.id}`}
+                    style={{ fontSize: 12, color: "#3b82f6", textDecoration: "none" }}>
+                    詳細→
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {matchResult && matchResult.total === 0 && (
+          <div style={{ marginTop: 12, fontSize: 12, color: "#6b7280" }}>
+            希望条件にマッチする顧客は見つかりませんでした
+          </div>
+        )}
+      </div>
 
       {/* New customer form */}
       {showForm && (

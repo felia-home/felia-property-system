@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 // GET /api/customers
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    const permission = session?.user?.permission ?? "";
+    const sessionStaffId = session?.user?.staffId ?? "";
+    const sessionStoreId = session?.user?.storeId ?? "";
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
@@ -22,6 +29,13 @@ export async function GET(request: NextRequest) {
     if (source) where.source = source;
     if (assignedTo) where.assigned_to = assignedTo;
     if (storeId) where.store_id = storeId;
+
+    // ロール別アクセス制御（ADMIN/BACKOFFICEは全件、MANAGER/SENIOR_MANAGERは自店舗、AGENTは自分担当のみ）
+    if (permission === "AGENT" || permission === "SENIOR_AGENT") {
+      where.assigned_to = sessionStaffId || "__none__";
+    } else if (permission === "MANAGER" || permission === "SENIOR_MANAGER") {
+      if (!storeId && sessionStoreId) where.store_id = sessionStoreId;
+    }
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },

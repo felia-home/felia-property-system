@@ -358,6 +358,7 @@ model Property {
   documents             PropertyDocument[]
   favorites             MemberFavorite[]
   visit_appointments    VisitAppointment[]
+  proposals             CustomerProposal[]
   @@map("properties")
 }
 
@@ -758,6 +759,7 @@ model Customer {
   assigned_staff         Staff?    @relation("CustomerAgent", fields: [assigned_to], references: [id])
   privateSelectionTokens PrivateSelectionToken[]
   visit_appointments     VisitAppointment[]
+  proposals              CustomerProposal[]
 
   @@map("customers")
 }
@@ -783,15 +785,37 @@ model CustomerActivity {
   customer_id    String
   customer       Customer  @relation(fields: [customer_id], references: [id], onDelete: Cascade)
   staff_id       String?
-  type           String    // CALL | EMAIL | LINE | VISIT | MEETING | VIEWING | NOTE | AI_AUTO
+  type           String    // CALL | EMAIL | LETTER | SHOWING | VISIT | RESEARCH | CONTRACT_DOCS | CONTRACT | SETTLEMENT | AFTER | MEMO | AI_AUTO
+  phase          String    @default("SALES") // SALES | CONTRACT
   direction      String    @default("OUTBOUND") // INBOUND | OUTBOUND
   content        String
   property_id    String?
   result         String?
   next_action    String?
   next_action_at DateTime?
+  duration_min   Int?
+  proposal_ids   String[]  @default([])
   created_at     DateTime  @default(now())
   @@map("customer_activities")
+}
+
+model CustomerProposal {
+  id             String    @id @default(cuid())
+  customer_id    String
+  staff_id       String?
+  property_id    String?
+  pdf_url        String?
+  thumbnail_url  String?
+  extracted_text String?
+  title          String?
+  note           String?
+  sent_at        DateTime?
+  created_at     DateTime  @default(now())
+  customer       Customer  @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  staff          Staff?    @relation(fields: [staff_id], references: [id], onDelete: SetNull)
+  property       Property? @relation(fields: [property_id], references: [id], onDelete: SetNull)
+
+  @@map("customer_proposals")
 }
 
 model Company {
@@ -959,6 +983,7 @@ model Staff {
   sale_results         SaleResult[]
   check_logs           PropertyCheckLog[]
   visit_appointments   VisitAppointment[]
+  proposals            CustomerProposal[]
 
   @@map("staffs")
 }

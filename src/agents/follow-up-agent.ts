@@ -47,7 +47,15 @@ export async function generateFollowUpMessage(
       family_members: true,
       activities: {
         orderBy: { created_at: "desc" },
+        take: 20,
+      },
+      proposals: {
+        orderBy: { created_at: "desc" },
         take: 5,
+        select: {
+          title: true, extracted_text: true,
+          created_at: true, sent_at: true,
+        },
       },
     },
   });
@@ -93,15 +101,37 @@ export async function generateFollowUpMessage(
       )
     : null;
 
+  // 活動履歴・提案物件履歴を時系列テキストへ整形
+  const activitySummary = customer.activities
+    .map((a) => {
+      const date = new Date(a.created_at).toLocaleDateString("ja-JP");
+      const dir  = a.direction === "INBOUND" ? "（着信）" : "（発信）";
+      return `${date} [${a.type}${dir}] ${a.content.slice(0, 80)}${a.result ? ` → 結果: ${a.result}` : ""}`;
+    })
+    .join("\n");
+  const proposalSummary = customer.proposals
+    .map((p) => {
+      const date = new Date(p.created_at).toLocaleDateString("ja-JP");
+      return `${date} 提案: ${p.title ?? "提案書類"}${p.extracted_text ? ` (${p.extracted_text.slice(0, 50)})` : ""}`;
+    })
+    .join("\n");
+
   const client = new Anthropic();
   const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
+    model: "claude-sonnet-4-6",
     max_tokens: 1500,
     messages: [
       {
         role: "user",
         content: `あなたはフェリアホームの優秀な不動産エージェントAIです。
-以下の顧客に対して、物件内見のアポイントを取るためのメールを作成してください。
+以下の顧客に対して、自然な追客メールを作成してください。
+
+## 【重要な制約】事実と異なる内容を絶対に書かないこと
+- 活動履歴に「来社（VISIT）」の記録がない場合は、来社や来店に関する言及を絶対にしないこと
+- 活動履歴に「案内・内見（SHOWING）」の記録がない場合は、内見・ご案内に関する言及をしないこと
+- 活動履歴に「契約（CONTRACT）」の記録がない場合は、契約に関する言及をしないこと
+- 提案物件履歴がない場合は、過去の提案物件についての言及をしないこと
+- 実際に行ったアクションのみを参照すること
 
 ## 顧客情報
 氏名: ${customer.name} 様
@@ -111,7 +141,12 @@ export async function generateFollowUpMessage(
 希望物件種別: ${customer.desired_property_type?.join("・") || "未設定"}
 入居希望時期: ${customer.desired_move_timing || "未設定"}
 最終連絡: ${daysSinceContact != null ? `${daysSinceContact}日前` : "連絡履歴なし"}
-過去の対応: ${customer.activities.map((a) => a.content.slice(0, 50)).join(" / ") || "なし"}
+
+## 活動履歴（直近20件）
+${activitySummary || "活動履歴なし（初回連絡）"}
+
+## 提案物件履歴
+${proposalSummary || "まだ物件提案なし"}
 
 ## 条件に合う掲載中物件
 ${
@@ -128,6 +163,7 @@ ${
 ## メール作成ルール
 - 件名と本文をそれぞれ作成
 - 丁寧・親しみやすいトーン、押しつけがましくない
+- 活動履歴・提案履歴がない場合は初回連絡として書く（過去の経緯を捏造しない）
 - 具体的な物件情報を1〜2件紹介（物件が見つからない場合は新着情報のご案内として作成）
 - 内見のアポイントを促す
 - 署名はフェリアホーム（担当者名は[担当者名]と記入）
