@@ -85,8 +85,13 @@ export async function GET(req: NextRequest) {
     _count: { id: true },
   });
   const staffIds = byStaff.map(s => s.assigned_to).filter(Boolean) as string[];
+  // 営業職のみ（在籍中・ADMIN/BACKOFFICE 除外）
   const staffs = await prisma.staff.findMany({
-    where: { id: { in: staffIds } },
+    where: {
+      id:         { in: staffIds },
+      is_active:  true,
+      permission: { in: ["AGENT", "MANAGER", "SENIOR_MANAGER"] },
+    },
     select: { id: true, name: true },
   });
   const staffMap = Object.fromEntries(staffs.map(s => [s.id, s.name]));

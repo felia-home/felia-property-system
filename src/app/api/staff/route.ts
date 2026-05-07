@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     const store_id = searchParams.get("store_id");
     const permission = searchParams.get("permission");
     const active = searchParams.get("active");
+    const salesOnly = searchParams.get("sales_only") === "true";
     const search = searchParams.get("search");
     const includeStats = searchParams.get("includeStats") === "true";
 
@@ -16,6 +17,10 @@ export async function GET(request: NextRequest) {
     if (active === "true") where.is_active = true;
     else if (active === "false") where.is_active = false;
     else where.is_active = true; // default: active only unless explicitly false
+    // 営業職のみ（ADMIN・BACKOFFICE などを除外）
+    if (salesOnly && !permission) {
+      where.permission = { in: ["AGENT", "MANAGER", "SENIOR_MANAGER"] };
+    }
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },

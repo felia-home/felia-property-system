@@ -27,8 +27,13 @@ export async function GET(req: NextRequest) {
     prisma.inquiry.count({ where: { ...baseWhere, created_at: { gte: prevStart, lte: prevEnd } } }),
   ]);
 
+  // 営業職のみ（在籍中・ADMIN/BACKOFFICE 除外）
   const staffs = await prisma.staff.findMany({
-    where: storeId ? { store_id: storeId } : {},
+    where: {
+      is_active:  true,
+      permission: { in: ["AGENT", "MANAGER", "SENIOR_MANAGER"] },
+      ...(storeId ? { store_id: storeId } : {}),
+    },
     select: { id: true, name: true },
   });
 
