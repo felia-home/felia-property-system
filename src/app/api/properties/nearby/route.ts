@@ -10,11 +10,32 @@ export async function GET(req: NextRequest) {
   const exclude_id = searchParams.get("exclude_id") ?? "";
   const city       = searchParams.get("city") ?? "";
 
+  // type: 物件種別フィルタ（カンマ区切りで複数値可）
+  const typeRaw = searchParams.get("type");
+  const types = typeRaw
+    ? typeRaw.split(",").map(s => s.trim()).filter(Boolean)
+    : [];
+
+  // priceMin / priceMax: 数値変換できない場合は無視
+  const priceMinRaw = searchParams.get("priceMin");
+  const priceMaxRaw = searchParams.get("priceMax");
+  const priceMin = priceMinRaw != null && priceMinRaw !== "" && Number.isFinite(Number(priceMinRaw))
+    ? Number(priceMinRaw) : null;
+  const priceMax = priceMaxRaw != null && priceMaxRaw !== "" && Number.isFinite(Number(priceMaxRaw))
+    ? Number(priceMaxRaw) : null;
+
+  const priceFilter: Record<string, number> = {};
+  if (priceMin != null) priceFilter.gte = priceMin;
+  if (priceMax != null) priceFilter.lte = priceMax;
+
   const where: Record<string, unknown> = {
     published_hp: true,
     is_deleted: false,
     ...(exclude_id ? { id: { not: exclude_id } } : {}),
     ...(city ? { city } : {}),
+    ...(types.length === 1 ? { property_type: types[0] }
+        : types.length > 1 ? { property_type: { in: types } } : {}),
+    ...(Object.keys(priceFilter).length > 0 ? { price: priceFilter } : {}),
   };
 
   const properties = await prisma.property.findMany({
