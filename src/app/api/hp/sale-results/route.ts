@@ -27,7 +27,10 @@ export async function GET() {
           select: {
             id: true,
             name: true,
+            position: true,
             photo_url: true,
+            photo_focal_x: true,
+            photo_focal_y: true,
           },
         },
       },
@@ -46,7 +49,14 @@ export async function GET() {
       latitude: r.latitude,
       longitude: r.longitude,
       staff: r.staff
-        ? { id: r.staff.id, name: r.staff.name, photo_url: r.staff.photo_url }
+        ? {
+            id:             r.staff.id,
+            name:           r.staff.name,
+            position:       r.staff.position,
+            photo_url:      r.staff.photo_url,
+            photo_focal_x:  r.staff.photo_focal_x ?? 50,
+            photo_focal_y:  r.staff.photo_focal_y ?? 50,
+          }
         : null,
     }));
 
