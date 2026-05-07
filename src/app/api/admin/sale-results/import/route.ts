@@ -67,14 +67,33 @@ export async function POST(req: NextRequest) {
       }
 
       try {
+        // CSV列順: [0]公開日(published_at)  [1]year_month  [2]property_type
+        //          [3]address  [4]staff_id（任意・空欄可）
         const published_at  = (row[0] ?? "").trim();
         const year_month    = (row[1] ?? "").trim();
         const property_type = (row[2] ?? "").trim();
         const address       = (row[3] ?? "").trim();
+        const staffIdRaw    = (row[4] ?? "").trim();
 
         if (!year_month || !property_type || !address) {
           skipped++;
           continue;
+        }
+
+        // staff_id 検証: 空欄なら null、指定があれば存在確認
+        let staffId: string | null = null;
+        if (staffIdRaw) {
+          const exists = await prisma.staff.findUnique({
+            where: { id: staffIdRaw },
+            select: { id: true },
+          });
+          if (!exists) {
+            console.warn(`[sale-results import] staff_id ${staffIdRaw} が見つからないためスキップ`);
+            errorDetails.push(`staff_id 不正: ${staffIdRaw}`);
+            skipped++;
+            continue;
+          }
+          staffId = exists.id;
         }
 
         const { area, area_town } = splitAddress(address);
@@ -99,8 +118,8 @@ export async function POST(req: NextRequest) {
             is_active:     true,
             latitude:      coords?.lat ?? null,
             longitude:     coords?.lng ?? null,
-            // 公開日を sort_order に使う想定はないが、新しいものを上に並べたいときのため
-            // published_at は SaleResult スキーマに無いので無視（保存対象外）
+            staff_id:      staffId,
+            // published_at は SaleResult スキーマに無いので保存対象外
           },
         });
         // published_at は SaleResult に既存カラムが無いため捨てる
