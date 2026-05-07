@@ -201,6 +201,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [allStaff, setAllStaff] = useState<{ id: string; name: string }[]>([]);
+  const [stores, setStores]     = useState<{ id: string; name: string }[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
 
   // Private selection URL
@@ -284,9 +285,15 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
       await loadCustomer();
 
       // スタッフ一覧・tokenInfo は独立して取得（失敗しても顧客表示に影響しない）
-      fetch("/api/staff?active=true")
+      fetch("/api/staff?active=true&sales_only=true")
         .then(r => r.json())
         .then((d: { staff?: { id: string; name: string }[] }) => setAllStaff(d.staff ?? []))
+        .catch(() => {});
+
+      // 店舗一覧
+      fetch("/api/stores")
+        .then(r => r.json())
+        .then((d: { stores?: { id: string; name: string }[] }) => setStores(d.stores ?? []))
         .catch(() => {});
 
       try {
@@ -798,6 +805,14 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
               </select>
             </div>
             <div style={row}>
+              <span style={labelW}>担当店舗</span>
+              <select value={String(form.store_id ?? "")} onChange={e => setF("store_id", (e.target.value || null) as never)}
+                style={{ ...inputSt, flex: 1 }}>
+                <option value="">未設定</option>
+                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div style={row}>
               <span style={labelW}>流入元</span>
               <select value={String(form.source ?? "")} onChange={e => setF("source", e.target.value as never)}
                 style={{ ...inputSt, flex: 1 }}>
@@ -1271,6 +1286,14 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
                 style={{ ...inputSt, flex: 1 }}>
                 <option value="">未設定</option>
                 {allStaff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div style={row}>
+              <span style={labelW}>担当店舗</span>
+              <select value={String(form.store_id ?? "")} onChange={e => setF("store_id", (e.target.value || null) as never)}
+                style={{ ...inputSt, flex: 1 }}>
+                <option value="">未設定</option>
+                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
             <div style={row}>
