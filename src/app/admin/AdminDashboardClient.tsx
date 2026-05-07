@@ -78,7 +78,6 @@ function DashboardInner() {
   const [loadingProps, setLoadingProps] = useState(true);
   const [licenseAlerts, setLicenseAlerts] = useState<{ company: string; expiry: Date; daysLeft: number }[]>([]);
   const [takkenAlerts, setTakkenAlerts] = useState<{ name: string; daysLeft: number }[]>([]);
-  const [newInquiries, setNewInquiries] = useState(0);
   const [roleTab, setRoleTab] = useState<"all" | "sales" | "backoffice">("all");
 
   useEffect(() => {
@@ -108,13 +107,6 @@ function DashboardInner() {
           }] : []
         ).filter(a => a.daysLeft <= 90);
         setLicenseAlerts(alerts);
-      })
-      .catch(() => {});
-
-    fetch("/api/inquiries?status=NEW&limit=1")
-      .then(r => r.json())
-      .then((d: { statusCounts?: Record<string, number> }) => {
-        setNewInquiries(d.statusCounts?.NEW ?? 0);
       })
       .catch(() => {});
 
@@ -191,27 +183,33 @@ function DashboardInner() {
 
   return (
     <div style={{ padding: 28, maxWidth: 1400 }}>
-      <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+      <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 600, color: "#3a2a1a" }}>物件管理ダッシュボード</h1>
           <p style={{ fontSize: 12, color: "#706e68", marginTop: 3 }}>フェリアホーム 物件情報管理システム</p>
         </div>
-        <div style={{ display: "flex", gap: 4 }}>
-          {([["all", "全体"], ["sales", "営業向け"], ["backoffice", "内勤向け"]] as const).map(([t, label]) => (
-            <button key={t} onClick={() => setRoleTab(t)}
-              style={{ padding: "6px 16px", borderRadius: 8, fontSize: 12, fontWeight: roleTab === t ? 700 : 400, border: "1px solid " + (roleTab === t ? "#234f35" : "#e0deda"), background: roleTab === t ? "#234f35" : "#fff", color: roleTab === t ? "#fff" : "#706e68", cursor: "pointer", fontFamily: "inherit" }}>
-              {label}
-            </button>
-          ))}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <Link
+            href="/admin/reports/sales"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "7px 14px", borderRadius: 6, fontSize: 13,
+              background: "#eff6ff", border: "1px solid #bfdbfe",
+              color: "#1d4ed8", textDecoration: "none", fontWeight: "bold",
+            }}
+          >
+            🎯 営業ダッシュボード →
+          </Link>
+          <div style={{ display: "flex", gap: 4 }}>
+            {([["all", "全体"], ["sales", "営業向け"], ["backoffice", "内勤向け"]] as const).map(([t, label]) => (
+              <button key={t} onClick={() => setRoleTab(t)}
+                style={{ padding: "6px 16px", borderRadius: 8, fontSize: 12, fontWeight: roleTab === t ? 700 : 400, border: "1px solid " + (roleTab === t ? "#234f35" : "#e0deda"), background: roleTab === t ? "#234f35" : "#fff", color: roleTab === t ? "#fff" : "#706e68", cursor: "pointer", fontFamily: "inherit" }}>
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-
-      {newInquiries > 0 && (
-        <div style={{ background: "#ffebee", border: "1px solid #ef9a9a", borderRadius: 10, padding: "12px 18px", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 14, color: "#c62828" }}>📧 未対応の反響が <strong>{newInquiries}件</strong> あります</span>
-          <a href="/admin/inquiries" style={{ fontSize: 13, color: "#c62828", fontWeight: 600, textDecoration: "none" }}>今すぐ確認 →</a>
-        </div>
-      )}
 
       {/* License alerts */}
       {(licenseAlerts ?? []).map(a => (

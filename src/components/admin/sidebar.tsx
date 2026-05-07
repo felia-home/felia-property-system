@@ -27,10 +27,11 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "顧客管理",
     items: [
-      { href: "/admin/customers",          label: "ダッシュボード", icon: "人" },
+      { href: "/admin/customers",          label: "顧客一覧",       icon: "人" },
       { href: "/admin/customers/pipeline", label: "パイプライン",   icon: "🗂" },
-      { href: "/admin/customers/follow-up",label: "AI追客",         icon: "🤖" },
-      { href: "/admin/notifications",      label: "通知管理",       icon: "📧" },
+      { href: "/admin/inquiries",          label: "問合せ一覧",     icon: "📧" },
+      { href: "/admin/customers/follow-up",label: "フォローアップ", icon: "🤖" },
+      { href: "/admin/notifications",      label: "通知管理",       icon: "🔔" },
     ],
   },
   {
