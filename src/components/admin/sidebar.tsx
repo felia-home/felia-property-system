@@ -88,6 +88,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/admin/settings/company",         label: "会社情報",           icon: "🏢" },
       { href: "/admin/settings/branches",        label: "店舗管理",           icon: "🏪" },
       { href: "/admin/settings/email-templates", label: "メールテンプレート", icon: "✉" },
+      { href: "/admin/settings/store-routing",   label: "会員自動割り振り",   icon: "🔀" },
       { href: "/admin/staff",                    label: "スタッフ管理",       icon: "👤" },
       { href: "/admin/notifications",            label: "通知設定",           icon: "🔔" },
     ],

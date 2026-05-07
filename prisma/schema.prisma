@@ -826,7 +826,21 @@ model Store {
   updated_at  DateTime  @updatedAt
   staff       Staff[]
   properties  Property[]
+  routing_rules StoreRoutingRule[]
   @@map("stores")
+}
+
+model StoreRoutingRule {
+  id         String   @id @default(cuid())
+  store_id   String
+  rule_type  String   // 'AREA' | 'STATION_LINE' | 'PROPERTY_TYPE' | 'DEFAULT'
+  rule_value String
+  priority   Int      @default(10)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  store      Store    @relation(fields: [store_id], references: [id], onDelete: Cascade)
+
+  @@map("store_routing_rules")
 }
 
 model Staff {

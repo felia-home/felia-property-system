@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { resolveStoreForMember } from "@/lib/store-routing";
 
 // GET /api/members — 全会員一覧（管理画面用、is_active フィルタなし）
 export async function GET(request: NextRequest) {
@@ -99,6 +100,13 @@ export async function POST(req: NextRequest) {
         where: { email: member.email },
       });
 
+      // 担当店舗を希望条件から自動解決（簡易登録時は DEFAULT ルールに落ちる）
+      const storeId = await resolveStoreForMember({
+        desired_areas:         existingCustomer?.desired_areas ?? [],
+        desired_stations:      existingCustomer?.desired_stations ?? [],
+        desired_property_type: existingCustomer?.desired_property_type ?? [],
+      });
+
       if (existingCustomer) {
         await prisma.customer.update({
           where: { id: existingCustomer.id },
@@ -109,6 +117,7 @@ export async function POST(req: NextRequest) {
             member_registered_at: member.created_at,
             is_deleted:           false,
             deleted_at:           null,
+            ...(existingCustomer.store_id ? {} : { store_id: storeId }),
           },
         });
       } else {
@@ -122,6 +131,7 @@ export async function POST(req: NextRequest) {
             is_member:             true,
             member_registered_at:  member.created_at,
             member_id:             member.id,
+            store_id:              storeId,
             desired_property_type: [],
             desired_areas:         [],
             desired_stations:      [],
